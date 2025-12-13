@@ -9,8 +9,9 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
-  root: 'src',            // where your index.html actually lives
   build: {
-    outDir: '../dist',    // output relative to project root
-  },
+    rollupOptions: {
+      input: '/index.html'  // point to the actual root-level index.html
+    }
+  }
 })
