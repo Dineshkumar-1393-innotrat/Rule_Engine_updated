@@ -1,0 +1,85 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+.pnpm-store/
+yarn.lock
+package-lock.json
+
+
+# Build outputs
+dist
+dist-ssr
+build
+out
+coverage
+*.local
+.vite
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Testing
+test.js
+__tests__
+*.test.js
+*.spec.js
+
+# Temporary files
+*.tmp
+*.temp
+.cache
+.temp
+
+# Large files and releases
+Espressif/releases/*.zip
+Espressif/releases/*.tar.gz
+Espressif/releases/*.rar
+Espressif/releases/esp-idf*
+**/node_modules/.cache
+**/.cache
+**/dist
+**/*.gz
+**/*.zip
+**/*.rar
+
+# Completely exclude Espressif directory
+Espressif/
+releases/
+
+# Additional binary and large file patterns
+*.iso
+*.img
+*.tar
+*.tgz
+*.tar.xz
+*.7z
+*.vsix
+*.pkg
+*.deb
+*.rpm
+**/build/
+**/dist/
+**/release/
+**/releases/
+**/downloads/
