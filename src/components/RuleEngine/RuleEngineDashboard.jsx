@@ -31,17 +31,19 @@ import {
     NumberDecrementStepper,
     useColorModeValue,
 } from '@chakra-ui/react';
-import { RuleEngine, defaultRules, DeviceStates, ConfigurableParameters, DeviceVariables } from '../../utils/RuleEngine';
+import { RuleEngine, defaultRules, DeviceStates, ConfigurableParameters, DeviceVariables, JeepM6DefaultRules } from '../../utils/RuleEngine';
 import RuleBuilder from './RuleBuilder';
 import DataVisualizer from './DataVisualizer';
-import DriverProfileBuilder from './DriverProfileBuilder';
+import RuleTemplateLibrary from './RuleTemplateLibrary';
+import CreateRuleTemplate from './CreateRuleTemplate';
 import { useAutoPersist } from '../../hooks/useAutoPersist';
 
 // Default initial state for the Rule Engine screen
 const DEFAULT_RULE_ENGINE_STATE = {
     rules: defaultRules,
+
     savedRules: defaultRules,
-    savedProfiles: [],
+    savedTemplates: [], // New state for templates
     parameters: {
         MIN_TRIP_DISTANCE: ConfigurableParameters.find(p => p.name === 'MIN_TRIP_DISTANCE')?.defaultValue || 2,
         MIN_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MIN_IGN_OFF_TIME')?.defaultValue || 120,
@@ -54,6 +56,7 @@ const DEFAULT_RULE_ENGINE_STATE = {
 const RuleEngineDashboard = () => {
     const toast = useToast();
     const intervalRef = useRef(null);
+    const demoTimeoutsRef = useRef([]); // Track demo timeouts to clear them on stop
     const bgColor = useColorModeValue('white', 'gray.800');
     const borderColor = useColorModeValue('gray.200', 'gray.700');
 
@@ -64,9 +67,10 @@ const RuleEngineDashboard = () => {
     });
 
     // Extract persisted values with defaults
+    // Extract persisted values with defaults
     const rules = persistedState.rules || defaultRules;
     const savedRules = persistedState.savedRules || defaultRules;
-    const savedProfiles = persistedState.savedProfiles || [];
+    const items = persistedState.customRuleTemplates || []; // Renamed key to force fresh state
     const parameters = persistedState.parameters || DEFAULT_RULE_ENGINE_STATE.parameters;
     const simRoadCondition = persistedState.simRoadCondition || 'good';
     const persistedActiveDriverName = persistedState.activeDriverName;
@@ -74,7 +78,8 @@ const RuleEngineDashboard = () => {
     // Setters that auto-save
     const setRules = (newRules) => updatePersistedState({ rules: newRules });
     const setSavedRules = (newSavedRules) => updatePersistedState({ savedRules: newSavedRules });
-    const setSavedProfiles = (newProfiles) => updatePersistedState({ savedProfiles: newProfiles });
+
+    const setCustomRuleTemplates = (newTemplates) => updatePersistedState({ customRuleTemplates: newTemplates });
     const setParameters = (newParams) => {
         if (typeof newParams === 'function') {
             updatePersistedState({ parameters: newParams(parameters) });
@@ -109,20 +114,25 @@ const RuleEngineDashboard = () => {
     const [simSpeed, setSimSpeed] = useState(0);
     const [ignition, setIgnition] = useState(false);
 
-    // Active driver - restore from persisted name
-    const [activeDriver, setActiveDriver] = useState(() => {
-        if (persistedActiveDriverName && savedProfiles.length > 0) {
-            return savedProfiles.find(p => p.name === persistedActiveDriverName) || null;
-        }
-        return null;
-    });
+    // Jeep M6 Simulation State
+    const [batteryVoltage, setBatteryVoltage] = useState(12.6);
+    const [crashDetected, setCrashDetected] = useState(false);
+    const [fotaStatus, setFotaStatus] = useState('IDLE'); // IDLE, DOWNLOADING, INSTALLING, SUCCESS, FAILED
+    const [geoFenceStatus, setGeoFenceStatus] = useState('INSIDE'); // INSIDE, OUTSIDE
+    const [lastCommand, setLastCommand] = useState('NONE');
 
-    // Trip Stats
+    // View State for Rule Templates
+    const [templateView, setTemplateView] = useState('library'); // 'library' or 'create'
+
+    // Trip Stats (Required for simulation)
     const tripStats = useRef({
         runTime: 0,      // seconds
         distance: 0,     // km
         offTime: 0       // seconds
     });
+
+    const [activeTabIndex, setActiveTabIndex] = useState(0);
+    const [prefillRule, setPrefillRule] = useState(null);
 
     // Handlers
     const handleSaveToLibrary = (rule) => {
@@ -137,27 +147,20 @@ const RuleEngineDashboard = () => {
         }
         setSavedRules(newSavedRules);
         // Auto-persisted by useAutoPersist
+
     };
 
-    const handleSaveProfile = (profile) => {
-        const exists = savedProfiles.some(p => p.name === profile.name);
-        let newProfiles;
-        if (exists) {
-            newProfiles = savedProfiles.map(p => p.name === profile.name ? profile : p);
-            toast({ title: 'Profile Updated', status: 'success', duration: 2000 });
-        } else {
-            newProfiles = [...savedProfiles, profile];
-            toast({ title: 'Profile Saved', status: 'success', duration: 2000 });
-        }
-        setSavedProfiles(newProfiles);
-        // Auto-persisted by useAutoPersist
+    const handleSaveTemplate = (template) => {
+        const newTemplates = [...items, template];
+        setCustomRuleTemplates(newTemplates);
+        toast({ title: 'Template Created', status: 'success', duration: 2000 });
+        setTemplateView('library');
     };
 
-    const handleActivateProfile = (profile) => {
-        setActiveDriver(profile);
-        updatePersistedState({ activeDriverName: profile.name }); // Persist active driver
-        setSimSpeed(profile.baseSpeed);
-        toast({ title: `Driver Profile "${profile.name}" Activated`, status: 'info', duration: 2000 });
+    const handleUseTemplate = (template) => {
+        setPrefillRule(template);
+        setActiveTabIndex(1); // Switch to Rule Builder tab
+        toast({ title: 'Template Loaded', description: 'Rule Builder prefilled with template data.', status: 'info', duration: 2000 });
     };
 
     const handleAddRule = (newRule) => {
@@ -169,8 +172,37 @@ const RuleEngineDashboard = () => {
         setRules(rules.filter(r => r.id !== ruleId));
     };
 
-    const toggleSimulation = () => setIsRunning(!isRunning);
+    const toggleSimulation = () => {
+        const willRun = !isRunning;
+        setIsRunning(willRun);
+
+        if (willRun) {
+            // Auto-start for better UX
+            if (!ignition) {
+                toggleIgnition();
+            }
+            if (simSpeed === 0) {
+                setSimSpeed(40); // Default cruising speed
+            }
+            toast({ title: 'Simulation Started', description: 'Ignition ON, Speed 40 km/h', status: 'success', duration: 2000 });
+        } else {
+            toast({ title: 'Simulation Stopped', status: 'info', duration: 2000 });
+        }
+    };
     const toggleIgnition = () => {
+        // Lifecycle Check: Only allow ignition in Trip states (Customer Mode)
+        const isTripMode = [DeviceStates.TRIP_IDLE, DeviceStates.TRIP_PENDING, DeviceStates.TRIP_ACTIVE, DeviceStates.TRIP_PAUSED].includes(deviceState);
+
+        if (!ignition && !isTripMode) {
+            toast({
+                title: 'Ignition Blocked',
+                description: `Ignition is disabled in ${deviceState} state. Complete lifecycle handover first.`,
+                status: 'warning',
+                duration: 3000
+            });
+            return;
+        }
+
         const newIgnitionState = !ignition;
         setIgnition(newIgnitionState);
 
@@ -242,7 +274,14 @@ const RuleEngineDashboard = () => {
         // Reset simulation controls
         setIgnition(false);
         setSimSpeed(0);
-        setActiveDriver(null);
+        // Active driver logic removed
+
+        // Reset Jeep M6 Controls
+        setBatteryVoltage(12.6);
+        setCrashDetected(false);
+        setFotaStatus('IDLE');
+        setGeoFenceStatus('INSIDE');
+        setLastCommand('NONE');
 
         // Reset trip stats
         tripStats.current = { runTime: 0, distance: 0, offTime: 0 };
@@ -259,6 +298,141 @@ const RuleEngineDashboard = () => {
         // Reset device state to IDLE
         setDeviceState(DeviceStates.TRIP_IDLE);
         prevIgnitionRef.current = false;
+
+        // Clear any running demo timeouts
+        demoTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
+        demoTimeoutsRef.current = [];
+    };
+
+    const handleLifecycleCommand = (command) => {
+        setLastCommand(command);
+        let validTransition = false;
+
+        if (deviceState === DeviceStates.FACTORY && command === 'PROVISION') {
+            setDeviceState(DeviceStates.PROVISIONED);
+            validTransition = true;
+        } else if (deviceState === DeviceStates.PROVISIONED && command === 'AUTHORIZE') {
+            setDeviceState(DeviceStates.AUTHORIZED);
+            validTransition = true;
+        } else if (deviceState === DeviceStates.AUTHORIZED && command === 'HANDOVER') {
+            setDeviceState(DeviceStates.TRIP_IDLE); // Equivalent to CUSTOMER ready state
+            validTransition = true;
+        }
+
+        const message = validTransition
+            ? `Command ${command} accepted. State changed to ${validTransition ? (command === 'HANDOVER' ? DeviceStates.TRIP_IDLE : (command === 'PROVISION' ? DeviceStates.PROVISIONED : DeviceStates.AUTHORIZED)) : ''}`
+            : `Command ${command} rejected in state ${deviceState}`;
+
+        toast({
+            title: validTransition ? 'Lifecycle Update' : 'Command Rejected',
+            description: message,
+            status: validTransition ? 'success' : 'warning',
+            duration: 2000
+        });
+
+        // Log Event
+        setEvents(prev => [...prev, {
+            ruleId: 'lifecycle-command', ruleName: 'Remote Command', type: 'command',
+            message: message, severity: validTransition ? 'info' : 'warning',
+            timestamp: new Date().toISOString(), dataSnapshot: { ...deviceVariables.current, deviceState, lastCommand: command }
+        }].slice(-100));
+    };
+
+    const handleLoadM6Rules = () => {
+        setRules([...rules, ...JeepM6DefaultRules]);
+        toast({ title: 'Jeep M6 Rules Loaded', status: 'success', duration: 2000 });
+    };
+
+    const runLifecycleDemo = () => {
+        // Clear any existing demo
+        demoTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
+        demoTimeoutsRef.current = [];
+
+        // Reset to Factory
+        setDeviceState(DeviceStates.FACTORY);
+        toast({
+            title: 'Lifecycle Demo Started',
+            description: 'Starting from FACTORY state...',
+            status: 'info',
+            duration: 2000
+        });
+
+        // Step 1: PROVISION (after 2s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            handleLifecycleCommand('PROVISION');
+        }, 2000));
+
+        // Step 2: AUTHORIZE (after 4s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            handleLifecycleCommand('AUTHORIZE');
+        }, 4000));
+
+        // Step 3: HANDOVER (after 6s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            handleLifecycleCommand('HANDOVER');
+        }, 6000));
+
+        // Step 4: Complete (after 8s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({
+                title: 'Lifecycle Demo Complete',
+                description: 'Device is now in CUSTOMER mode (TRIP_IDLE). Ready for trips!',
+                status: 'success',
+                duration: 4000,
+                position: 'top'
+            });
+        }, 8000));
+    };
+
+    const runDemoScenario = () => {
+        // 1. Reset
+        clearData();
+        setDeviceState(DeviceStates.CUSTOMER); // Ensure we are in customer mode for demo (or TRIP_IDLE)
+        // ... (rest of demo logic needs to ensure it works, assume TRIP_IDLE is fine)
+
+
+        // 2. Load Rules
+        setRules([...rules, ...JeepM6DefaultRules]);
+        toast({ title: 'Demo Started: Rules Loaded', status: 'info', duration: 2000 });
+
+        // 3. Start Simulation
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setIsRunning(true);
+            toggleIgnition();
+            toast({ title: 'Ignition ON', status: 'success', duration: 2000 });
+        }, 1000));
+
+        // 4. Normal Drive
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(60);
+            toast({ title: 'Cruising at 60 km/h', status: 'info' });
+        }, 3000));
+
+        // 5. Overspeed
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(110); // Trigger Overspeed Rule
+            toast({ title: 'Simulating Overspeed...', status: 'warning' });
+        }, 6000));
+
+        // 6. Slow Down & Low Battery
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(40);
+            setBatteryVoltage(10.5); // Trigger Low Battery Rule
+            toast({ title: 'Simulating Low Battery...', status: 'warning' });
+        }, 12000));
+
+        // 7. Crash
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setCrashDetected(true); // Trigger Crash Rule
+            toast({ title: 'Simulating CRASH!', status: 'error' });
+        }, 16000));
+
+        // 8. End
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setIsRunning(false);
+            toggleIgnition();
+            toast({ title: 'Demo Completed', position: 'top', duration: 5000 });
+        }, 20000));
     };
 
     // Simulation Loop
@@ -274,21 +448,22 @@ const RuleEngineDashboard = () => {
                     tripStats.current.offTime = 0;
                     deviceVariables.current.elapsedIgnitionOffTime = 0;
 
-                    if (activeDriver) {
-                        // Aggressiveness affects speed fluctuation and RPM
-                        const fluctuation = (Math.random() - 0.5) * (activeDriver.aggressiveness / 5);
-                        currentSpeed = Math.max(0, Math.min(200, activeDriver.baseSpeed + fluctuation));
+                    // Default behavior
+                    const fluctuation = Math.floor(Math.random() * 5) - 2;
+                    currentSpeed = Math.max(0, Math.min(200, simSpeed + fluctuation));
+                    currentRpm = Math.floor(1000 + Math.random() * 7000);
 
-                        // RPM calculation based on speed and aggressiveness
-                        const baseRpm = (currentSpeed / 200) * 6000;
-                        const aggressionRpm = (activeDriver.aggressiveness / 100) * 2000 * Math.random();
-                        currentRpm = Math.floor(1000 + baseRpm + aggressionRpm);
-                    } else {
-                        // Default behavior
-                        const fluctuation = Math.floor(Math.random() * 5) - 2;
-                        currentSpeed = Math.max(0, Math.min(200, simSpeed + fluctuation));
-                        currentRpm = Math.floor(1000 + Math.random() * 7000);
-                    }
+                    // Unified Simulation: Add noise to battery voltage if engine is ON
+                    // Simulate alternator fluctuating between 13.5V and 14.5V
+                    setBatteryVoltage(prev => {
+                        // If it was forced low (e.g. 10.5) during demo, let's slowly recover it or fluctuate it?
+                        // If it's very low, maybe don't auto-recover instantly to keep the 'problem' visible.
+                        // But for normal simulation, we want 13.5-14.5.
+                        if (prev > 12) {
+                            return parseFloat((13.5 + Math.random()).toFixed(1));
+                        }
+                        return prev; // Keep it low if it was set low, until manual reset
+                    });
 
                     // Update distance (speed is km/h, time is 1s)
                     // Distance in km = speed * (1/3600)
@@ -322,31 +497,43 @@ const RuleEngineDashboard = () => {
 
                     // State Machine: TRIP_PENDING or TRIP_ACTIVE → TRIP_IDLE transition
                     // State Machine: TRIP_PENDING/ACTIVE → TRIP_PAUSED
+                    // Ensure parameters are numbers
+                    const minIgnOff = Number(parameters.MIN_IGN_OFF_TIME) || 120;
+                    const maxIgnOff = Number(parameters.MAX_IGN_OFF_TIME) || 120;
+
                     if ((deviceState === DeviceStates.TRIP_PENDING || deviceState === DeviceStates.TRIP_ACTIVE) &&
-                        deviceVariables.current.elapsedIgnitionOffTime >= parameters.MIN_IGN_OFF_TIME &&
-                        deviceVariables.current.elapsedIgnitionOffTime < parameters.MAX_IGN_OFF_TIME) {
-                        setDeviceState(DeviceStates.TRIP_PAUSED);
-                        toast({
-                            title: 'State: TRIP_PAUSED',
-                            description: `Trip Paused (Ign Off > ${parameters.MIN_IGN_OFF_TIME}s)`,
-                            status: 'warning',
-                            duration: 2000
-                        });
+                        deviceVariables.current.elapsedIgnitionOffTime >= minIgnOff &&
+                        deviceVariables.current.elapsedIgnitionOffTime < maxIgnOff) {
+
+                        // If we are PENDING and hit minIgnOff, it's a False Trip -> Go straight to IDLE and STOP
+                        if (deviceState === DeviceStates.TRIP_PENDING) {
+                            setDeviceState(DeviceStates.TRIP_IDLE);
+                            setIsRunning(false); // STOP SIMULATION
+                            toast({ title: 'False Trip Ended', description: 'Distance too short. Simulation Stopped.', status: 'info', duration: 2000 });
+                        } else {
+                            // Normal Pause
+                            setDeviceState(DeviceStates.TRIP_PAUSED);
+                            toast({ title: 'State: TRIP_PAUSED', description: `Trip Paused (Ign Off > ${minIgnOff}s)`, status: 'warning', duration: 2000 });
+                        }
+
                         // Log State Change
                         setEvents(prev => [...prev, {
                             ruleId: 'state-change', ruleName: 'State Change', type: 'state',
-                            message: 'State changed to TRIP_PAUSED (Ignition Off)', severity: 'warning',
-                            timestamp: new Date().toISOString(), dataSnapshot: { ...deviceVariables.current, deviceState: DeviceStates.TRIP_PAUSED }
+                            message: deviceState === DeviceStates.TRIP_PENDING ? 'State changed to TRIP_IDLE (False Trip)' : 'State changed to TRIP_PAUSED',
+                            severity: 'warning',
+                            timestamp: new Date().toISOString(),
+                            dataSnapshot: { ...deviceVariables.current, deviceState: deviceState === DeviceStates.TRIP_PENDING ? DeviceStates.TRIP_IDLE : DeviceStates.TRIP_PAUSED }
                         }].slice(-100));
                     }
 
                     // State Machine: TRIP_PAUSED → TRIP_IDLE
                     if ((deviceState === DeviceStates.TRIP_PAUSED || deviceState === DeviceStates.TRIP_ACTIVE || deviceState === DeviceStates.TRIP_PENDING) &&
-                        deviceVariables.current.elapsedIgnitionOffTime >= parameters.MAX_IGN_OFF_TIME) {
+                        deviceVariables.current.elapsedIgnitionOffTime >= maxIgnOff) {
                         setDeviceState(DeviceStates.TRIP_IDLE);
+                        setIsRunning(false); // STOP SIMULATION
                         toast({
                             title: 'State: TRIP_IDLE',
-                            description: `Trip ended. Ignition off for ${parameters.MAX_IGN_OFF_TIME}s`,
+                            description: `Trip ended. Ignition off for ${maxIgnOff}s. Simulation Stopped.`,
                             status: 'info',
                             duration: 2000
                         });
@@ -385,9 +572,17 @@ const RuleEngineDashboard = () => {
                     offTime: tripStats.current.offTime,
 
                     // Parameters (for rule evaluation)
+                    // Parameters (for rule evaluation)
                     MIN_TRIP_DISTANCE: parameters.MIN_TRIP_DISTANCE,
                     MIN_IGN_OFF_TIME: parameters.MIN_IGN_OFF_TIME,
-                    MAX_IGN_OFF_TIME: parameters.MAX_IGN_OFF_TIME
+                    MAX_IGN_OFF_TIME: parameters.MAX_IGN_OFF_TIME,
+
+                    // Jeep M6 Data
+                    batteryVoltage: batteryVoltage,
+                    crashDetected: crashDetected,
+                    fotaStatus: fotaStatus,
+                    geoFenceStatus: geoFenceStatus,
+                    lastCommand: lastCommand
                 };
 
                 // Evaluate Rules
@@ -429,7 +624,20 @@ const RuleEngineDashboard = () => {
         }
 
         return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-    }, [isRunning, engine, simSpeed, simRoadCondition, toast, activeDriver, ignition, deviceState, parameters]);
+    }, [isRunning, engine, simSpeed, simRoadCondition, toast, ignition, deviceState, parameters]);
+
+    // Map savedRules to template format to show in library
+    const standardTemplates = useMemo(() => {
+        return savedRules.map(rule => ({
+            title: rule.name,
+            description: rule.event.message,
+            tags: ['Saved Rule', rule.event.severity],
+            message: rule.event.message,
+            severity: rule.event.severity,
+        }));
+    }, [savedRules]);
+
+    const allTemplates = [...standardTemplates, ...items];
 
     return (
         <Container maxW="container.xl" py={5}>
@@ -445,6 +653,15 @@ const RuleEngineDashboard = () => {
                         </Button>
                         <Button variant="outline" onClick={clearData}>
                             Clear Data
+                        </Button>
+                        {/* <Button colorScheme="purple" variant="outline" onClick={handleLoadM6Rules}>
+                            Load Jeep M6 Rules
+                        </Button> */}
+                        <Button colorScheme="teal" onClick={runLifecycleDemo}>
+                            ▶ Lifecycle Demo
+                        </Button>
+                        <Button colorScheme="pink" onClick={runDemoScenario}>
+                            ▶ Run M6 Demo
                         </Button>
                     </HStack>
                 </Box>
@@ -483,6 +700,34 @@ const RuleEngineDashboard = () => {
                             {deviceState}
                         </Badge>
                     </HStack>
+
+                    {/* Device Lifecycle Control */}
+                    <Box mt={2} mb={4}>
+                        <FormControl display="flex" alignItems="center">
+                            <FormLabel fontSize="sm" mb={0} mr={2}>Override Device State:</FormLabel>
+                            <Select
+                                size="sm"
+                                width="auto"
+                                value={deviceState}
+                                onChange={(e) => setDeviceState(e.target.value)}
+                                bg={Object.values(DeviceStates).filter(s => !s.startsWith('TRIP')).includes(deviceState) ? "yellow.100" : "white"}
+                            >
+                                <optgroup label="Trip States">
+                                    <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
+                                    <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
+                                    <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
+                                    <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
+                                </optgroup>
+                                <optgroup label="Lifecycle States">
+                                    <option value={DeviceStates.FACTORY}>FACTORY</option>
+                                    <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
+                                    <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
+                                    <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
+                                </optgroup>
+                            </Select>
+                        </FormControl>
+                    </Box>
+
                     <Grid templateColumns="repeat(3, 1fr)" gap={4}>
                         <GridItem>
                             <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
@@ -541,8 +786,8 @@ const RuleEngineDashboard = () => {
                                 <FormLabel fontSize="sm">MIN_IGN_OFF_TIME (seconds)</FormLabel>
                                 <NumberInput
                                     value={parameters.MIN_IGN_OFF_TIME}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MIN_IGN_OFF_TIME: val }))}
-                                    min={10}
+                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MIN_IGN_OFF_TIME: isNaN(val) ? 0 : val }))}
+                                    min={5}
                                     max={3600}
                                     step={10}
                                     size="sm"
@@ -553,7 +798,7 @@ const RuleEngineDashboard = () => {
                                         <NumberDecrementStepper />
                                     </NumberInputStepper>
                                 </NumberInput>
-                                <Text fontSize="xs" color="gray.500">Time to end trip</Text>
+                                <Text fontSize="xs" color="gray.500">Time to pause trip</Text>
                             </FormControl>
                         </GridItem>
                         <GridItem>
@@ -561,7 +806,7 @@ const RuleEngineDashboard = () => {
                                 <FormLabel fontSize="sm">MAX_IGN_OFF_TIME (seconds)</FormLabel>
                                 <NumberInput
                                     value={parameters.MAX_IGN_OFF_TIME}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: val }))}
+                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: isNaN(val) ? 0 : val }))}
                                     min={10}
                                     max={3600}
                                     step={10}
@@ -601,14 +846,13 @@ const RuleEngineDashboard = () => {
                                     onChange={setSimSpeed}
                                     min={0}
                                     max={200}
-                                    isDisabled={!!activeDriver || !ignition}
+                                    isDisabled={!ignition}
                                 >
                                     <SliderTrack>
                                         <SliderFilledTrack />
                                     </SliderTrack>
                                     <SliderThumb />
                                 </Slider>
-                                {activeDriver && <Text fontSize="xs" color="blue.500">Controlled by Driver Profile: {activeDriver.name}</Text>}
                                 {!ignition && <Text fontSize="xs" color="red.500">Ignition is OFF</Text>}
                             </FormControl>
                         </GridItem>
@@ -628,6 +872,77 @@ const RuleEngineDashboard = () => {
                             </FormControl>
                         </GridItem>
                     </Grid>
+
+                    {/* Jeep M6 Specific Controls */}
+                    <Box mt={4} pt={4} borderTopWidth="1px" borderColor={borderColor}>
+                        <Text fontWeight="bold" fontSize="sm" mb={3} color="purple.600">Jeep M6 Cloud Simulation</Text>
+                        <Grid templateColumns="repeat(3, 1fr)" gap={4}>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">Battery Voltage: {batteryVoltage}V</FormLabel>
+                                    <Slider
+                                        value={batteryVoltage}
+                                        onChange={setBatteryVoltage}
+                                        min={9}
+                                        max={15}
+                                        step={0.1}
+                                        size="sm"
+                                    >
+                                        <SliderTrack>
+                                            <SliderFilledTrack bg={batteryVoltage < 11 ? 'red.500' : 'green.500'} />
+                                        </SliderTrack>
+                                        <SliderThumb boxSize={3} />
+                                    </Slider>
+                                </FormControl>
+                            </GridItem>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">Crash Detection</FormLabel>
+                                    <Button
+                                        size="sm"
+                                        width="full"
+                                        colorScheme={crashDetected ? "red" : "gray"}
+                                        onClick={() => setCrashDetected(!crashDetected)}
+                                    >
+                                        {crashDetected ? "CRASH DETECTED!" : "No Crash"}
+                                    </Button>
+                                </FormControl>
+                            </GridItem>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">FOTA Status</FormLabel>
+                                    <Select
+                                        size="sm"
+                                        value={fotaStatus}
+                                        onChange={(e) => setFotaStatus(e.target.value)}
+                                        bg={bgColor}
+                                    >
+                                        <option value="IDLE">IDLE</option>
+                                        <option value="DOWNLOADING">DOWNLOADING</option>
+                                        <option value="INSTALLING">INSTALLING</option>
+                                        <option value="SUCCESS">SUCCESS</option>
+                                        <option value="FAILED">FAILED</option>
+                                    </Select>
+                                </FormControl>
+                            </GridItem>
+                        </Grid>
+
+                        <Text fontWeight="bold" fontSize="xs" mt={3} mb={2}>Lifecycle Commands</Text>
+                        <HStack spacing={2}>
+                            <Button size="xs" colorScheme="orange" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={deviceState !== DeviceStates.FACTORY}>
+                                Provision
+                            </Button>
+                            <Button size="xs" colorScheme="cyan" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={deviceState !== DeviceStates.PROVISIONED}>
+                                Authorize
+                            </Button>
+                            <Button size="xs" colorScheme="purple" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={deviceState !== DeviceStates.AUTHORIZED}>
+                                Handover
+                            </Button>
+                            <Button size="xs" variant="outline" onClick={() => setDeviceState(DeviceStates.FACTORY)}>
+                                Reset to Factory
+                            </Button>
+                        </HStack>
+                    </Box>
                     <HStack mt={4} spacing={4} fontSize="sm" color="gray.600">
                         <Text>Trip Time: {Math.floor(tripStats.current.runTime / 60)}m {tripStats.current.runTime % 60}s</Text>
                         <Text>Distance: {tripStats.current.distance.toFixed(2)} km</Text>
@@ -635,11 +950,11 @@ const RuleEngineDashboard = () => {
                     </HStack>
                 </Box>
 
-                <Tabs variant="enclosed" colorScheme="blue">
+                <Tabs variant="enclosed" colorScheme="blue" index={activeTabIndex} onChange={setActiveTabIndex}>
                     <TabList mb="1em">
                         <Tab>Dashboard</Tab>
                         <Tab>Rule Builder</Tab>
-                        <Tab>Driver Profiles</Tab>
+                        <Tab fontSize="sm">Rule Template</Tab>
                     </TabList>
 
                     <TabPanels>
@@ -667,14 +982,22 @@ const RuleEngineDashboard = () => {
                                 onAddRule={handleAddRule}
                                 onDeleteRule={handleDeleteRule}
                                 onSaveToLibrary={handleSaveToLibrary}
+                                prefillRule={prefillRule}
                             />
                         </TabPanel>
-                        <TabPanel>
-                            <DriverProfileBuilder
-                                savedProfiles={savedProfiles}
-                                onSaveProfile={handleSaveProfile}
-                                onActivateProfile={handleActivateProfile}
-                            />
+                        <TabPanel p={0} h="100%">
+                            {templateView === 'library' ? (
+                                <RuleTemplateLibrary
+                                    onCreateNew={() => setTemplateView('create')}
+                                    templates={allTemplates}
+                                    onUseTemplate={handleUseTemplate}
+                                />
+                            ) : (
+                                <CreateRuleTemplate
+                                    onCancel={() => setTemplateView('library')}
+                                    onSave={handleSaveTemplate}
+                                />
+                            )}
                         </TabPanel>
                     </TabPanels>
                 </Tabs>
@@ -723,7 +1046,7 @@ const RuleEngineDashboard = () => {
                     </Box>
                 </Box>
             </VStack>
-        </Container>
+        </Container >
     );
 };
 

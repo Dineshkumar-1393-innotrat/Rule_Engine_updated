@@ -24,7 +24,7 @@ import {
 import { FaTrash, FaPlus, FaChevronDown, FaChevronRight, FaInfoCircle } from 'react-icons/fa';
 import { AvailableFacts, DeviceStates, DeviceVariables, ConfigurableParameters } from '../../utils/RuleEngine';
 
-const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveToLibrary }) => {
+const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveToLibrary, prefillRule }) => {
     const bgColor = useColorModeValue('white', 'gray.800');
     const borderColor = useColorModeValue('gray.200', 'gray.700');
     const sectionBg = useColorModeValue('gray.50', 'gray.700');
@@ -72,6 +72,28 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
             setSeverity(ruleToLoad.event.severity);
         }
     };
+
+    // Effect to handle prefilled rule from Template Library
+    React.useEffect(() => {
+        if (prefillRule) {
+            setNewRuleName(prefillRule.title || '');
+            setMessage(prefillRule.message || '');
+            setSeverity(prefillRule.severity || 'info');
+
+            // Attempt to map template constraints to conditions if possible
+            // This is a basic mapping; templates might need more structured data for complex conditions
+            if (prefillRule.minValue || prefillRule.maxValue) {
+                const newConds = [];
+                if (prefillRule.minValue) {
+                    newConds.push({ fact: 'speed', operator: '>', value: prefillRule.minValue });
+                }
+                if (prefillRule.maxValue) {
+                    newConds.push({ fact: 'speed', operator: '<', value: prefillRule.maxValue });
+                }
+                if (newConds.length > 0) setConditions(newConds);
+            }
+        }
+    }, [prefillRule]);
 
     const createRuleObject = () => {
         if (!newRuleName || !message) return null;

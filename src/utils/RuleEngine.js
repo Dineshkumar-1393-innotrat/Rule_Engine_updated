@@ -30,7 +30,12 @@ export const DeviceStates = {
     TRIP_IDLE: 'TRIP_IDLE',
     TRIP_PENDING: 'TRIP_PENDING',
     TRIP_ACTIVE: 'TRIP_ACTIVE',
-    TRIP_PAUSED: 'TRIP_PAUSED'
+    TRIP_PAUSED: 'TRIP_PAUSED',
+    // Jeep M6 States
+    FACTORY: 'FACTORY',
+    PROVISIONED: 'PROVISIONED',
+    AUTHORIZED: 'AUTHORIZED',
+    CUSTOMER: 'CUSTOMER'
 };
 
 // ============================================
@@ -158,10 +163,17 @@ export const AvailableFacts = [
     { name: 'engineTemp', label: 'Engine Temp (°C)', type: 'number', category: 'sensor' },
     { name: 'fuelLevel', label: 'Fuel Level (%)', type: 'number', category: 'sensor' },
     { name: 'roadCondition', label: 'Road Condition', type: 'string', category: 'sensor' },
+    // Jeep M6 Sensors
+    { name: 'batteryVoltage', label: 'Battery Voltage (V)', type: 'number', category: 'sensor' },
+    { name: 'geoFenceStatus', label: 'Geo Fence (INSIDE/OUTSIDE)', type: 'string', category: 'sensor' },
 
     // Device State
     { name: 'deviceState', label: 'Device State', type: 'state', category: 'state' },
     { name: 'ignition', label: 'Ignition (ON/OFF)', type: 'boolean', category: 'state' },
+    // Jeep M6 States
+    { name: 'crashDetected', label: 'Crash Detected', type: 'boolean', category: 'state' },
+    { name: 'fotaStatus', label: 'FOTA Status', type: 'string', category: 'state' },
+    { name: 'lastCommand', label: 'Last Command', type: 'string', category: 'state' },
 
     // Internal Variables
     { name: 'tripStartTime', label: 'Trip Start Time', type: 'timestamp', category: 'variable' },
@@ -396,6 +408,66 @@ export const defaultRules = [
             type: 'trip_status',
             message: 'Trip Stopped (Engine off > 2 mins)',
             severity: 'info'
+        }
+    }
+];
+
+export const JeepM6DefaultRules = [
+    {
+        id: 'm6-overspeed',
+        name: 'M6 Overspeed Alert',
+        conditions: {
+            all: [
+                { fact: 'speed', operator: '>', value: 100 }
+            ]
+        },
+        event: {
+            type: 'alert',
+            message: 'Overspeed detected (> 100 km/h)',
+            severity: 'critical'
+        }
+    },
+    {
+        id: 'm6-crash',
+        name: 'M6 Crash Detection',
+        conditions: {
+            all: [
+                { fact: 'crashDetected', operator: '==', value: true }
+            ]
+        },
+        event: {
+            type: 'emergency_alert',
+            message: 'CRASH DETECTED! Sending Emergency Alert.',
+            severity: 'critical'
+        }
+    },
+    {
+        id: 'm6-low-battery',
+        name: 'M6 Low Battery Protect',
+        conditions: {
+            all: [
+                { fact: 'batteryVoltage', operator: '<', value: 11.0 }
+            ]
+        },
+        event: {
+            type: 'command_rejection',
+            message: 'Low Battery (< 11V). Remote commands disabled.',
+            severity: 'warning'
+        }
+    },
+    {
+        id: 'm6-fota-safety',
+        name: 'M6 FOTA Safety Check',
+        conditions: {
+            all: [
+                { fact: 'ignition', operator: '==', value: true },
+                { fact: 'fotaStatus', operator: '==', value: 'DOWNLOADING' }
+            ]
+        },
+        event: {
+            type: 'fota_error',
+            message: 'FOTA Rejected: Ignition is ON.',
+            severity: 'critical'
         }
     }
 ];
