@@ -17,7 +17,6 @@ export class CanvasIntegration {
     this.canvasHandlers.set(diagramType, handler);
     console.log(`Registered canvas handler for ${diagramType}`);
   }
-
   /**
    * Load file content into appropriate canvas
    */
