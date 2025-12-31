@@ -67,9 +67,9 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
         const ruleToLoad = savedRules.find(r => r.id === ruleId);
         if (ruleToLoad) {
             setNewRuleName(ruleToLoad.name);
-            setConditions(ruleToLoad.conditions.all);
-            setMessage(ruleToLoad.event.message);
-            setSeverity(ruleToLoad.event.severity);
+            setConditions(ruleToLoad.conditions?.all || []);
+            setMessage(ruleToLoad.event?.message || '');
+            setSeverity(ruleToLoad.event?.severity || 'info');
         }
     };
 
@@ -393,7 +393,9 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                                     </Badge>
                                 </HStack>
                                 <Text fontSize="sm" color="gray.500">
-                                    {rule.conditions.all.map(c => `${c.fact} ${c.operator} ${c.value}`).join(' AND ')}
+                                    {rule.conditions?.all
+                                        ? rule.conditions.all.map(c => `${c.fact} ${c.operator} ${c.value}`).join(' AND ')
+                                        : rule.condition || 'No conditions defined'}
                                 </Text>
                             </Box>
                             <IconButton

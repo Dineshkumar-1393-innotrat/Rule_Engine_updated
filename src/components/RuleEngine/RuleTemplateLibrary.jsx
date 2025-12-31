@@ -44,7 +44,13 @@ const TemplateCard = ({ title, description, tags, onUse }) => {
                 <Heading size="md" fontWeight="bold">{title}</Heading>
                 <HStack fontSize="xs" color="gray.500">
                     <Icon as={FaTags} />
-                    <Text>Quick Tags</Text>
+                    <HStack spacing={1}>
+                        {tags && tags.map((tag, i) => (
+                            <Tag key={i} size="sm" variant="subtle" colorScheme="blue">
+                                {tag}
+                            </Tag>
+                        ))}
+                    </HStack>
                 </HStack>
             </Flex>
             <Text fontSize="sm" color="gray.600" mb={6} flex="1">

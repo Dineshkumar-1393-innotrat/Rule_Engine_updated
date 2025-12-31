@@ -31,7 +31,8 @@ export const DeviceStates = {
     TRIP_PENDING: 'TRIP_PENDING',
     TRIP_ACTIVE: 'TRIP_ACTIVE',
     TRIP_PAUSED: 'TRIP_PAUSED',
-    // Jeep M6 States
+    // Jeep M6 States (Section 3.2)
+    PRE_SALES: 'PRE-SALES',
     FACTORY: 'FACTORY',
     PROVISIONED: 'PROVISIONED',
     AUTHORIZED: 'AUTHORIZED',
@@ -48,6 +49,97 @@ export const DeviceVariables = [
         type: 'timestamp',
         defaultValue: null,
         category: 'trip'
+    },
+    {
+        name: 'journeyId',
+        description: 'Unique Trip ID (UUID)',
+        type: 'string',
+        defaultValue: null,
+        category: 'trip'
+    },
+    {
+        name: 'vehicleId',
+        description: 'Vehicle Identification Number (VIN)',
+        type: 'string',
+        defaultValue: 'WAUD2AFD7DN006931',
+        category: 'device'
+    },
+    {
+        name: 'harshAccCnt',
+        description: 'Number of harsh acceleration events',
+        type: 'number',
+        defaultValue: 0,
+        category: 'trip'
+    },
+    {
+        name: 'hardBrakeCnt',
+        description: 'Number of hard braking events',
+        type: 'number',
+        defaultValue: 0,
+        category: 'trip'
+    },
+    {
+        name: 'harshTurnCnt',
+        description: 'Number of harsh turn events',
+        type: 'number',
+        defaultValue: 0,
+        category: 'trip'
+    },
+    {
+        name: 'idlingCnt',
+        description: 'Number of idling instances',
+        type: 'number',
+        defaultValue: 0,
+        category: 'trip'
+    },
+    {
+        name: 'idleDuration',
+        description: 'Total idle time in minutes',
+        type: 'number',
+        defaultValue: 0,
+        category: 'trip'
+    },
+    {
+        name: 'tripType',
+        description: 'Active or Idle',
+        type: 'string',
+        defaultValue: 'Idle',
+        category: 'trip'
+    },
+    {
+        name: 'imeiNo',
+        description: 'IMEI Number',
+        type: 'string',
+        defaultValue: '356741000000021',
+        category: 'device'
+    },
+    {
+        name: 'tboxSerialNum',
+        description: 'Dongle Serial Number',
+        type: 'string',
+        defaultValue: 'SN29482029',
+        category: 'device'
+    },
+    {
+        name: 'protocolVersion',
+        description: 'Protocol Version',
+        type: 'string',
+        defaultValue: '2.0.0',
+        category: 'device'
+    },
+    {
+        name: 'ccpuVersion',
+        description: 'CCPU SW Version',
+        type: 'string',
+        defaultValue: 'CD.02.03',
+        category: 'device'
+    },
+    {
+        name: 'vmcuVersion',
+        description: 'VMCU SW Version',
+        type: 'string',
+        defaultValue: 'VD0.02.03',
+        category: 'device'
     },
     {
         name: 'tripStartOdo',
@@ -94,10 +186,10 @@ export const ConfigurableParameters = [
     },
     {
         name: 'MIN_IGN_OFF_TIME',
-        description: 'Minimum ignition off time to end a trip (seconds)',
+        description: 'Minimum ignition off time to pause trip (seconds)',
         type: 'number',
-        defaultValue: 120,
-        min: 10,
+        defaultValue: 180,
+        min: 1,
         max: 3600,
         unit: 'seconds'
     },
@@ -105,9 +197,9 @@ export const ConfigurableParameters = [
         name: 'MAX_IGN_OFF_TIME',
         description: 'Maximum ignition off time before trip ends (seconds)',
         type: 'number',
-        defaultValue: 120,
-        min: 10,
-        max: 3600,
+        defaultValue: 7200,
+        min: 2,
+        max: 14400,
         unit: 'seconds'
     }
 ];
@@ -159,13 +251,29 @@ export const StateTransitions = {
 export const AvailableFacts = [
     // Sensor Data
     { name: 'speed', label: 'Speed (km/h)', type: 'number', category: 'sensor' },
-    { name: 'rpm', label: 'RPM', type: 'number', category: 'sensor' },
+    { name: 'ignition', label: 'Ignition (ON/OFF)', type: 'boolean', category: 'state' },
     { name: 'engineTemp', label: 'Engine Temp (°C)', type: 'number', category: 'sensor' },
-    { name: 'fuelLevel', label: 'Fuel Level (%)', type: 'number', category: 'sensor' },
-    { name: 'roadCondition', label: 'Road Condition', type: 'string', category: 'sensor' },
-    // Jeep M6 Sensors
+    { name: 'fuelLevel', label: '% Fuel Level', type: 'number', category: 'sensor' },
+    { name: 'rpm', label: 'RPM', type: 'number', category: 'sensor' },
+    { name: 'isLive', label: 'Is Alert Live', type: 'boolean', category: 'event' },
     { name: 'batteryVoltage', label: 'Battery Voltage (V)', type: 'number', category: 'sensor' },
     { name: 'geoFenceStatus', label: 'Geo Fence (INSIDE/OUTSIDE)', type: 'string', category: 'sensor' },
+
+    // SouthBound Interface Variables
+    { name: 'vehicleId', label: 'VIN', type: 'string', category: 'device' },
+    { name: 'imeiNo', label: 'IMEI', type: 'string', category: 'device' },
+    { name: 'tboxOperatingState', label: 'Operating State (NORMAL/SLEEP)', type: 'string', category: 'state' },
+    { name: 'tboxApplicationState', label: 'App State (FACTORY/PROVISIONED...)', type: 'string', category: 'state' },
+    { name: 'tboxeSimState', label: 'eSIM State', type: 'string', category: 'state' },
+    { name: 'journeyId', label: 'Trip ID', type: 'string', category: 'variable' },
+    { name: 'alertType', label: 'Alert Type', type: 'string', category: 'event' },
+    { name: 'commandType', label: 'Command Type', type: 'string', category: 'event' },
+    { name: 'harshAccCnt', label: 'Harsh Accel Count', type: 'number', category: 'trip' },
+    { name: 'hardBrakeCnt', label: 'Hard Brake Count', type: 'number', category: 'trip' },
+    { name: 'idlingCnt', label: 'Idling Count', type: 'number', category: 'trip' },
+    { name: 'idleDuration', label: 'Idle Duration (min)', type: 'number', category: 'trip' },
+    { name: 'tripType', label: 'Trip Type (Active/Idle)', type: 'string', category: 'trip' },
+
 
     // Device State
     { name: 'deviceState', label: 'Device State', type: 'state', category: 'state' },
@@ -186,6 +294,19 @@ export const AvailableFacts = [
     { name: 'runTime', label: 'Run Time (s)', type: 'number', category: 'trip' },
     { name: 'distance', label: 'Distance (km)', type: 'number', category: 'trip' },
     { name: 'offTime', label: 'Off Time (s)', type: 'number', category: 'trip' },
+    // Hardware/Firmware Specific
+    { name: 'gasPedal', label: 'Gas Pedal (%)', type: 'number', category: 'sensor' },
+    { name: 'brakeActive', label: 'Brake Active', type: 'boolean', category: 'sensor' },
+    { name: 'engineMilStat', label: 'MIL Status', type: 'number', category: 'sensor' },
+
+    // TE-01 Specific CAN Aliases (for spec compliance)
+    { name: 'DRV_CLUSTER_DSPEED', label: 'Cluster Speed (CAN)', type: 'number', category: 'sensor' },
+    { name: 'EFCMNT_PDLE_ACCEL', label: 'Accel Pedal (CAN)', type: 'number', category: 'sensor' },
+    { name: 'CONTACT_FREIN1', label: 'Brake Contact (CAN)', type: 'boolean', category: 'sensor' },
+    { name: 'KEY_POS', label: 'Key Position (CAN)', type: 'number', category: 'state' },
+    { name: 'ETAT_MT', label: 'Engine State (CAN)', type: 'number', category: 'state' },
+    { name: 'TowCondition', label: 'Tow Condition (Flag)', type: 'number', category: 'state' },
+    { name: 'MovDetect', label: 'Motion Detect (Flag)', type: 'number', category: 'state' },
 
     // Parameters (for reference in conditions)
     { name: 'MIN_TRIP_DISTANCE', label: 'Min Trip Distance (km)', type: 'parameter', category: 'parameter' },
@@ -469,5 +590,536 @@ export const JeepM6DefaultRules = [
             message: 'FOTA Rejected: Ignition is ON.',
             severity: 'critical'
         }
+    },
+    {
+        id: 'm6-hard-accel',
+        name: 'M6 Harsh Acceleration',
+        conditions: {
+            all: [
+                { fact: 'speed', operator: '>', value: 20 },
+                { fact: 'gasPedal', operator: '>', value: 30 }
+            ]
+        },
+        event: {
+            type: 'alert',
+            message: 'Harsh Acceleration Detected (Pedal > 30%)',
+            severity: 'warning',
+            alertDetails: { type: 'HARD_ACCELERATION', code: 'HA01' }
+        }
+    },
+    {
+        id: 'm6-hard-brake',
+        name: 'M6 Harsh Braking',
+        conditions: {
+            all: [
+                { fact: 'brakeActive', operator: '==', value: true },
+                { fact: 'speed', operator: '>', value: 10 }
+            ]
+        },
+        event: {
+            type: 'alert',
+            message: 'Harsh Braking Detected (Brake ON)',
+            severity: 'warning',
+            alertDetails: { type: 'HARD_BRAKING', code: 'HB01' }
+        }
+    },
+    {
+        id: 'm6-device-removal',
+        name: 'Device Removal',
+        conditions: {
+            all: [
+                { fact: 'alertType', operator: '==', value: 'DEVICE_REMOVAL' }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'DEVICE REMOVAL DETECTED!',
+            severity: 'critical',
+            alertDetails: { type: 'DEVICE_REMOVAL', code: 'DR01' }
+        }
+    },
+    {
+        id: 'm6-towing',
+        name: 'Towing Alert',
+        conditions: {
+            all: [
+                { fact: 'ignition', operator: '==', value: false },
+                { fact: 'speed', operator: '>', value: 10 }
+            ]
+        },
+        event: {
+            type: 'theft_alert',
+            message: 'Towing Detected! (Moving while Ign OFF)',
+            severity: 'critical',
+            alertDetails: { type: 'TOWING', code: 'TW01' }
+        }
+    },
+    {
+        id: 'm6-sos',
+        name: 'SOS Panic',
+        conditions: {
+            all: [
+                { fact: 'alertType', operator: '==', value: 'SOS' }
+            ]
+        },
+        event: {
+            type: 'emergency_alert',
+            message: 'SOS PANIC BUTTON PRESSED!',
+            severity: 'critical',
+            alertDetails: { type: 'SOS', code: 'EM01' }
+        }
+    },
+    // ============================================
+    // TE-01 Section 14: Vehicle Alerts & Events
+    // ============================================
+    // 14.1 Vehicle Alerts
+    {
+        id: 'alert-ignition-on',
+        name: 'Ignition ON Alert',
+        conditions: {
+            all: [
+                { fact: 'ignition', operator: '==', value: true }
+            ]
+        },
+        event: {
+            type: 'vehicle_event',
+            message: 'Vehicle Ignition turned ON',
+            severity: 'info',
+            alertDetails: { type: 'IGNITION_ON', code: 'VE01', category: 'Vehicle Event' }
+        }
+    },
+    {
+        id: 'alert-ignition-off',
+        name: 'Ignition OFF Alert',
+        conditions: {
+            all: [
+                { fact: 'ignition', operator: '==', value: false }
+            ]
+        },
+        event: {
+            type: 'vehicle_event',
+            message: 'Vehicle Ignition turned OFF',
+            severity: 'info',
+            alertDetails: { type: 'IGNITION_OFF', code: 'VE02', category: 'Vehicle Event' }
+        }
+    },
+    {
+        id: 'alert-overspeed',
+        name: 'Overspeed Alert',
+        conditions: {
+            all: [
+                { fact: 'speed', operator: '>', value: 120 }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Vehicle exceeding speed limit (>120 km/h)',
+            severity: 'warning',
+            alertDetails: { type: 'OVERSPEED', code: 'VA01', category: 'Vehicle Alert' }
+        }
+    },
+    {
+        id: 'alert-harsh-acceleration',
+        name: 'Harsh Acceleration Alert',
+        conditions: {
+            all: [
+                { fact: 'harshAccCnt', operator: '>', value: 0 }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Harsh acceleration detected',
+            severity: 'warning',
+            alertDetails: { type: 'HARSH_ACCELERATION', code: 'VA02', category: 'Vehicle Alert' }
+        }
+    },
+    {
+        id: 'alert-harsh-braking',
+        name: 'Harsh Braking Alert',
+        conditions: {
+            all: [
+                { fact: 'hardBrakeCnt', operator: '>', value: 0 }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Harsh braking detected',
+            severity: 'warning',
+            alertDetails: { type: 'HARSH_BRAKING', code: 'VA03', category: 'Vehicle Alert' }
+        }
+    },
+    {
+        id: 'alert-harsh-cornering',
+        name: 'Harsh Cornering Alert',
+        conditions: {
+            all: [
+                { fact: 'harshTurnCnt', operator: '>', value: 0 }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Harsh cornering detected',
+            severity: 'warning',
+            alertDetails: { type: 'HARSH_CORNERING', code: 'VA04', category: 'Vehicle Alert' }
+        }
+    },
+    {
+        id: 'alert-idling',
+        name: 'Excessive Idling Alert',
+        conditions: {
+            all: [
+                { fact: 'idleDuration', operator: '>', value: 10 }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Excessive idling detected (>10 minutes)',
+            severity: 'info',
+            alertDetails: { type: 'EXCESSIVE_IDLING', code: 'VA05', category: 'Vehicle Alert' }
+        }
+    },
+    // 14.2 Emergency & Safety Alerts
+    {
+        id: 'alert-crash',
+        name: 'Crash Detection Alert',
+        conditions: {
+            all: [
+                { fact: 'crashDetected', operator: '==', value: true }
+            ]
+        },
+        event: {
+            type: 'emergency_alert',
+            message: 'CRASH DETECTED - Emergency services notified',
+            severity: 'critical',
+            alertDetails: { type: 'CRASH', code: 'ES01', category: 'Emergency & Safety' }
+        }
+    },
+    {
+        id: 'alert-sos-panic',
+        name: 'SOS Panic Button Alert',
+        conditions: {
+            all: [
+                { fact: 'alertType', operator: '==', value: 'SOS' }
+            ]
+        },
+        event: {
+            type: 'emergency_alert',
+            message: 'SOS PANIC BUTTON PRESSED',
+            severity: 'critical',
+            alertDetails: { type: 'SOS_PANIC', code: 'ES02', category: 'Emergency & Safety' }
+        }
+    },
+    {
+        id: 'alert-towing',
+        name: 'Towing Detection Alert',
+        conditions: {
+            all: [
+                { fact: 'ignition', operator: '==', value: false },
+                { fact: 'speed', operator: '>', value: 5 }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'Vehicle towing detected (moving while ignition OFF)',
+            severity: 'critical',
+            alertDetails: { type: 'TOWING', code: 'ES03', category: 'Emergency & Safety' }
+        }
+    },
+    {
+        id: 'alert-geofence-entry',
+        name: 'Geofence Entry Alert',
+        conditions: {
+            all: [
+                { fact: 'geoFenceStatus', operator: '==', value: 'INSIDE' }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Vehicle entered geofence zone',
+            severity: 'info',
+            alertDetails: { type: 'GEOFENCE_ENTRY', code: 'VA06', category: 'Vehicle Alert' }
+        }
+    },
+    {
+        id: 'alert-geofence-exit',
+        name: 'Geofence Exit Alert',
+        conditions: {
+            all: [
+                { fact: 'geoFenceStatus', operator: '==', value: 'OUTSIDE' }
+            ]
+        },
+        event: {
+            type: 'vehicle_alert',
+            message: 'Vehicle exited geofence zone',
+            severity: 'warning',
+            alertDetails: { type: 'GEOFENCE_EXIT', code: 'VA07', category: 'Vehicle Alert' }
+        }
+    },
+    // 14.3 Diagnostic Alerts
+    {
+        id: 'alert-low-battery',
+        name: 'Low Battery Alert',
+        conditions: {
+            all: [
+                { fact: 'batteryVoltage', operator: '<', value: 11.5 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Low battery voltage detected (<11.5V)',
+            severity: 'warning',
+            alertDetails: { type: 'LOW_BATTERY', code: 'DA01', category: 'Diagnostic Alert' }
+        }
+    },
+    {
+        id: 'alert-critical-battery',
+        name: 'Critical Battery Alert',
+        conditions: {
+            all: [
+                { fact: 'batteryVoltage', operator: '<', value: 11.0 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Critical battery voltage (<11V) - Remote commands disabled',
+            severity: 'critical',
+            alertDetails: { type: 'CRITICAL_BATTERY', code: 'DA02', category: 'Diagnostic Alert' }
+        }
+    },
+    {
+        id: 'alert-mil-active',
+        name: 'MIL (Check Engine) Alert',
+        conditions: {
+            all: [
+                { fact: 'engineMilStat', operator: '>', value: 0 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Malfunction Indicator Lamp (MIL) is active',
+            severity: 'warning',
+            alertDetails: { type: 'MIL_ACTIVE', code: 'DA03', category: 'Diagnostic Alert' }
+        }
+    },
+    {
+        id: 'alert-engine-overheat',
+        name: 'Engine Overheating Alert',
+        conditions: {
+            all: [
+                { fact: 'engineTemp', operator: '>', value: 110 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Engine temperature critical (>110°C)',
+            severity: 'critical',
+            alertDetails: { type: 'ENGINE_OVERHEAT', code: 'DA04', category: 'Diagnostic Alert' }
+        }
+    },
+    {
+        id: 'alert-low-fuel',
+        name: 'Low Fuel Alert',
+        conditions: {
+            all: [
+                { fact: 'fuelLevel', operator: '<', value: 10 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Low fuel level (<10%)',
+            severity: 'warning',
+            alertDetails: { type: 'LOW_FUEL', code: 'DA05', category: 'Diagnostic Alert' }
+        }
+    },
+    {
+        id: 'alert-device-removal',
+        name: 'Device Removal Alert',
+        conditions: {
+            all: [
+                { fact: 'alertType', operator: '==', value: 'DEVICE_REMOVAL' }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'Device tampering/removal detected',
+            severity: 'critical',
+            alertDetails: { type: 'DEVICE_REMOVAL', code: 'SA01', category: 'Security Alert' }
+        }
+    },
+    {
+        id: 'alert-device-reconnect',
+        name: 'Device Reconnection Alert',
+        conditions: {
+            all: [
+                { fact: 'alertType', operator: '==', value: 'DEVICE_RECONNECT' }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'Device reconnected after removal',
+            severity: 'warning',
+            alertDetails: { type: 'DEVICE_RECONNECT', code: 'SA02', category: 'Security Alert' }
+        }
+    },
+    // TE-01 Specification Alerts (Sno 3, 10, 14, 16, 17, 19, 20, 21)
+    {
+        id: 'te01-overspeed-80',
+        name: 'SpeedAlert (80km/h)',
+        description: 'Alert triggered when vehicle cluster speed exceeds 80 km/h',
+        conditions: {
+            all: [
+                { fact: 'DRV_CLUSTER_DSPEED', operator: '>', value: 80 }
+            ]
+        },
+        event: {
+            type: 'general',
+            message: 'OverspeedAlert_80 generated (Speed > 80km/h)',
+            severity: 'warning',
+            alertDetails: { type: 'SPEED_ALERT_80', code: 'VA31', category: 'General' }
+        }
+    },
+    {
+        id: 'te01-overspeed-120',
+        name: 'SpeedAlert (120km/h)',
+        description: 'Alert triggered when vehicle cluster speed exceeds 120 km/h',
+        conditions: {
+            all: [
+                { fact: 'DRV_CLUSTER_DSPEED', operator: '>', value: 120 }
+            ]
+        },
+        event: {
+            type: 'general',
+            message: 'OverspeedAlert_120 generated (Speed > 120km/h)',
+            severity: 'critical',
+            alertDetails: { type: 'SPEED_ALERT_120', code: 'VA31', category: 'General' }
+        }
+    },
+    {
+        id: 'te01-tow-away',
+        name: 'TowAwayAlert',
+        description: 'Alert generated if vehicle is towed (motion detected while parked)',
+        conditions: {
+            all: [
+                { fact: 'TowCondition', operator: '==', value: 1 }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'TowAlert generated: Vehicle movement detected while ignition OFF',
+            severity: 'critical',
+            alertDetails: { type: 'TOW_AWAY', code: 'VA40', category: 'Critical' }
+        }
+    },
+    {
+        id: 'te01-engine-idling',
+        name: 'Engine Idling Alert',
+        description: 'Alert triggered when engine is ON but vehicle is stationary',
+        conditions: {
+            all: [
+                { fact: 'ETAT_MT', operator: '==', value: 3 },
+                { fact: 'DRV_CLUSTER_DSPEED', operator: '==', value: 0 },
+                { fact: 'idleDuration', operator: '>', value: 3 }
+            ]
+        },
+        event: {
+            type: 'general',
+            message: 'Engine Idling Alert: Engine ON for > 3 minutes while stationary',
+            severity: 'warning',
+            alertDetails: { type: 'ENGINE_IDLING', code: 'VA14', category: 'General' }
+        }
+    },
+    {
+        id: 'te01-parking-disturbance',
+        name: 'Parking Disturbance Alert',
+        description: 'Alert triggered if vehicle is moved while in parking condition',
+        conditions: {
+            all: [
+                { fact: 'MovDetect', operator: '==', value: 1 }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'MovDetectAlert generated: Vehicle disturbance detected',
+            severity: 'critical',
+            alertDetails: { type: 'PARKING_DISTURBANCE', code: 'VA39', category: 'Critical' }
+        }
+    },
+    {
+        id: 'te01-dongle-status',
+        name: 'DongleStatusAlert',
+        description: 'Alert triggered when the dongle status is disconnected (Operating State = 1)',
+        conditions: {
+            all: [
+                { fact: 'tboxOperatingState', operator: '==', value: 'DISCONNECTED' }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'DongleStatusAlert generated: Device disconnected',
+            severity: 'critical',
+            alertDetails: { type: 'DONGLE_DISCONNECTED', code: 'VA43', category: 'Critical' }
+        }
+    },
+    {
+        id: 'te01-harsh-acc',
+        name: 'Harsh Acceleration Alert',
+        description: 'Alert if vehicle is driven in rash manner (Acc/t > Threshold)',
+        conditions: {
+            all: [
+                { fact: 'EFCMNT_PDLE_ACCEL', operator: '>', value: 30 }
+            ]
+        },
+        event: {
+            type: 'general',
+            message: 'HarshAccAlert generated: Rapid acceleration detected',
+            severity: 'warning',
+            alertDetails: { type: 'HARSH_ACCEL', code: 'VA48', category: 'General' }
+        }
+    },
+    {
+        id: 'te01-harsh-brake',
+        name: 'Harsh Brake Alert',
+        description: 'Alert if vehicle is driven in rash manner (Decel/t > Threshold)',
+        conditions: {
+            all: [
+                { fact: 'CONTACT_FREIN1', operator: '==', value: 1 }
+            ]
+        },
+        event: {
+            type: 'general',
+            message: 'HarshBrakeAlert generated: Sudden deceleration detected',
+            severity: 'warning',
+            alertDetails: { type: 'HARSH_BRAKE', code: 'VA49', category: 'General' }
+        }
     }
 ];
+// ============================================
+// DEFAULT LIFECYCLE RULES (Section 2 Spec)
+// ============================================
+export const DefaultLifecycleRules = {
+    [DeviceStates.PRE_SALES]: {
+        identity: 'IMEI',
+        subsystems: { CAN: false, GPS: false, GSM: true, Telemetry: false, Alerts: false },
+        allowedActions: { vinDecoding: false, certDownload: false, telemetryPublish: false }
+    },
+    [DeviceStates.FACTORY]: {
+        identity: 'IMEI',
+        subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: false, Alerts: false },
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: false }
+    },
+    [DeviceStates.PROVISIONED]: {
+        identity: 'VIN',
+        subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: false },
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+    },
+    [DeviceStates.AUTHORIZED]: {
+        identity: 'VIN',
+        subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: true },
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+    },
+    [DeviceStates.CUSTOMER]: {
+        identity: 'MSISDN',
+        subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: true },
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+    }
+};
