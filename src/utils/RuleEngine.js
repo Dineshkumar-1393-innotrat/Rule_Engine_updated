@@ -201,6 +201,33 @@ export const ConfigurableParameters = [
         min: 2,
         max: 14400,
         unit: 'seconds'
+    },
+    {
+        name: 'OVERSPEED_THR',
+        description: 'User defined speed threshold for overspeed alerts (km/h)',
+        type: 'number',
+        defaultValue: 120,
+        min: 20,
+        max: 200,
+        unit: 'km/h'
+    },
+    {
+        name: 'HARSH_ACCEL_THR',
+        description: 'Threshold for Harsh Acceleration (km/h per second)',
+        type: 'number',
+        defaultValue: 10,
+        min: 1,
+        max: 50,
+        unit: 'km/h/s'
+    },
+    {
+        name: 'HARD_BRAKE_THR',
+        description: 'Threshold for Hard Braking (km/h per second)',
+        type: 'number',
+        defaultValue: 15,
+        min: 1,
+        max: 50,
+        unit: 'km/h/s'
     }
 ];
 
@@ -1090,6 +1117,38 @@ export const JeepM6DefaultRules = [
             message: 'HarshBrakeAlert generated: Sudden deceleration detected',
             severity: 'warning',
             alertDetails: { type: 'HARSH_BRAKE', code: 'VA49', category: 'General' }
+        }
+    },
+    {
+        id: 'te01-low-battery',
+        name: 'Low Battery Alert',
+        description: 'Alert triggered when vehicle/dongle battery voltage is low (< 11.5V)',
+        conditions: {
+            all: [
+                { fact: 'batteryVoltage', operator: '<', value: 11.5 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'LowBatteryAlert generated: Battery voltage critical (< 11.5V)',
+            severity: 'warning',
+            alertDetails: { type: 'LOW_BATTERY', code: 'VA16', category: 'Diagnostic' }
+        }
+    },
+    {
+        id: 'te01-device-removal',
+        name: 'Device Removal Alert',
+        description: 'Alert triggered when the dongle is unplugged or loses power abruptly',
+        conditions: {
+            all: [
+                { fact: 'isDeviceRemoved', operator: '==', value: true }
+            ]
+        },
+        event: {
+            type: 'security_alert',
+            message: 'DeviceRemovalAlert generated: Dongle unplugged or power lost',
+            severity: 'critical',
+            alertDetails: { type: 'DEVICE_REMOVAL', code: 'VA05', category: 'Security' }
         }
     }
 ];

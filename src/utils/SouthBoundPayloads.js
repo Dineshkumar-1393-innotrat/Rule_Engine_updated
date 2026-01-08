@@ -155,9 +155,12 @@ export const generateTripPayload = (type, deviceData) => {
 };
 
 /**
- * Generates the 'commandResponse' payload
+ * Generates a generic command response payload
+ * Compliance: TE-01 Section 10
  */
-export const generateCommandResponsePayload = (commandId, commandType, status, deviceData) => {
+export const generateCommandResponsePayload = (commandId, commandType, status, deviceData, extraData = {}) => {
+    const isSuccess = status === 'Success' || status === 'succeeded';
+
     return {
         header: {
             messageID: uuidv4(),
@@ -167,12 +170,69 @@ export const generateCommandResponsePayload = (commandId, commandType, status, d
             identity: getIdentity(deviceData)
         },
         subtype: `${commandType}Response`,
-        return_code: status === 'Success' ? 'succeeded' : 'failed',
+        Tbox_operating_state: deviceData.tboxOperatingState?.toLowerCase() || 'normal',
+        e_Tbox_application_state: deviceData.tboxApplicationState?.toLowerCase() || 'factory',
+        Tbox_esim_state: deviceData.tboxeSimState || 'normal_sim',
+        version: "2.0.0",
+        time_stamp: {
+            seconds: Math.floor(Date.now() / 1000),
+            nanos: (Date.now() % 1000) * 1000000
+        },
+        return_code: isSuccess ? 'succeeded' : 'failed',
         commandResponsePayload: {
+            [commandType + 'Response']: {
+                commandStatus: isSuccess ? 'success' : 'failure',
+                ...extraData
+            },
+            // Legacy/Fallback field
             status: status,
             currentTboxState: deviceData.tboxApplicationState
         }
     };
+};
+
+/**
+ * Specialized Refresh/Wakeup Response (Section 10.2)
+ */
+export const generateWakeupResponsePayload = (commandId, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'WakeupCommand', 'Success', deviceData, {
+        WakeupcommandStatus: 'success'
+    });
+};
+
+/**
+ * Specialized Fetch Logs Response (Section 10.3)
+ */
+export const generateFetchLogsResponsePayload = (commandId, status, errorCode, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'deviceFetchLogs', status, deviceData, {
+        fileUploadStatus: status === 'Success' ? 'successful' : 'failure',
+        errorCode: errorCode || 'invalidErrorCode(00)'
+    });
+};
+
+/**
+ * Specialized TBOX State Update Response (Section 10.5)
+ */
+export const generateStateUpdateResponsePayload = (commandId, status, nextState, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'TBOXStateUpdateCommand', status, deviceData, {
+        commandStatus: status,
+        currentTboxState: nextState
+    });
+};
+
+/**
+ * Specialized Threshold Update Response (Section 10.6/10.7)
+ */
+export const generateThresholdUpdateResponsePayload = (commandId, type, status, thresholds, deviceData) => {
+    const extra = { commandStatus: status.toLowerCase() };
+    if (type === 'UserDefinedSpeed') {
+        extra.definedSpeed = thresholds.speed.toString();
+    } else if (type === 'UserDefinedMinimumTripDistance') {
+        extra.definedMinimumTripDistance = thresholds.distance.toString();
+        extra.DefinedEngineOffTime = thresholds.engineOffTime.toString();
+    }
+
+    return generateCommandResponsePayload(commandId, type + 'Command', status, deviceData, extra);
 };
 
 /**

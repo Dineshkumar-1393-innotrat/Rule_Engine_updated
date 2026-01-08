@@ -32,8 +32,16 @@ import {
     useColorModeValue,
     SimpleGrid,
     Progress,
-    Flex
+    Flex,
+    IconButton,
+    Tooltip,
+    Spacer,
+    Menu,
+    MenuButton,
+    MenuList,
+    MenuItem
 } from '@chakra-ui/react';
+import { Play, Square, Trash2, Zap, Activity, Car } from 'lucide-react';
 import {
     RuleEngine,
     defaultRules, // Keep defaultRules as it's used in DEFAULT_RULE_ENGINE_STATE
@@ -51,6 +59,7 @@ import DataVisualizer from './DataVisualizer';
 import CreateRuleTemplate from './CreateRuleTemplate';
 import RuleTemplateLibrary from './RuleTemplateLibrary';
 import CANSignalBuilder from './CANSignalBuilder'; // Added
+import DongleAlertPopup from './DongleAlertPopup'; // Added
 
 import { useAutoPersist } from '../../hooks/useAutoPersist';
 import {
@@ -59,7 +68,11 @@ import {
     generateAlertPayload,
     generateTripPayload,
     generateCommandResponsePayload,
-    generateDrivingScorePayload
+    generateDrivingScorePayload,
+    generateWakeupResponsePayload,
+    generateFetchLogsResponsePayload,
+    generateStateUpdateResponsePayload,
+    generateThresholdUpdateResponsePayload
 } from '../../utils/SouthBoundPayloads';
 
 // Default initial state for the Rule Engine screen
@@ -67,11 +80,13 @@ const DEFAULT_RULE_ENGINE_STATE = {
     rules: defaultRules,
 
     savedRules: defaultRules,
-    savedTemplates: [], // New state for templates
     parameters: {
         MIN_TRIP_DISTANCE: ConfigurableParameters.find(p => p.name === 'MIN_TRIP_DISTANCE')?.defaultValue || 2,
         MIN_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MIN_IGN_OFF_TIME')?.defaultValue || 120,
-        MAX_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MAX_IGN_OFF_TIME')?.defaultValue || 300
+        MAX_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MAX_IGN_OFF_TIME')?.defaultValue || 300,
+        OVERSPEED_THR: ConfigurableParameters.find(p => p.name === 'OVERSPEED_THR')?.defaultValue || 120,
+        HARSH_ACCEL_THR: ConfigurableParameters.find(p => p.name === 'HARSH_ACCEL_THR')?.defaultValue || 10,
+        HARD_BRAKE_THR: ConfigurableParameters.find(p => p.name === 'HARD_BRAKE_THR')?.defaultValue || 15
     },
     simRoadCondition: 'good',
     activeDriverName: null,
@@ -164,11 +179,14 @@ const RuleEngineDashboard = () => {
         vinFragments: {}, // Track fragments for 0x3E0
         vinProgress: 0,
         msisdn: '9123456789',
-        drivingScore: 100
+        drivingScore: 100,
+        batteryVoltage: 12.8,
+        isDeviceRemoved: false
     });
 
     const [tboxApplicationState, setTboxApplicationState] = useState(DeviceStates.PRE_SALES);
     const [tboxOperatingState, setTboxOperatingState] = useState('NORMAL');
+    const [tboxeSimState, setTboxeSimState] = useState('NORMAL_SIM');
     const [lastPayload, setLastPayload] = useState(null);
     const [lastTripPayload, setLastTripPayload] = useState(null);
 
@@ -198,6 +216,7 @@ const RuleEngineDashboard = () => {
     const [crashDetected, setCrashDetected] = useState(false);
     const [geoFenceStatus, setGeoFenceStatus] = useState('INSIDE'); // INSIDE, OUTSIDE
     const [lastCommand, setLastCommand] = useState('NONE');
+    const [isDeviceRemoved, setIsDeviceRemoved] = useState(false);
 
     // M6 Pedal State
     const [gasPedal, setGasPedal] = useState(0);
@@ -209,6 +228,10 @@ const RuleEngineDashboard = () => {
 
     // View State for Rule Templates
     const [templateView, setTemplateView] = useState('library'); // 'library' or 'create'
+
+    // Alert Popup State
+    const [activePopupAlert, setActivePopupAlert] = useState(null);
+    const [isAlertPopupOpen, setIsAlertPopupOpen] = useState(false);
 
     // Trip Stats (Required for simulation)
     const tripStats = useRef({
@@ -458,28 +481,120 @@ const RuleEngineDashboard = () => {
         demoTimeoutsRef.current = [];
     };
 
-    const handleRemoteCommand = (commandType) => {
+    const handleRemoteCommand = (commandType, payload = {}) => {
         const commandId = Math.random().toString(36).substring(7);
-        toast({ title: `Command Received: ${commandType}`, description: `ID: ${commandId}`, status: 'info' });
+        const timestamp = Date.now();
+        const commandReceivedAt = payload.timestamp || timestamp;
+
+        // Section 10.8: Command Expiry (60s)
+        if (timestamp - commandReceivedAt > 60000) {
+            toast({ title: 'Command Expired', description: 'Command received after 60s timeout. Ignoring.', status: 'warning' });
+            return;
+        }
+
+        toast({ title: `Remote Command: ${commandType}`, description: `ID: ${commandId}`, status: 'info' });
 
         // Simulate device processing delay
         setTimeout(() => {
-            const status = Math.random() > 0.1 ? 'Success' : 'Failure';
-            const payload = generateCommandResponsePayload(commandId, commandType, status, deviceVariables.current);
-            setLastPayload({ type: 'commandResponse', content: payload });
+            let status = 'Success';
+            let responsePayload = null;
+            let extraMsg = '';
+
+            // Section 10.13: Failure Code Logic (Simplified Simulation)
+            if (crashDetected && (commandType === 'DoorLock' || commandType === 'DoorUnlock')) {
+                status = 'Failure';
+                extraMsg = ' (Failure Code: Crashed_Detected)';
+            }
+
+            switch (commandType) {
+                case 'Blinker':
+                case 'DoorLock':
+                case 'DoorUnlock':
+                case 'Honk':
+                    responsePayload = generateCommandResponsePayload(commandId, commandType, status, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    break;
+
+                case 'Wakeup':
+                    responsePayload = generateWakeupResponsePayload(commandId, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    // Section 10.2: Refresh triggers automated telemetry
+                    const telPayload = generateTelemetryPayload({
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    }, {
+                        speed: simSpeed,
+                        rpm: 800,
+                        batteryVoltage
+                    });
+                    setLastPayload({ type: 'telemetry', content: telPayload });
+                    break;
+
+                case 'FetchLogs':
+                    responsePayload = generateFetchLogsResponsePayload(commandId, 'Success', 'invalidErrorCode(00)', {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    break;
+
+                case 'TBOXStateUpdate':
+                    const nextState = payload.targetState || 'CUSTOMER';
+                    setTboxApplicationState(nextState);
+                    responsePayload = generateStateUpdateResponsePayload(commandId, 'Success', nextState, {
+                        ...deviceVariables.current,
+                        tboxApplicationState: nextState
+                    });
+                    break;
+
+                case 'UserDefinedSpeed':
+                    const newSpeed = payload.speed || 95;
+                    setParameters(prev => ({ ...prev, OVERSPEED_THR: newSpeed }));
+                    responsePayload = generateThresholdUpdateResponsePayload(commandId, 'UserDefinedSpeed', 'Success', { speed: newSpeed }, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    toast({ title: 'Overspeed Updated', description: `New threshold: ${newSpeed} km/h` });
+                    break;
+
+                case 'UserDefinedMinimumTripDistance':
+                    const newDist = payload.distance || 5;
+                    const newOff = payload.engineOffTime || 15;
+                    setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: newDist, MIN_IGN_OFF_TIME: newOff }));
+                    responsePayload = generateThresholdUpdateResponsePayload(commandId, 'UserDefinedMinimumTripDistance', 'Success', { distance: newDist, engineOffTime: newOff }, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    break;
+
+                default:
+                    responsePayload = generateCommandResponsePayload(commandId, commandType, status, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+            }
+
+            setLastPayload({ type: 'commandResponse', content: responsePayload });
 
             setEvents(prev => [...prev, {
                 ruleId: 'remote-cmd',
                 ruleName: 'Remote Command',
                 type: 'event',
-                message: `Remote ${commandType} ${status}`,
+                message: `Remote ${commandType} ${status}${extraMsg}`,
                 severity: status === 'Success' ? 'success' : 'error',
                 timestamp: new Date().toISOString(),
                 dataSnapshot: { commandId, commandType, status }
             }].slice(-100));
 
-            toast({ title: `Command ${status}`, description: `${commandType} processed.`, status: status === 'Success' ? 'success' : 'error' });
-        }, 2000);
+            toast({
+                title: `Command ${status}`,
+                description: `${commandType} processed${extraMsg}.`,
+                status: status === 'Success' ? 'success' : 'error'
+            });
+        }, 1500);
     };
 
     const runFotaSequence = () => {
@@ -1091,7 +1206,7 @@ const RuleEngineDashboard = () => {
                 const deltaV = currentSpeed - prevSpeedRef.current;
 
                 // Harsh Accel (> 3 sec gap)
-                if (deltaV > parameters.HARSH_ACCEL_THRESHOLD && (now - lastHarshAccTime.current) > 3000) {
+                if (deltaV > parameters.HARSH_ACCEL_THR && (now - lastHarshAccTime.current) > 3000) {
                     deviceVariables.current.harshAccCnt++;
                     deviceVariables.current.drivingScore = Math.max(0, deviceVariables.current.drivingScore - 5);
                     lastHarshAccTime.current = now;
@@ -1099,7 +1214,7 @@ const RuleEngineDashboard = () => {
                 }
 
                 // Hard Brake (> 1 sec gap)
-                if (deltaV < -parameters.HARD_BRAKE_THRESHOLD && (now - lastHardBrakeTime.current) > 1000) {
+                if (deltaV < -parameters.HARD_BRAKE_THR && (now - lastHardBrakeTime.current) > 1000) {
                     deviceVariables.current.hardBrakeCnt++;
                     deviceVariables.current.drivingScore = Math.max(0, deviceVariables.current.drivingScore - 5);
                     lastHardBrakeTime.current = now;
@@ -1229,6 +1344,7 @@ const RuleEngineDashboard = () => {
 
                     // Jeep M6 Data
                     batteryVoltage: batteryVoltage,
+                    isDeviceRemoved: isDeviceRemoved,
                     crashDetected: crashDetected,
                     fotaStatus: fotaStatus,
                     geoFenceStatus: geoFenceStatus,
@@ -1318,7 +1434,8 @@ const RuleEngineDashboard = () => {
 
                     newEvents.forEach(event => {
                         // Section 14.1: Alert Lifecycle
-                        if (event.type === 'alert' || event.type === 'emergency_alert') {
+                        // Trigger for any condition that results in an 'alert', 'security_alert', or 'diagnostic_alert'
+                        if (['alert', 'emergency_alert', 'security_alert', 'diagnostic_alert'].includes(event.type)) {
                             if (!activeAlertInstances.current[event.ruleId]) {
                                 // New Alert Instance
                                 const alertId = crypto.randomUUID();
@@ -1347,6 +1464,10 @@ const RuleEngineDashboard = () => {
                                     isClosable: true,
                                     position: 'top-right'
                                 });
+
+                                // TRIGGER PROMINENT POPUP
+                                setActivePopupAlert(event);
+                                setIsAlertPopupOpen(true);
                             }
                         }
                     });
@@ -1425,154 +1546,187 @@ const RuleEngineDashboard = () => {
     }, [persistedState.customRuleTemplates]);
 
     return (
-        <Flex direction="column" h="100vh" bg="gray.50">
-            <VStack spacing={5} align="stretch">
+        <Flex direction="column" minH="100vh" bg="gray.50" p={5}>
+            <VStack spacing={5} align="stretch" w="full">
                 <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Heading>Rule Engine Dashboard</Heading>
+                    <Heading size="lg">Rule Engine Dashboard</Heading>
                     <HStack>
-                        <Button
-                            colorScheme={isRunning ? "red" : "green"}
-                            onClick={toggleSimulation}
-                        >
-                            {isRunning ? "Stop Simulation" : "Start Simulation"}
-                        </Button>
-                        <Button variant="outline" onClick={clearData}>
-                            Clear Data
-                        </Button>
-                        {/* <Button colorScheme="purple" variant="outline" onClick={handleLoadM6Rules}>
-                            Load Jeep M6 Rules
-                        </Button> */}
-                        <Button colorScheme="teal" onClick={runFullAutomatedDemo}>
-                            ▶ Full Automated Demo
-                        </Button>
-                        <Button colorScheme="blue" onClick={runCANDemo}>
-                            ▶ Run CAN Demo
-                        </Button>
-                        <Button colorScheme="pink" onClick={runDemoScenario}>
-                            ▶ Run M6 Demo
-                        </Button>
+                        <Tooltip label={isRunning ? "Stop Simulation" : "Start Simulation"}>
+                            <IconButton
+                                icon={isRunning ? <Square size={18} /> : <Play size={18} />}
+                                colorScheme={isRunning ? "red" : "green"}
+                                onClick={toggleSimulation}
+                                aria-label={isRunning ? "Stop Simulation" : "Start Simulation"}
+                                size="sm"
+                            />
+                        </Tooltip>
+                        <Tooltip label="Clear Data">
+                            <IconButton
+                                icon={<Trash2 size={18} />}
+                                variant="outline"
+                                onClick={clearData}
+                                aria-label="Clear Data"
+                                size="sm"
+                            />
+                        </Tooltip>
+                        <Tooltip label="Full Automated Demo">
+                            <IconButton
+                                icon={<Zap size={18} />}
+                                colorScheme="teal"
+                                onClick={runFullAutomatedDemo}
+                                aria-label="Full Automated Demo"
+                                size="sm"
+                            />
+                        </Tooltip>
+                        <Tooltip label="Run CAN Demo">
+                            <IconButton
+                                icon={<Activity size={18} />}
+                                colorScheme="blue"
+                                onClick={runCANDemo}
+                                aria-label="Run CAN Demo"
+                                size="sm"
+                            />
+                        </Tooltip>
+                        <Tooltip label="Run M6 Demo">
+                            <IconButton
+                                icon={<Car size={18} />}
+                                colorScheme="pink"
+                                onClick={runDemoScenario}
+                                aria-label="Run M6 Demo"
+                                size="sm"
+                            />
+                        </Tooltip>
                     </HStack>
                 </Box>
 
                 {/* Device State Machine Display */}
                 <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
-                    <HStack justify="space-between" mb={3}>
-                        <Text fontWeight="bold">Device State Machine</Text>
-                        <HStack spacing={3}>
-                            {Object.values(DeviceStates).map((state) => {
-                                // Determine if this badge represents the current Trip State OR Lifecycle State
-                                const isTripState = state.startsWith('TRIP_');
-                                const isLifecycleState = !isTripState;
+                    <VStack align="stretch" spacing={4}>
+                        <HStack justify="space-between">
+                            <Text fontWeight="bold">Device State Machine</Text>
+                            <HStack spacing={2}>
+                                {Object.values(DeviceStates).map((state) => {
+                                    const isTripState = state.startsWith('TRIP_');
+                                    const isLifecycleState = !isTripState;
+                                    const isActive = (isTripState && deviceState === state) ||
+                                        (isLifecycleState && tboxApplicationState === state);
 
-                                const isActive = (isTripState && deviceState === state) ||
-                                    (isLifecycleState && tboxApplicationState === state);
+                                    let activeColor = 'blue';
+                                    if (isActive) {
+                                        if (state === 'TRIP_ACTIVE') activeColor = 'green';
+                                        else if (state === 'TRIP_PAUSED') activeColor = 'orange';
+                                        else if (state === 'TRIP_PENDING') activeColor = 'yellow';
+                                        else if (state === 'TRIP_IDLE') activeColor = 'teal';
+                                        else if (state === 'PRE-SALES') activeColor = 'gray';
+                                        else if (state === 'FACTORY') activeColor = 'purple';
+                                        else if (state === 'PROVISIONED') activeColor = 'cyan';
+                                        else if (state === 'AUTHORIZED') activeColor = 'blue';
+                                        else if (state === 'CUSTOMER') activeColor = 'pink';
+                                    }
 
-                                let activeColor = 'blue';
-
-                                if (isActive) {
-                                    if (state === 'TRIP_ACTIVE') activeColor = 'green';
-                                    else if (state === 'TRIP_PAUSED') activeColor = 'orange';
-                                    else if (state === 'TRIP_PENDING') activeColor = 'yellow';
-                                    else if (state === 'TRIP_IDLE') activeColor = 'teal';
-                                    else if (state === 'PRE-SALES') activeColor = 'gray';
-                                    else if (state === 'FACTORY') activeColor = 'purple';
-                                    else if (state === 'PROVISIONED') activeColor = 'cyan';
-                                    else if (state === 'AUTHORIZED') activeColor = 'blue';
-                                    else if (state === 'CUSTOMER') activeColor = 'pink';
-                                }
-
-                                return (
-                                    <Badge
-                                        key={state}
-                                        colorScheme={isActive ? activeColor : 'gray'}
-                                        variant="solid"
-                                        fontSize={isActive ? 'lg' : 'xs'}
-                                        px={isActive ? 6 : 2}
-                                        py={isActive ? 3 : 1}
-                                        fontWeight="bold"
-                                        borderRadius="md"
-                                        textTransform="uppercase"
-                                        boxShadow={isActive ? `0 0 20px var(--chakra-colors-${activeColor}-400)` : 'none'}
-                                        opacity={isActive ? 1 : 0.4}
-                                        cursor="pointer"
-                                        _hover={{ opacity: isActive ? 1 : 0.6 }}
-                                    >
-                                        {state}
-                                    </Badge>
-                                );
-                            })}
+                                    return (
+                                        <Badge
+                                            key={state}
+                                            colorScheme={isActive ? activeColor : 'gray'}
+                                            variant="solid"
+                                            fontSize={isActive ? 'xs' : '2xs'}
+                                            px={2}
+                                            py={1}
+                                            fontWeight="bold"
+                                            borderRadius="md"
+                                            opacity={isActive ? 1 : 0.4}
+                                        >
+                                            {state}
+                                        </Badge>
+                                    );
+                                })}
+                            </HStack>
                         </HStack>
-                        <Badge
-                            colorScheme={
-                                deviceState === DeviceStates.TRIP_ACTIVE ? 'green' :
-                                    deviceState === DeviceStates.TRIP_PAUSED ? 'orange' :
-                                        deviceState === DeviceStates.TRIP_PENDING ? 'yellow' : 'gray'
-                            }
-                            variant="solid"
-                            fontSize="lg"
-                            px={4}
-                            py={2}
-                            borderRadius="full"
-                        >
-                            {deviceState}
-                        </Badge>
-                    </HStack>
 
-                    {/* Device Lifecycle Control */}
-                    <Box mt={2} mb={4}>
-                        <FormControl display="flex" alignItems="center">
-                            <FormLabel fontSize="sm" mb={0} mr={2}>Override Device State:</FormLabel>
-                            <Select
-                                size="sm"
-                                width="auto"
-                                value={deviceState}
-                                onChange={(e) => setDeviceState(e.target.value)}
-                                bg={Object.values(DeviceStates).filter(s => !s.startsWith('TRIP')).includes(deviceState) ? "yellow.100" : "white"}
-                            >
-                                <optgroup label="Trip States">
-                                    <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
-                                    <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
-                                    <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
-                                    <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
-                                </optgroup>
-                                <optgroup label="Lifecycle States">
-                                    <option value={DeviceStates.FACTORY}>FACTORY</option>
-                                    <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
-                                    <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
-                                    <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
-                                </optgroup>
-                            </Select>
-                        </FormControl>
-                    </Box>
-
-                    <Grid templateColumns="repeat(3, 1fr)" gap={4}>
-                        <GridItem>
-                            <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                                <Text fontSize="xs" color="gray.500">Current State</Text>
-                                <Text fontWeight="bold" color={
-                                    deviceState === DeviceStates.TRIP_ACTIVE ? 'green.500' :
-                                        deviceState === DeviceStates.TRIP_PAUSED ? 'orange.500' : 'gray.500'
-                                } fontSize="lg">{deviceState}</Text>
-                            </Box>
-                        </GridItem>
-                        <GridItem>
-                            <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                                <Text fontSize="xs" color="gray.500">Trip Distance</Text>
-                                <Text fontWeight="bold" fontSize="lg">
-                                    {deviceVariables.current.currentTripDistance.toFixed(2)} km
-                                </Text>
-                            </Box>
-                        </GridItem>
-                        <GridItem>
-                            <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                                <Text fontSize="xs" color="gray.500">Elapsed Ign Off</Text>
-                                <Text fontWeight="bold" fontSize="lg">
-                                    {deviceVariables.current.elapsedIgnitionOffTime}s
-                                </Text>
-                            </Box>
-                        </GridItem>
-                    </Grid>
+                        <HStack spacing={4} mt={1} borderTopWidth="1px" pt={2} borderColor={borderColor}>
+                            <HStack spacing={2}>
+                                <Text fontSize="xs" color="gray.500" fontWeight="bold">OPERATING:</Text>
+                                <Badge colorScheme={tboxOperatingState === 'NORMAL' ? 'green' : 'red'}>
+                                    {tboxOperatingState}
+                                </Badge>
+                            </HStack>
+                            <HStack spacing={2}>
+                                <Text fontSize="xs" color="gray.500" fontWeight="bold">eSIM:</Text>
+                                <Badge colorScheme={tboxeSimState === 'NORMAL_SIM' ? 'blue' : 'orange'}>
+                                    {tboxeSimState}
+                                </Badge>
+                            </HStack>
+                            <HStack spacing={2}>
+                                <Text fontSize="xs" color="gray.500" fontWeight="bold">BATTERY:</Text>
+                                <Badge colorScheme={batteryVoltage < 11.5 ? 'red' : 'green'}>
+                                    {batteryVoltage}V
+                                </Badge>
+                            </HStack>
+                            {isDeviceRemoved && (
+                                <Badge colorScheme="purple" variant="solid">DEVICE REMOVED</Badge>
+                            )}
+                            <Spacer />
+                            <Badge colorScheme={deviceState === DeviceStates.TRIP_ACTIVE ? 'green' : 'gray'} variant="outline">
+                                {deviceState}
+                            </Badge>
+                        </HStack>
+                    </VStack>
                 </Box>
+
+                {/* Device Lifecycle Control */}
+                <Box mt={2} mb={4}>
+                    <FormControl display="flex" alignItems="center">
+                        <FormLabel fontSize="sm" mb={0} mr={2}>Override Device State:</FormLabel>
+                        <Select
+                            size="sm"
+                            width="auto"
+                            value={deviceState}
+                            onChange={(e) => setDeviceState(e.target.value)}
+                            bg={Object.values(DeviceStates).filter(s => !s.startsWith('TRIP')).includes(deviceState) ? "yellow.100" : "white"}
+                        >
+                            <optgroup label="Trip States">
+                                <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
+                                <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
+                                <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
+                                <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
+                            </optgroup>
+                            <optgroup label="Lifecycle States">
+                                <option value={DeviceStates.FACTORY}>FACTORY</option>
+                                <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
+                                <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
+                                <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
+                            </optgroup>
+                        </Select>
+                    </FormControl>
+                </Box>
+
+                <Grid templateColumns="repeat(3, 1fr)" gap={4}>
+                    <GridItem>
+                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
+                            <Text fontSize="xs" color="gray.500">Current State</Text>
+                            <Text fontWeight="bold" color={
+                                deviceState === DeviceStates.TRIP_ACTIVE ? 'green.500' :
+                                    deviceState === DeviceStates.TRIP_PAUSED ? 'orange.500' : 'gray.500'
+                            } fontSize="lg">{deviceState}</Text>
+                        </Box>
+                    </GridItem>
+                    <GridItem>
+                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
+                            <Text fontSize="xs" color="gray.500">Trip Distance</Text>
+                            <Text fontWeight="bold" fontSize="lg">
+                                {deviceVariables.current.currentTripDistance.toFixed(2)} km
+                            </Text>
+                        </Box>
+                    </GridItem>
+                    <GridItem>
+                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
+                            <Text fontSize="xs" color="gray.500">Elapsed Ign Off</Text>
+                            <Text fontWeight="bold" fontSize="lg">
+                                {deviceVariables.current.elapsedIgnitionOffTime}s
+                            </Text>
+                        </Box>
+                    </GridItem>
+                </Grid>
 
                 {/* SouthBound Lifecycle & Config */}
                 <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
@@ -1614,62 +1768,85 @@ const RuleEngineDashboard = () => {
                     </Grid>
                     <Box mt={6} p={4} borderTopWidth="1px">
                         <Text fontWeight="bold" mb={3}>Remote Operations (Section 10)</Text>
-                        <SimpleGrid columns={4} gap={3}>
-                            <Button size="sm" colorScheme="teal" leftIcon={<Text>🔦</Text>} onClick={() => handleRemoteCommand('Blinker')}>Blinker</Button>
-                            <Button size="sm" colorScheme="cyan" leftIcon={<Text>🔒</Text>} onClick={() => handleRemoteCommand('DoorLock')}>Lock</Button>
-                            <Button size="sm" colorScheme="cyan" variant="outline" leftIcon={<Text>🔓</Text>} onClick={() => handleRemoteCommand('DoorUnlock')}>Unlock</Button>
-                            <Button size="sm" colorScheme="red" leftIcon={<Text>📢</Text>} onClick={() => handleRemoteCommand('Honk')}>Honk</Button>
-                        </SimpleGrid>
-                    </Box>
+                        <VStack align="stretch" spacing={4}>
+                            <SimpleGrid columns={4} gap={3}>
+                                <Button size="sm" colorScheme="teal" leftIcon={<Text>🔦</Text>} onClick={() => handleRemoteCommand('Blinker')}>Blinker</Button>
+                                <Button size="sm" colorScheme="cyan" leftIcon={<Text>🔒</Text>} onClick={() => handleRemoteCommand('DoorLock')}>Lock</Button>
+                                <Button size="sm" colorScheme="cyan" variant="outline" leftIcon={<Text>🔓</Text>} onClick={() => handleRemoteCommand('DoorUnlock')}>Unlock</Button>
+                                <Button size="sm" colorScheme="red" leftIcon={<Text>📢</Text>} onClick={() => handleRemoteCommand('Honk')}>Honk</Button>
+                            </SimpleGrid>
 
-                    {/* FOTA Update Center */}
-                    <Box mt={6} p={4} borderTopWidth="1px" bg="blue.50" _dark={{ bg: "blue.900" }} borderRadius="md">
-                        <Text fontWeight="bold" mb={2} color="blue.700" _dark={{ color: "blue.200" }}>FOTA Update Center (Section 11)</Text>
-                        <VStack align="stretch" spacing={3}>
-                            <HStack justify="space-between">
-                                <Text fontSize="sm">Current Version: <b>{deviceVariables.current.ccpuVersion}</b></Text>
-                                <Badge colorScheme={
-                                    fotaStatus === 'SUCCESS' ? 'green' :
-                                        fotaStatus === 'IDLE' ? 'gray' : 'orange'
-                                }>{fotaStatus}</Badge>
+                            <SimpleGrid columns={3} gap={3}>
+                                <Button size="sm" colorScheme="blue" variant="solid" onClick={() => handleRemoteCommand('Wakeup')}>Refresh (Wakeup)</Button>
+                                <Button size="sm" colorScheme="gray" onClick={() => handleRemoteCommand('FetchLogs')}>Fetch Logs</Button>
+                                <Menu>
+                                    <MenuButton as={Button} size="sm" rightIcon={<Text>▼</Text>}>
+                                        Remote State Update
+                                    </MenuButton>
+                                    <MenuList>
+                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'PROVISIONED' })}>PROVISIONED</MenuItem>
+                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'AUTHORIZED' })}>AUTHORIZED</MenuItem>
+                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'CUSTOMER' })}>CUSTOMER</MenuItem>
+                                    </MenuList>
+                                </Menu>
+                            </SimpleGrid>
+
+                            <HStack spacing={3}>
+                                <Button size="xs" variant="outline" onClick={() => handleRemoteCommand('UserDefinedSpeed', { speed: 110 })}>Set Speed Thr (110)</Button>
+                                <Button size="xs" variant="outline" onClick={() => handleRemoteCommand('UserDefinedMinimumTripDistance', { distance: 5, engineOffTime: 30 })}>Set Trip Thr (5km/30s)</Button>
                             </HStack>
-
-                            {fotaStatus === 'DOWNLOADING' && (
-                                <Progress value={fotaProgress} size="xs" colorScheme="blue" />
-                            )}
-
-                            <HStack>
-                                <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'}>Check for Update</Button>
-                                <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'}>Install Update (CD.02.04)</Button>
-                                <Button size="xs" variant="ghost" onClick={() => { setFotaStatus('IDLE'); setFotaProgress(0); }}>Reset</Button>
-                            </HStack>
-
-                            <Text fontSize="xs" color="gray.500 italic">Note: Ignition must be OFF to install.</Text>
                         </VStack>
                     </Box>
+                </Box>
 
-                    <Box mt={4}>
-                        <Text fontWeight="semibold" fontSize="sm" mb={2}>Trigger Alerts (M6)</Text>
-                        <HStack wrap="wrap">
-                            <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_ACCELERATION')}>Hard Accel</Button>
-                            <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_BRAKING')}>Hard Brake</Button>
-                            <Button size="sm" colorScheme="orange" variant="outline" onClick={() => triggerManualAlert('TOWING')}>Towing</Button>
-                            <Button size="sm" colorScheme="red" onClick={() => triggerManualAlert('SOS')}>SOS / Panic</Button>
-                            <Button size="sm" colorScheme="gray" variant="outline" onClick={() => triggerManualAlert('DEVICE_REMOVAL')}>Device Removal</Button>
+                {/* FOTA Update Center */}
+                <Box mt={6} p={4} borderTopWidth="1px" bg="blue.50" _dark={{ bg: "blue.900" }} borderRadius="md">
+                    <Text fontWeight="bold" mb={2} color="blue.700" _dark={{ color: "blue.200" }}>FOTA Update Center (Section 11)</Text>
+                    <VStack align="stretch" spacing={3}>
+                        <HStack justify="space-between">
+                            <Text fontSize="sm">Current Version: <b>{deviceVariables.current.ccpuVersion}</b></Text>
+                            <Badge colorScheme={
+                                fotaStatus === 'SUCCESS' ? 'green' :
+                                    fotaStatus === 'IDLE' ? 'gray' : 'orange'
+                            }>{fotaStatus}</Badge>
                         </HStack>
-                    </Box>
 
-                    {lastPayload && (
+                        {fotaStatus === 'DOWNLOADING' && (
+                            <Progress value={fotaProgress} size="xs" colorScheme="blue" />
+                        )}
+
+                        <HStack>
+                            <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'}>Check for Update</Button>
+                            <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'}>Install Update (CD.02.04)</Button>
+                            <Button size="xs" variant="ghost" onClick={() => { setFotaStatus('IDLE'); setFotaProgress(0); }}>Reset</Button>
+                        </HStack>
+
+                        <Text fontSize="xs" color="gray.500 italic">Note: Ignition must be OFF to install.</Text>
+                    </VStack>
+                </Box>
+
+                <Box mt={4}>
+                    <Text fontWeight="semibold" fontSize="sm" mb={2}>Trigger Alerts (M6)</Text>
+                    <HStack wrap="wrap">
+                        <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_ACCELERATION')}>Hard Accel</Button>
+                        <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_BRAKING')}>Hard Brake</Button>
+                        <Button size="sm" colorScheme="orange" variant="outline" onClick={() => triggerManualAlert('TOWING')}>Towing</Button>
+                        <Button size="sm" colorScheme="red" onClick={() => triggerManualAlert('SOS')}>SOS / Panic</Button>
+                        <Button size="sm" colorScheme="gray" variant="outline" onClick={() => triggerManualAlert('DEVICE_REMOVAL')}>Device Removal</Button>
+                    </HStack>
+                </Box>
+
+                {
+                    lastPayload && (
                         <Box mt={4} p={2} bg="gray.900" borderRadius="md">
                             <Text color="gray.400" fontSize="xs" mb={1}>Last Payload: {lastPayload.type}</Text>
                             <Text color="green.300" fontFamily="monospace" fontSize="xs" whiteSpace="pre-wrap">
                                 {JSON.stringify(lastPayload.content, null, 2)}
                             </Text>
                         </Box>
-                    )}
-                </Box>
+                    )
+                }
 
-                {/* Configurable Parameters */}
                 <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
 
                     <Text fontWeight="bold" mb={3}>Configurable Parameters</Text>
@@ -1736,11 +1913,33 @@ const RuleEngineDashboard = () => {
                         </GridItem>
                         <GridItem>
                             <FormControl>
-                                <FormLabel fontSize="sm">HARSH_ACCEL_THR</FormLabel>
+                                <FormLabel fontSize="sm">OVERSPEED_THR (km/h)</FormLabel>
                                 <NumberInput
-                                    value={parameters.HARSH_ACCEL_THRESHOLD}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THRESHOLD: val }))}
+                                    value={parameters.OVERSPEED_THR}
+                                    onChange={(_, val) => setParameters(prev => ({ ...prev, OVERSPEED_THR: isNaN(val) ? 0 : val }))}
+                                    min={20}
+                                    max={200}
+                                    step={5}
                                     size="sm"
+                                >
+                                    <NumberInputField color="black" />
+                                    <NumberInputStepper>
+                                        <NumberIncrementStepper />
+                                        <NumberDecrementStepper />
+                                    </NumberInputStepper>
+                                </NumberInput>
+                                <Text fontSize="xs" color="gray.500">Threshold for overspeed alerts</Text>
+                            </FormControl>
+                        </GridItem>
+                        <GridItem>
+                            <FormControl>
+                                <FormLabel fontSize="sm">HARSH_ACCEL_THR (km/h/s)</FormLabel>
+                                <NumberInput
+                                    value={parameters.HARSH_ACCEL_THR}
+                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: val }))}
+                                    size="sm"
+                                    min={1}
+                                    max={50}
                                 >
                                     <NumberInputField color="black" />
                                 </NumberInput>
@@ -1748,11 +1947,13 @@ const RuleEngineDashboard = () => {
                         </GridItem>
                         <GridItem>
                             <FormControl>
-                                <FormLabel fontSize="sm">HARD_BRAKE_THR</FormLabel>
+                                <FormLabel fontSize="sm">HARD_BRAKE_THR (km/h/s)</FormLabel>
                                 <NumberInput
-                                    value={parameters.HARD_BRAKE_THRESHOLD}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THRESHOLD: val }))}
+                                    value={parameters.HARD_BRAKE_THR}
+                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: val }))}
                                     size="sm"
+                                    min={1}
+                                    max={50}
                                 >
                                     <NumberInputField color="black" />
                                 </NumberInput>
@@ -1770,9 +1971,13 @@ const RuleEngineDashboard = () => {
                                 <HStack justify="space-between" mb={2}>
                                     <FormLabel mb={0}>Ignition</FormLabel>
                                     <Button
-                                        size="xs"
+                                        size="lg"
+                                        w="100px"
                                         colorScheme={ignition ? "green" : "gray"}
                                         onClick={toggleIgnition}
+                                        boxShadow="md"
+                                        _hover={{ transform: 'scale(1.05)' }}
+                                        transition="all 0.2s"
                                     >
                                         {ignition ? "ON" : "OFF"}
                                     </Button>
@@ -1791,6 +1996,28 @@ const RuleEngineDashboard = () => {
                                     <SliderThumb />
                                 </Slider>
                                 {!ignition && <Text fontSize="xs" color="red.500">Ignition is OFF</Text>}
+                                <HStack spacing={4} mt={4}>
+                                    <FormControl display="flex" alignItems="center">
+                                        <FormLabel mb="0" fontSize="sm">Brake (CONTACT_FREIN1)</FormLabel>
+                                        <Button
+                                            size="sm"
+                                            colorScheme={brakeActive ? "orange" : "gray"}
+                                            onClick={() => setBrakeActive(!brakeActive)}
+                                        >
+                                            {brakeActive ? "ACTIVE" : "OFF"}
+                                        </Button>
+                                    </FormControl>
+                                    <FormControl display="flex" alignItems="center">
+                                        <FormLabel mb="0" fontSize="sm">MIL Status</FormLabel>
+                                        <Button
+                                            size="sm"
+                                            colorScheme={milActive ? "red" : "gray"}
+                                            onClick={() => setMilActive(!milActive)}
+                                        >
+                                            {milActive ? "ON" : "OFF"}
+                                        </Button>
+                                    </FormControl>
+                                </HStack>
                             </FormControl>
                         </GridItem>
                         <GridItem>
@@ -1882,11 +2109,26 @@ const RuleEngineDashboard = () => {
                                     <FormLabel fontSize="xs">Crash Detection</FormLabel>
                                     <Button
                                         size="sm"
-                                        width="full"
                                         colorScheme={crashDetected ? "red" : "gray"}
+                                        variant={crashDetected ? "solid" : "outline"}
                                         onClick={() => setCrashDetected(!crashDetected)}
+                                        w="full"
                                     >
-                                        {crashDetected ? "CRASH DETECTED!" : "No Crash"}
+                                        Crash {crashDetected ? "YES" : "NO"}
+                                    </Button>
+                                </FormControl>
+                            </GridItem>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">Device Removal</FormLabel>
+                                    <Button
+                                        size="sm"
+                                        colorScheme={isDeviceRemoved ? "red" : "gray"}
+                                        variant={isDeviceRemoved ? "solid" : "outline"}
+                                        onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}
+                                        w="full"
+                                    >
+                                        Removal {isDeviceRemoved ? "TRIP" : "OFF"}
                                     </Button>
                                 </FormControl>
                             </GridItem>
@@ -1904,6 +2146,36 @@ const RuleEngineDashboard = () => {
                                         <option value="INSTALLING">INSTALLING</option>
                                         <option value="SUCCESS">SUCCESS</option>
                                         <option value="FAILED">FAILED</option>
+                                    </Select>
+                                </FormControl>
+                            </GridItem>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">Operating State</FormLabel>
+                                    <Select
+                                        size="sm"
+                                        value={tboxOperatingState}
+                                        onChange={(e) => setTboxOperatingState(e.target.value)}
+                                        bg={bgColor}
+                                    >
+                                        <option value="NORMAL">NORMAL</option>
+                                        <option value="DISCONNECTED">DISCONNECTED</option>
+                                        <option value="FAIL">FAIL</option>
+                                    </Select>
+                                </FormControl>
+                            </GridItem>
+                            <GridItem>
+                                <FormControl>
+                                    <FormLabel fontSize="xs">eSIM State</FormLabel>
+                                    <Select
+                                        size="sm"
+                                        value={tboxeSimState}
+                                        onChange={(e) => setTboxeSimState(e.target.value)}
+                                        bg={bgColor}
+                                    >
+                                        <option value="NORMAL_SIM">NORMAL_SIM</option>
+                                        <option value="NO_SIM">NO_SIM</option>
+                                        <option value="SIM_ERROR">SIM_ERROR</option>
                                     </Select>
                                 </FormControl>
                             </GridItem>
@@ -2046,7 +2318,7 @@ const RuleEngineDashboard = () => {
                                                     value={parameters.MAX_IGN_OFF_TIME || 300}
                                                     onChange={(val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: val }))}
                                                     min={2}
-                                                    max={7200}
+                                                    max={15}
                                                     step={1}
                                                 >
                                                     <SliderTrack>
@@ -2059,12 +2331,70 @@ const RuleEngineDashboard = () => {
                                                     value={parameters.MAX_IGN_OFF_TIME || 300}
                                                     onChange={(val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: Number(val) }))}
                                                     min={2}
-                                                    max={7200}
+                                                    max={20}
                                                 >
                                                     <NumberInputField color="black" />
                                                 </NumberInput>
                                             </HStack>
                                             <Text fontSize="xs" color="gray.500" mt={1}>Time after Ignition OFF before Trip is terminated (IDLE).</Text>
+                                        </FormControl>
+
+                                        <FormControl>
+                                            <FormLabel fontWeight="bold">Harsh Accel Threshold (km/h/s)</FormLabel>
+                                            <HStack spacing={4}>
+                                                <Slider
+                                                    flex="1"
+                                                    value={parameters.HARSH_ACCEL_THR || 10}
+                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: val }))}
+                                                    min={1}
+                                                    max={50}
+                                                    step={1}
+                                                >
+                                                    <SliderTrack>
+                                                        <SliderFilledTrack bg="red.400" />
+                                                    </SliderTrack>
+                                                    <SliderThumb />
+                                                </Slider>
+                                                <NumberInput
+                                                    maxW="110px"
+                                                    value={parameters.HARSH_ACCEL_THR || 10}
+                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: Number(val) }))}
+                                                    min={1}
+                                                    max={50}
+                                                >
+                                                    <NumberInputField color="black" />
+                                                </NumberInput>
+                                            </HStack>
+                                            <Text fontSize="xs" color="gray.500" mt={1}>Speed increase per second to trigger Harsh Acceleration.</Text>
+                                        </FormControl>
+
+                                        <FormControl>
+                                            <FormLabel fontWeight="bold">Hard Brake Threshold (km/h/s)</FormLabel>
+                                            <HStack spacing={4}>
+                                                <Slider
+                                                    flex="1"
+                                                    value={parameters.HARD_BRAKE_THR || 15}
+                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: val }))}
+                                                    min={1}
+                                                    max={50}
+                                                    step={1}
+                                                >
+                                                    <SliderTrack>
+                                                        <SliderFilledTrack bg="red.600" />
+                                                    </SliderTrack>
+                                                    <SliderThumb />
+                                                </Slider>
+                                                <NumberInput
+                                                    maxW="110px"
+                                                    value={parameters.HARD_BRAKE_THR || 15}
+                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: Number(val) }))}
+                                                    min={1}
+                                                    max={50}
+                                                >
+                                                    <NumberInputField color="black" />
+                                                </NumberInput>
+                                            </HStack>
+                                            <Text fontSize="xs" color="gray.500" mt={1}>Speed decrease per second to trigger Hard Braking.</Text>
                                         </FormControl>
                                     </SimpleGrid>
                                 </Box>
@@ -2168,6 +2498,13 @@ const RuleEngineDashboard = () => {
                     </Box>
                 </Box>
             </VStack>
+
+            {/* Dongle Alert Popup */}
+            <DongleAlertPopup
+                isOpen={isAlertPopupOpen}
+                onClose={() => setIsAlertPopupOpen(false)}
+                alert={activePopupAlert}
+            />
         </Flex>
     );
 };
