@@ -26,16 +26,69 @@
 // ============================================
 // DEVICE STATES
 // ============================================
+
+/**
+ * Device Trip States
+ * These states manage the trip lifecycle based on ignition and distance thresholds.
+ */
 export const DeviceStates = {
-    TRIP_IDLE: 'TRIP_IDLE',
-    TRIP_PENDING: 'TRIP_PENDING',
-    TRIP_ACTIVE: 'TRIP_ACTIVE',
-    TRIP_PAUSED: 'TRIP_PAUSED',
-    // Jeep M6 States (Section 3.2)
+    // Trip State Machine
+    TRIP_IDLE: 'TRIP_IDLE',           // No active trip, ignition OFF
+    TRIP_PENDING: 'TRIP_PENDING',     // Ignition ON, waiting for MIN_TRIP_DISTANCE
+    TRIP_ACTIVE: 'TRIP_ACTIVE',       // Active trip confirmed (distance threshold met)
+    TRIP_PAUSED: 'TRIP_PAUSED',       // Trip paused (ignition temporarily OFF)
+
+    /**
+     * Lifecycle States (Jeep M6 / TE-01 Spec Section 3.2)
+     * 
+     * These states represent the device lifecycle from manufacturing to customer activation.
+     * State transitions are command-driven by CVIP and involve certificate-based authentication.
+     * 
+     * Flow: FACTORY → PROVISIONED → AUTHORIZED → CUSTOMER
+     */
+
+    // PRE-SALES: Initial state before manufacturing (minimal functionality)
+    // - Identity: IMEI
+    // - Subsystems: GSM only
+    // - Purpose: Device exists but not yet manufactured/configured
     PRE_SALES: 'PRE-SALES',
+
+    // FACTORY: Post-manufacturing state, dongle inserted into device
+    // - Identity: IMEI
+    // - Subsystems: CAN, GPS, GSM enabled
+    // - Authentication: Uses common certificates to connect to CVIP
+    // - Purpose: Device ready for provisioning, can decode VIN and download device certificates
     FACTORY: 'FACTORY',
+
+    // PROVISIONED: Device successfully authenticated with CVIP using device-specific certificates
+    // - Identity: VIN (Vehicle Identification Number)
+    // - Subsystems: CAN, GPS, GSM, Telemetry enabled
+    // - Authentication: Device certificates created via Access Token (Access Token service + CVIP bundle)
+    // - CVIP Flow:
+    //   1. Dongle connects using common certificates
+    //   2. CVIP issues Access Token
+    //   3. Device certificates created using access token
+    //   4. CVIP reconnects using device-specific certificates
+    //   5. Device joins CVIP successfully → State becomes PROVISIONED
+    // - Purpose: Device authenticated and ready for authorization
     PROVISIONED: 'PROVISIONED',
+
+    // AUTHORIZED: CVIP has authorized the device for full operation
+    // - Identity: VIN
+    // - Subsystems: All enabled (CAN, GPS, GSM, Telemetry, Alerts)
+    // - Trigger: CVIP sends command to change state from PROVISIONED → AUTHORIZED
+    // - Purpose: Device fully operational, ready for customer activation
     AUTHORIZED: 'AUTHORIZED',
+
+    // CUSTOMER: Device activated for customer use
+    // - Identity: MSISDN (Mobile number) or VehicleId
+    // - Subsystems: All enabled (full functionality)
+    // - Trigger: After dongle responds successfully to CVIP authorization,
+    //           CVIP initiates state change AUTHORIZED → CUSTOMER
+    // - Events:
+    //   - Device subscribes to: CSR Access Token Response
+    //   - Device publishes: IMEI to CSR Access Request
+    // - Purpose: Device in production use by end customer
     CUSTOMER: 'CUSTOMER'
 };
 
@@ -269,6 +322,228 @@ export const StateTransitions = {
                 description: 'Trip ended'
             }
         ]
+    }
+};
+
+// ============================================
+// LIFECYCLE STATE TRANSITIONS
+// ============================================
+
+/**
+ * Lifecycle State Transitions
+ * 
+ * Documents the device lifecycle flow from Factory to Customer.
+ * State transitions are command-driven by CVIP and require proper authentication.
+ * 
+ * Security Considerations:
+ * - All state transitions must be authenticated using device-specific certificates
+ * - State transitions are idempotent (safe to retry)
+ * - Device validates CVIP commands before transitioning
+ * - Access tokens are used for certificate creation but not stored long-term
+ */
+export const LifecycleStateTransitions = {
+    [DeviceStates.PRE_SALES]: {
+        description: 'Initial state before manufacturing',
+        identity: 'IMEI',
+        transitions: [
+            {
+                to: DeviceStates.FACTORY,
+                trigger: 'Manufacturing complete, dongle inserted',
+                process: [
+                    'Device manufactured and dongle physically inserted',
+                    'Basic subsystems (CAN, GPS, GSM) initialized',
+                    'Device ready to connect to CVIP using common certificates'
+                ],
+                requirements: ['Physical dongle insertion', 'Subsystem initialization']
+            }
+        ]
+    },
+
+    [DeviceStates.FACTORY]: {
+        description: 'Post-manufacturing state, ready for provisioning',
+        identity: 'IMEI',
+        transitions: [
+            {
+                to: DeviceStates.PROVISIONED,
+                trigger: 'Successful CVIP authentication and device certificate creation',
+                process: [
+                    '1. Dongle connects to CVIP using common certificates',
+                    '2. CVIP authenticates device and issues Access Token',
+                    '   - Access Token generated using: Access Token service + CVIP bundle',
+                    '3. Device uses Access Token to create device-specific certificates',
+                    '4. CVIP reconnects to device using device-specific certificates',
+                    '5. Device successfully joins CVIP',
+                    '6. State automatically becomes PROVISIONED'
+                ],
+                requirements: [
+                    'Valid IMEI',
+                    'Common certificates available',
+                    'CVIP connectivity',
+                    'Access Token service operational',
+                    'Device certificate creation successful'
+                ],
+                security: [
+                    'Common certificates used only for initial connection',
+                    'Access Token is temporary and used only for cert creation',
+                    'Device-specific certificates replace common certificates',
+                    'All subsequent communication uses device-specific certs'
+                ]
+            }
+        ]
+    },
+
+    [DeviceStates.PROVISIONED]: {
+        description: 'Device authenticated with CVIP, awaiting authorization',
+        identity: 'VIN',
+        transitions: [
+            {
+                to: DeviceStates.AUTHORIZED,
+                trigger: 'CVIP sends authorization command',
+                process: [
+                    '1. CVIP validates device provisioning status',
+                    '2. CVIP sends TBOXStateUpdateCommand to change state to AUTHORIZED',
+                    '3. Device validates command using device-specific certificates',
+                    '4. Device enables all subsystems (including Alerts)',
+                    '5. Device responds with success confirmation',
+                    '6. State becomes AUTHORIZED'
+                ],
+                requirements: [
+                    'Valid VIN decoded',
+                    'Device certificates active',
+                    'CVIP authorization command received',
+                    'Command signature valid'
+                ],
+                security: [
+                    'Command must be signed with CVIP private key',
+                    'Device verifies command signature before transition',
+                    'Transition is idempotent (can safely retry)'
+                ]
+            }
+        ]
+    },
+
+    [DeviceStates.AUTHORIZED]: {
+        description: 'Device fully authorized, ready for customer activation',
+        identity: 'VIN',
+        transitions: [
+            {
+                to: DeviceStates.CUSTOMER,
+                trigger: 'Successful dongle response to CVIP, followed by customer activation command',
+                process: [
+                    '1. Device responds successfully to CVIP authorization',
+                    '2. CVIP validates dongle response',
+                    '3. CVIP initiates state change: AUTHORIZED → CUSTOMER',
+                    '4. CVIP sends TBOXStateUpdateCommand with target state CUSTOMER',
+                    '5. Device updates internal state to CUSTOMER',
+                    '6. Device identity switches from VIN to MSISDN (if available)',
+                    '7. Device subscribes to CSR Access Token Response events',
+                    '8. Device publishes IMEI to CSR Access Request'
+                ],
+                requirements: [
+                    'Successful authorization response from dongle',
+                    'CVIP customer activation command',
+                    'MSISDN assigned (optional, falls back to VehicleId)',
+                    'CSR event subscription capability'
+                ],
+                security: [
+                    'Customer activation requires explicit CVIP command',
+                    'Cannot self-transition to CUSTOMER state',
+                    'MSISDN assignment validated by CVIP'
+                ]
+            }
+        ]
+    },
+
+    [DeviceStates.CUSTOMER]: {
+        description: 'Device activated for customer use (production state)',
+        identity: 'MSISDN',
+        transitions: [
+            // Terminal state - no further transitions in normal operation
+            // May transition back to AUTHORIZED for service/maintenance (not documented here)
+        ],
+        notes: [
+            'This is the production state for customer-facing devices',
+            'All subsystems and features are fully enabled',
+            'Device uses MSISDN as primary identity for customer-facing services',
+            'Falls back to VehicleId if MSISDN not available'
+        ]
+    }
+};
+
+// ============================================
+// LIFECYCLE EVENT CONFIGURATION
+// ============================================
+
+/**
+ * Lifecycle Event Configuration
+ * 
+ * Defines event subscriptions and publications for each lifecycle state.
+ * This ensures proper event routing and message handling based on device state.
+ */
+export const LifecycleEventConfig = {
+    [DeviceStates.PRE_SALES]: {
+        subscribes: [],
+        publishes: [],
+        description: 'Minimal event handling - device not yet operational'
+    },
+
+    [DeviceStates.FACTORY]: {
+        subscribes: [
+            'ACCESS_TOKEN_RESPONSE',      // Response from CVIP Access Token service
+            'DEVICE_CERT_RESPONSE'        // Response after device certificate creation
+        ],
+        publishes: [
+            'DEVICE_JOINED',              // Notify CVIP of device connection
+            'CERT_REQUEST'                // Request device certificate creation
+        ],
+        description: 'Certificate provisioning events'
+    },
+
+    [DeviceStates.PROVISIONED]: {
+        subscribes: [
+            'TBOX_STATE_UPDATE_COMMAND',  // Command to transition to AUTHORIZED
+            'CONFIGURATION_UPDATE'        // Configuration updates from CVIP
+        ],
+        publishes: [
+            'TELEMETRY',                  // Basic telemetry data
+            'COMMAND_RESPONSE'            // Responses to CVIP commands
+        ],
+        description: 'Telemetry enabled, awaiting authorization'
+    },
+
+    [DeviceStates.AUTHORIZED]: {
+        subscribes: [
+            'TBOX_STATE_UPDATE_COMMAND',  // Command to transition to CUSTOMER
+            'CONFIGURATION_UPDATE',
+            'REMOTE_COMMAND'              // Remote commands (lock, unlock, etc.)
+        ],
+        publishes: [
+            'TELEMETRY',
+            'ALERTS',                     // Alert events now enabled
+            'TRIP_DATA',
+            'COMMAND_RESPONSE'
+        ],
+        description: 'Full functionality enabled, ready for customer activation'
+    },
+
+    [DeviceStates.CUSTOMER]: {
+        subscribes: [
+            'CSR_ACCESS_TOKEN_RESPONSE',  // Customer Service Representative access token responses
+            'TBOX_STATE_UPDATE_COMMAND',
+            'CONFIGURATION_UPDATE',
+            'REMOTE_COMMAND',
+            'FOTA_UPDATE'                 // Firmware Over-The-Air updates
+        ],
+        publishes: [
+            'IMEI_CSR_ACCESS_REQUEST',    // Publish IMEI for CSR access requests
+            'TELEMETRY',
+            'ALERTS',
+            'TRIP_DATA',
+            'DRIVING_SCORE',
+            'COMMAND_RESPONSE',
+            'EMERGENCY_ALERT'             // SOS, crash detection, etc.
+        ],
+        description: 'Production state - full event handling for customer use'
     }
 };
 
@@ -1155,30 +1430,81 @@ export const JeepM6DefaultRules = [
 // ============================================
 // DEFAULT LIFECYCLE RULES (Section 2 Spec)
 // ============================================
+
+/**
+ * Default Lifecycle Rules
+ * 
+ * Defines subsystems, allowed actions, and authentication requirements for each lifecycle state.
+ * These rules control what functionality is available at each stage of the device lifecycle.
+ * 
+ * Key Concepts:
+ * - Identity: How the device identifies itself to CVIP (IMEI, VIN, or MSISDN)
+ * - Subsystems: Which hardware/software subsystems are enabled
+ * - Allowed Actions: What operations the device can perform
+ * - Authentication: Certificate and token requirements for CVIP communication
+ */
 export const DefaultLifecycleRules = {
     [DeviceStates.PRE_SALES]: {
         identity: 'IMEI',
         subsystems: { CAN: false, GPS: false, GSM: true, Telemetry: false, Alerts: false },
-        allowedActions: { vinDecoding: false, certDownload: false, telemetryPublish: false }
+        allowedActions: { vinDecoding: false, certDownload: false, telemetryPublish: false },
+        authentication: {
+            certificateType: 'none',
+            requiresAccessToken: false,
+            cvipConnectionState: 'disconnected'
+        },
+        description: 'Minimal functionality - device not yet manufactured'
     },
     [DeviceStates.FACTORY]: {
         identity: 'IMEI',
         subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: false, Alerts: false },
-        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: false }
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: false },
+        authentication: {
+            certificateType: 'common',
+            requiresAccessToken: true,
+            cvipConnectionState: 'connecting',
+            accessTokenPurpose: 'Device certificate creation',
+            accessTokenSource: 'Access Token service + CVIP bundle'
+        },
+        description: 'Post-manufacturing - uses common certificates to bootstrap device-specific certificates'
     },
     [DeviceStates.PROVISIONED]: {
         identity: 'VIN',
         subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: false },
-        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true },
+        authentication: {
+            certificateType: 'device-specific',
+            requiresAccessToken: false,
+            cvipConnectionState: 'connected',
+            certificateValidation: 'All CVIP commands validated using device certificates'
+        },
+        description: 'Device authenticated with CVIP - telemetry enabled, awaiting authorization'
     },
     [DeviceStates.AUTHORIZED]: {
         identity: 'VIN',
         subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: true },
-        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true },
+        authentication: {
+            certificateType: 'device-specific',
+            requiresAccessToken: false,
+            cvipConnectionState: 'connected',
+            certificateValidation: 'All CVIP commands validated using device certificates',
+            commandSigning: 'CVIP commands must be signed with CVIP private key'
+        },
+        description: 'Fully authorized - all subsystems enabled, ready for customer activation'
     },
     [DeviceStates.CUSTOMER]: {
         identity: 'MSISDN',
         subsystems: { CAN: true, GPS: true, GSM: true, Telemetry: true, Alerts: true },
-        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true }
+        allowedActions: { vinDecoding: true, certDownload: true, telemetryPublish: true },
+        authentication: {
+            certificateType: 'device-specific',
+            requiresAccessToken: false,
+            cvipConnectionState: 'connected',
+            certificateValidation: 'All CVIP commands validated using device certificates',
+            commandSigning: 'CVIP commands must be signed with CVIP private key',
+            identityFallback: 'Falls back to VehicleId if MSISDN not assigned'
+        },
+        description: 'Production state - full functionality for customer use'
     }
 };

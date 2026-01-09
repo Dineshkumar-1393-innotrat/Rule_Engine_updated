@@ -621,23 +621,73 @@ const RuleEngineDashboard = () => {
             setFotaStatus('SUCCESS');
             deviceVariables.current.ccpuVersion = 'CD.02.04';
             toast({ title: 'FOTA Success', description: 'System updated to CD.02.04.', status: 'success' });
-        }, 3000);
+        }, 1500);
+    };
+
+    const handleDongleInsertion = () => {
+        if (tboxApplicationState !== DeviceStates.PRE_SALES) {
+            toast({
+                title: 'Invalid Operation',
+                description: 'Dongle insertion only valid in PRE-SALES state',
+                status: 'warning',
+                duration: 2000
+            });
+            return;
+        }
+
+        setTboxApplicationState(DeviceStates.FACTORY);
+
+        setEvents(prev => [...prev, {
+            ruleId: 'dongle-inserted',
+            ruleName: 'Dongle Insertion',
+            type: 'state',
+            message: 'Dongle physically inserted. Subsystems (CAN, GPS, GSM) initialized. State: FACTORY',
+            severity: 'success',
+            timestamp: new Date().toISOString()
+        }].slice(-100));
+
+        toast({
+            title: 'Dongle Inserted',
+            description: 'Device transitioned to FACTORY state. Monitoring CAN for VIN discovery...',
+            status: 'success',
+            duration: 3000
+        });
     };
 
     const handleLifecycleCommand = (command) => {
-        setLastCommand(command);
+        setLastCommand(typeof command === 'string' ? command : command.type);
         let validTransition = false;
         let nextState = tboxApplicationState;
+        let targetState = null;
 
-        if (tboxApplicationState === DeviceStates.FACTORY && command === 'PROVISION') {
-            nextState = DeviceStates.PROVISIONED;
-            validTransition = true;
-        } else if (tboxApplicationState === DeviceStates.PROVISIONED && command === 'AUTHORIZE') {
-            nextState = DeviceStates.AUTHORIZED;
-            validTransition = true;
-        } else if (tboxApplicationState === DeviceStates.AUTHORIZED && command === 'HANDOVER') {
-            nextState = DeviceStates.CUSTOMER; // Explicitly CUSTOMER
-            validTransition = true;
+        // Handle TBOXStateUpdateCommand with targetState parameter (CVIP spec-compliant)
+        if (typeof command === 'object' && command.type === 'TBOXStateUpdate' && command.targetState) {
+            targetState = command.targetState;
+
+            // Validate transition based on current state
+            if (tboxApplicationState === DeviceStates.FACTORY && targetState === DeviceStates.PROVISIONED) {
+                validTransition = true;
+                nextState = DeviceStates.PROVISIONED;
+            } else if (tboxApplicationState === DeviceStates.PROVISIONED && targetState === DeviceStates.AUTHORIZED) {
+                validTransition = true;
+                nextState = DeviceStates.AUTHORIZED;
+            } else if (tboxApplicationState === DeviceStates.AUTHORIZED && targetState === DeviceStates.CUSTOMER) {
+                validTransition = true;
+                nextState = DeviceStates.CUSTOMER;
+            }
+        }
+        // Legacy support for old command format (backward compatibility)
+        else if (typeof command === 'string') {
+            if (tboxApplicationState === DeviceStates.FACTORY && command === 'PROVISION') {
+                nextState = DeviceStates.PROVISIONED;
+                validTransition = true;
+            } else if (tboxApplicationState === DeviceStates.PROVISIONED && command === 'AUTHORIZE') {
+                nextState = DeviceStates.AUTHORIZED;
+                validTransition = true;
+            } else if (tboxApplicationState === DeviceStates.AUTHORIZED && command === 'HANDOVER') {
+                nextState = DeviceStates.CUSTOMER;
+                validTransition = true;
+            }
         }
 
         if (validTransition) {
@@ -649,20 +699,30 @@ const RuleEngineDashboard = () => {
                 ...deviceVariables.current,
                 tboxApplicationState: nextState,
                 tboxOperatingState,
-                lifecycleRules // Added
+                lifecycleRules
             });
             setLastPayload({ type: 'deviceJoined', content: payload });
 
             toast({
-                title: 'Lifecycle Update',
-                description: `State changed to ${nextState}`,
+                title: 'CVIP Lifecycle Command',
+                description: `State transitioned to ${nextState}`,
                 status: 'success',
                 duration: 2000
             });
+
+            setEvents(prev => [...prev, {
+                ruleId: 'lifecycle-transition',
+                ruleName: 'Lifecycle State Change',
+                type: 'state',
+                message: `CVIP Command: ${tboxApplicationState} → ${nextState}`,
+                severity: 'success',
+                timestamp: new Date().toISOString()
+            }].slice(-100));
         } else {
+            const attemptedTarget = targetState || (typeof command === 'string' ? command : 'unknown');
             toast({
                 title: 'Command Rejected',
-                description: `Cannot ${command} from ${tboxApplicationState}`,
+                description: `Invalid transition from ${tboxApplicationState} to ${attemptedTarget}`,
                 status: 'warning',
                 duration: 2000
             });
@@ -727,51 +787,56 @@ const RuleEngineDashboard = () => {
             position: 'top'
         });
 
-        // 2. Start Simulation -> Automatically moves to FACTORY (Installation Detected)
+        // 2. Insert Dongle → FACTORY State
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setIsRunning(true);
-            toast({ title: 'Step 2: FACTORY State', description: 'Active signals detected. Monitoring CAN for VIN discovery...', status: 'info' });
+            handleDongleInsertion();
+            toast({ title: 'Step 2: Dongle Inserted', description: 'Device transitioned to FACTORY. Starting simulation...', status: 'info' });
         }, 3000));
 
-        // 3. Toggle Ignition -> Starts VIN Discovery
+        // 3. Start Simulation
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setIsRunning(true);
+            toast({ title: 'Step 3: Simulation Active', description: 'Monitoring for VIN discovery...', status: 'info' });
+        }, 6000));
+
+        // 4. Toggle Ignition → Starts VIN Discovery
         demoTimeoutsRef.current.push(setTimeout(() => {
             toggleIgnition();
             toast({ title: 'Ignition ON', description: 'Starting VIN reconstruction (CAN 0x3E0)...', status: 'success' });
-        }, 6000));
+        }, 9000));
 
-        // 4. Force PROVISIONED State (Determinism)
+        // 5. Force PROVISIONED State (VIN discovery takes time, so we simulate it)
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setTboxApplicationState(DeviceStates.PROVISIONED);
-            toast({ title: 'Step 3: PROVISIONED State', description: 'VIN Discovered! Identity switched to VIN. Provisioning certificates...', status: 'info' });
+            handleLifecycleCommand('PROVISION');
+            toast({ title: 'Step 4: PROVISIONED State', description: 'VIN Discovered! CVIP provisioning complete. Identity switched to VIN.', status: 'info' });
         }, 22000));
 
-        // 5. Force AUTHORIZED State (Determinism)
+        // 6. Force AUTHORIZED State
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setTboxApplicationState(DeviceStates.AUTHORIZED);
-            toast({ title: 'Step 4: AUTHORIZED State', description: 'Certificates provisioned. Ready for service activation.', status: 'info' });
+            handleLifecycleCommand('AUTHORIZE');
+            toast({ title: 'Step 5: AUTHORIZED State', description: 'CVIP authorization complete. Ready for service activation.', status: 'info' });
         }, 26000));
 
-        // 6. Force CUSTOMER State (Handover)
+        // 7. Force CUSTOMER State (Handover)
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setTboxApplicationState(DeviceStates.CUSTOMER);
-            setDeviceState(DeviceStates.TRIP_IDLE); // Ensure clean state
-            toast({ title: 'Step 5: CUSTOMER State', description: 'Handover complete. Identity switched to MSISDN. All features enabled.', status: 'success' });
+            handleLifecycleCommand('HANDOVER');
+            toast({ title: 'Step 6: CUSTOMER State', description: 'Handover complete. Identity switched to MSISDN. All features enabled.', status: 'success' });
         }, 30000));
 
-        // 7. Start Driving & Trips
+        // 8. Start Driving & Trips
         demoTimeoutsRef.current.push(setTimeout(() => {
             setSimSpeed(45);
             setRules([...rules, ...JeepM6DefaultRules]);
             toast({ title: 'Trip Started', description: 'Cruising at 45 km/h. Monitoring for events...', status: 'info' });
         }, 34000));
 
-        // 8. Trigger Overspeed
+        // 9. Trigger Overspeed
         demoTimeoutsRef.current.push(setTimeout(() => {
             setSimSpeed(115);
             toast({ title: 'Simulating Alert', description: 'Exceeding speed threshold...', status: 'warning' });
         }, 40000));
 
-        // 9. End Trip
+        // 10. End Trip
         demoTimeoutsRef.current.push(setTimeout(() => {
             setSimSpeed(0);
             toggleIgnition();
@@ -930,16 +995,8 @@ const RuleEngineDashboard = () => {
                 const gpsEnabled = rulesForState?.subsystems?.GPS !== false;
                 const canEnabled = rulesForState?.subsystems.CAN !== false;
 
-                // Section 3.2.1: PRE-SALES → FACTORY transition
-                // Detects vehicle installation (active CAN, GPS, GSM) - Simulated when simulation starts
-                if (tboxApplicationState === DeviceStates.PRE_SALES) {
-                    setTboxApplicationState(DeviceStates.FACTORY);
-                    setEvents(prev => [...prev, {
-                        ruleId: 'system-startup', ruleName: 'Lifecycle Transition', type: 'state',
-                        message: 'Active signals detected. Transitioning PRE-SALES → FACTORY', severity: 'info',
-                        timestamp: new Date().toISOString()
-                    }].slice(-100));
-                }
+                // PRE-SALES → FACTORY transition now requires manual dongle insertion
+                // (See handleDongleInsertion function)
 
                 if (ignition) {
                     // Engine is ON
@@ -1002,8 +1059,16 @@ const RuleEngineDashboard = () => {
 
                                 if (fragmentCount + 1 === 3) {
                                     toast({ title: 'VIN Discovered', description: `Full VIN: ${deviceVariables.current.vehicleId}`, status: 'success' });
-                                    // Auto-move to Provisioned as per Exit Condition Section 3.2.2
-                                    setTimeout(() => handleLifecycleCommand('PROVISION'), 1000);
+
+                                    // VIN Discovery Complete - Ready for CVIP provisioning command
+                                    setEvents(prev => [...prev, {
+                                        ruleId: 'vin-complete',
+                                        ruleName: 'VIN Discovery Complete',
+                                        type: 'state',
+                                        message: `VIN fully discovered: ${deviceVariables.current.vehicleId}. Device ready for provisioning. Awaiting CVIP command.`,
+                                        severity: 'success',
+                                        timestamp: new Date().toISOString()
+                                    }].slice(-100));
                                 }
                             }
                         }
@@ -1745,10 +1810,20 @@ const RuleEngineDashboard = () => {
                                     <Badge colorScheme={tboxApplicationState === 'CUSTOMER' ? 'green' : 'gray'}>CUSTOMER</Badge>
                                 </HStack>
                                 <HStack>
+                                    {tboxApplicationState === 'PRE-SALES' && (
+                                        <Button
+                                            size="sm"
+                                            colorScheme="green"
+                                            onClick={handleDongleInsertion}
+                                            leftIcon={<Zap size={16} />}
+                                        >
+                                            Insert Dongle
+                                        </Button>
+                                    )}
                                     <Button size="sm" colorScheme="blue" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={tboxApplicationState !== 'FACTORY'}>Provision</Button>
                                     <Button size="sm" colorScheme="purple" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={tboxApplicationState !== 'PROVISIONED'}>Authorize</Button>
                                     <Button size="sm" colorScheme="orange" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={tboxApplicationState !== 'AUTHORIZED'}>Handover</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setTboxApplicationState('FACTORY')}>Reset</Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setTboxApplicationState('PRE-SALES')}>Reset to PRE-SALES</Button>
                                 </HStack>
                             </VStack>
                         </GridItem>
