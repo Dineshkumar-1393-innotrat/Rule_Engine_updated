@@ -81,7 +81,7 @@ const RuleTemplateLibrary = ({ onCreateNew, templates, onUseTemplate }) => {
 
     return (
         <Box bg={bgColor} minH="100%" p={8} borderRadius="xl">
-            <Flex justifyContent="space-between" alignItems="flex-start" mb={2}>
+            <Flex justify="space-between" align="center" mb={2} wrap="wrap" gap={4}>
                 <Box>
                     <Heading size="lg" mb={1}>Rule Templates</Heading>
                     <Text color="gray.500" fontSize="sm">Choose A Template Quickly To Create A Rule</Text>
@@ -113,7 +113,7 @@ const RuleTemplateLibrary = ({ onCreateNew, templates, onUseTemplate }) => {
                     />
                 </InputGroup>
 
-                <HStack spacing={2}>
+                <Flex wrap="wrap" gap={2} align="center">
                     <Text fontSize="sm" fontWeight="medium" mr={2}>Quick Tags :</Text>
                     <Tag size="md" borderRadius="full" variant="subtle" colorScheme="red" cursor="pointer" onClick={() => setSearchQuery('Temperature')}>
                         <TagLeftIcon boxSize="12px" as={FaThermometerHalf} />
@@ -127,7 +127,7 @@ const RuleTemplateLibrary = ({ onCreateNew, templates, onUseTemplate }) => {
                         <TagLeftIcon boxSize="12px" as={FaBatteryThreeQuarters} />
                         <TagLabel>Battery</TagLabel>
                     </Tag>
-                </HStack>
+                </Flex>
             </Box>
 
             <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", lg: "repeat(3, 1fr)" }} gap={6}>

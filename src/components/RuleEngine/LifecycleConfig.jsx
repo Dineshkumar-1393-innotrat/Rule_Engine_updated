@@ -15,6 +15,7 @@ import {
     CardBody,
     Divider,
     Badge,
+    Flex,
     useColorModeValue
 } from '@chakra-ui/react';
 import { DeviceStates } from '../../utils/RuleEngine';
@@ -96,16 +97,16 @@ const LifecycleConfig = ({ rules, onUpdateRule }) => {
                                 {/* Subsystems Section */}
                                 <VStack align="stretch" spacing={3}>
                                     <Text fontWeight="bold" fontSize="sm">Subsystem Enablement</Text>
-                                    <SimpleGrid columns={2} spacing={2}>
+                                    <SimpleGrid columns={{ base: 1, sm: 2 }} spacing={2}>
                                         {Object.keys(rule.subsystems).map((sub) => (
-                                            <HStack key={sub} justify="space-between">
+                                            <Flex key={sub} justify="space-between" align="center" gap={2}>
                                                 <Text fontSize="xs">{sub}</Text>
                                                 <Switch
                                                     size="sm"
                                                     isChecked={rule.subsystems[sub]}
                                                     onChange={() => handleSubsystemToggle(state, sub)}
                                                 />
-                                            </HStack>
+                                            </Flex>
                                         ))}
                                     </SimpleGrid>
                                 </VStack>
@@ -115,7 +116,7 @@ const LifecycleConfig = ({ rules, onUpdateRule }) => {
                                     <Text fontWeight="bold" fontSize="sm">Allowed Actions</Text>
                                     <VStack spacing={2} align="stretch">
                                         {Object.keys(rule.allowedActions).map((action) => (
-                                            <HStack key={action} justify="space-between">
+                                            <Flex key={action} justify="space-between" align="center" gap={2}>
                                                 <Text fontSize="xs">{action.replace(/([A-Z])/g, ' $1').trim()}</Text>
                                                 <Switch
                                                     size="sm"
@@ -123,7 +124,7 @@ const LifecycleConfig = ({ rules, onUpdateRule }) => {
                                                     colorScheme="green"
                                                     onChange={() => handleActionToggle(state, action)}
                                                 />
-                                            </HStack>
+                                            </Flex>
                                         ))}
                                     </VStack>
                                 </VStack>

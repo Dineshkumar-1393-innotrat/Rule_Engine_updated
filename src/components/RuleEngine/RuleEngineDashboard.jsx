@@ -39,9 +39,14 @@ import {
     Menu,
     MenuButton,
     MenuList,
-    MenuItem
+    MenuItem,
+    Card,
+    CardHeader,
+    CardBody,
+    Icon,
+    Divider
 } from '@chakra-ui/react';
-import { Play, Square, Trash2, Zap, Activity, Car } from 'lucide-react';
+import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle } from 'lucide-react';
 import {
     RuleEngine,
     defaultRules, // Keep defaultRules as it's used in DEFAULT_RULE_ENGINE_STATE
@@ -58,6 +63,7 @@ import DataVisualizer from './DataVisualizer';
 
 import CreateRuleTemplate from './CreateRuleTemplate';
 import RuleTemplateLibrary from './RuleTemplateLibrary';
+import TripConfiguration from './TripConfiguration';
 import CANSignalBuilder from './CANSignalBuilder'; // Added
 import DongleAlertPopup from './DongleAlertPopup'; // Added
 
@@ -84,6 +90,7 @@ const DEFAULT_RULE_ENGINE_STATE = {
         MIN_TRIP_DISTANCE: ConfigurableParameters.find(p => p.name === 'MIN_TRIP_DISTANCE')?.defaultValue || 2,
         MIN_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MIN_IGN_OFF_TIME')?.defaultValue || 120,
         MAX_IGN_OFF_TIME: ConfigurableParameters.find(p => p.name === 'MAX_IGN_OFF_TIME')?.defaultValue || 300,
+        MAX_IGN_ON_TIME: 3600, // Added default 1 hour
         OVERSPEED_THR: ConfigurableParameters.find(p => p.name === 'OVERSPEED_THR')?.defaultValue || 120,
         HARSH_ACCEL_THR: ConfigurableParameters.find(p => p.name === 'HARSH_ACCEL_THR')?.defaultValue || 10,
         HARD_BRAKE_THR: ConfigurableParameters.find(p => p.name === 'HARD_BRAKE_THR')?.defaultValue || 15
@@ -126,11 +133,11 @@ const RuleEngineDashboard = () => {
 
     const setCustomRuleTemplates = (newTemplates) => updatePersistedState({ customRuleTemplates: newTemplates });
     const setParameters = (newParams) => {
-        if (typeof newParams === 'function') {
-            updatePersistedState({ parameters: newParams(parameters) });
-        } else {
-            updatePersistedState({ parameters: newParams });
-        }
+        updatePersistedState((currentState) => {
+            const currentParams = currentState.parameters || DEFAULT_RULE_ENGINE_STATE.parameters;
+            const updatedParams = typeof newParams === 'function' ? newParams(currentParams) : newParams;
+            return { parameters: updatedParams };
+        });
     };
     const setLifecycleRules = (newRules) => updatePersistedState({ lifecycleRules: newRules });
     const setSimRoadCondition = (condition) => updatePersistedState({ simRoadCondition: condition });
@@ -185,6 +192,12 @@ const RuleEngineDashboard = () => {
     });
 
     const [tboxApplicationState, setTboxApplicationState] = useState(DeviceStates.PRE_SALES);
+    const tboxApplicationStateRef = useRef(tboxApplicationState);
+
+    useEffect(() => {
+        tboxApplicationStateRef.current = tboxApplicationState;
+    }, [tboxApplicationState]);
+
     const [tboxOperatingState, setTboxOperatingState] = useState('NORMAL');
     const [tboxeSimState, setTboxeSimState] = useState('NORMAL_SIM');
     const [lastPayload, setLastPayload] = useState(null);
@@ -310,12 +323,13 @@ const RuleEngineDashboard = () => {
     const toggleIgnition = () => {
         // Lifecycle Check: Allow ignition in all states except PRE-SALES
         // (Section 3 requires monitoring CAN in FACTORY for VIN discovery)
-        const isPreSales = tboxApplicationState === DeviceStates.PRE_SALES;
+        const currentState = tboxApplicationStateRef.current;
+        const isPreSales = currentState === DeviceStates.PRE_SALES;
 
         if (!ignition && isPreSales) {
             toast({
                 title: 'Ignition Blocked',
-                description: `Ignition is disabled in ${tboxApplicationState} state. Device must reach FACTORY state first.`,
+                description: `Ignition is disabled in ${currentState} state. Device must reach FACTORY state first.`,
                 status: 'warning',
                 duration: 3000
             });
@@ -625,7 +639,8 @@ const RuleEngineDashboard = () => {
     };
 
     const handleDongleInsertion = () => {
-        if (tboxApplicationState !== DeviceStates.PRE_SALES) {
+        const currentState = tboxApplicationStateRef.current;
+        if (currentState !== DeviceStates.PRE_SALES) {
             toast({
                 title: 'Invalid Operation',
                 description: 'Dongle insertion only valid in PRE-SALES state',
@@ -657,7 +672,8 @@ const RuleEngineDashboard = () => {
     const handleLifecycleCommand = (command) => {
         setLastCommand(typeof command === 'string' ? command : command.type);
         let validTransition = false;
-        let nextState = tboxApplicationState;
+        const currentState = tboxApplicationStateRef.current; // Use Ref for fresh state
+        let nextState = currentState;
         let targetState = null;
 
         // Handle TBOXStateUpdateCommand with targetState parameter (CVIP spec-compliant)
@@ -665,26 +681,26 @@ const RuleEngineDashboard = () => {
             targetState = command.targetState;
 
             // Validate transition based on current state
-            if (tboxApplicationState === DeviceStates.FACTORY && targetState === DeviceStates.PROVISIONED) {
+            if (currentState === DeviceStates.FACTORY && targetState === DeviceStates.PROVISIONED) {
                 validTransition = true;
                 nextState = DeviceStates.PROVISIONED;
-            } else if (tboxApplicationState === DeviceStates.PROVISIONED && targetState === DeviceStates.AUTHORIZED) {
+            } else if (currentState === DeviceStates.PROVISIONED && targetState === DeviceStates.AUTHORIZED) {
                 validTransition = true;
                 nextState = DeviceStates.AUTHORIZED;
-            } else if (tboxApplicationState === DeviceStates.AUTHORIZED && targetState === DeviceStates.CUSTOMER) {
+            } else if (currentState === DeviceStates.AUTHORIZED && targetState === DeviceStates.CUSTOMER) {
                 validTransition = true;
                 nextState = DeviceStates.CUSTOMER;
             }
         }
         // Legacy support for old command format (backward compatibility)
         else if (typeof command === 'string') {
-            if (tboxApplicationState === DeviceStates.FACTORY && command === 'PROVISION') {
+            if (currentState === DeviceStates.FACTORY && command === 'PROVISION') {
                 nextState = DeviceStates.PROVISIONED;
                 validTransition = true;
-            } else if (tboxApplicationState === DeviceStates.PROVISIONED && command === 'AUTHORIZE') {
+            } else if (currentState === DeviceStates.PROVISIONED && command === 'AUTHORIZE') {
                 nextState = DeviceStates.AUTHORIZED;
                 validTransition = true;
-            } else if (tboxApplicationState === DeviceStates.AUTHORIZED && command === 'HANDOVER') {
+            } else if (currentState === DeviceStates.AUTHORIZED && command === 'HANDOVER') {
                 nextState = DeviceStates.CUSTOMER;
                 validTransition = true;
             }
@@ -714,7 +730,7 @@ const RuleEngineDashboard = () => {
                 ruleId: 'lifecycle-transition',
                 ruleName: 'Lifecycle State Change',
                 type: 'state',
-                message: `CVIP Command: ${tboxApplicationState} → ${nextState}`,
+                message: `CVIP Command: ${currentState} → ${nextState}`,
                 severity: 'success',
                 timestamp: new Date().toISOString()
             }].slice(-100));
@@ -722,7 +738,7 @@ const RuleEngineDashboard = () => {
             const attemptedTarget = targetState || (typeof command === 'string' ? command : 'unknown');
             toast({
                 title: 'Command Rejected',
-                description: `Invalid transition from ${tboxApplicationState} to ${attemptedTarget}`,
+                description: `Invalid transition from ${currentState} to ${attemptedTarget}`,
                 status: 'warning',
                 duration: 2000
             });
@@ -742,7 +758,8 @@ const RuleEngineDashboard = () => {
             alertType: alertType, // THE TRIGGER
             batteryVoltage,
             crashDetected,
-            geoFenceStatus
+            geoFenceStatus,
+            ...parameters
         };
 
         const triggeredEvents = engine.evaluate(currentData);
@@ -778,6 +795,18 @@ const RuleEngineDashboard = () => {
         setIsRunning(false);
         setIgnition(false);
         setSimSpeed(0);
+
+        // Reset Parameters to Defaults
+        const defaultParams = {
+            MIN_TRIP_DISTANCE: 2,
+            MIN_IGN_OFF_TIME: 10,
+            MAX_IGN_OFF_TIME: 15,
+            MAX_IGN_ON_TIME: 3600,
+            OVERSPEED_THR: 100,
+            HARSH_ACCEL_THR: 10,
+            HARD_BRAKE_THR: 15
+        };
+        setParameters(defaultParams);
 
         toast({
             title: 'Full Automated Demo Started',
@@ -826,8 +855,10 @@ const RuleEngineDashboard = () => {
         // 8. Start Driving & Trips
         demoTimeoutsRef.current.push(setTimeout(() => {
             setSimSpeed(45);
+            // Lower trip distance threshold for demo purposes so we hit TRIP_ACTIVE quickly
+            setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: 0.1 }));
             setRules([...rules, ...JeepM6DefaultRules]);
-            toast({ title: 'Trip Started', description: 'Cruising at 45 km/h. Monitoring for events...', status: 'info' });
+            toast({ title: 'Trip Started', description: 'Driving at 45 km/h. Adjusted MIN_TRIP_DISTANCE to 0.1km for demo.', status: 'info' });
         }, 34000));
 
         // 9. Trigger Overspeed
@@ -840,7 +871,17 @@ const RuleEngineDashboard = () => {
         demoTimeoutsRef.current.push(setTimeout(() => {
             setSimSpeed(0);
             toggleIgnition();
-            toast({ title: 'Demo Completed', description: 'Full lifecycle and trip scenario finished.', status: 'success', duration: 10000 });
+            // Reset parameters to defaults
+            setParameters({
+                MIN_TRIP_DISTANCE: 2,
+                MIN_IGN_OFF_TIME: 120,
+                MAX_IGN_OFF_TIME: 300,
+                MAX_IGN_ON_TIME: 3600,
+                OVERSPEED_THR: 100,
+                HARSH_ACCEL_THR: 10,
+                HARD_BRAKE_THR: 15
+            });
+            toast({ title: 'Demo Completed', description: 'Full lifecycle and trip scenario finished. Parameters reset.', status: 'success', duration: 10000 });
         }, 50000));
     };
 
@@ -1311,7 +1352,7 @@ const RuleEngineDashboard = () => {
                 }
 
                 // Speed Alert Hysteresis (10 kmph)
-                const overspeedLimit = 100; // Calibratable
+                const overspeedLimit = parameters.OVERSPEED_THR || 100;
                 const hysteresis = 10;
 
                 if (!isSpeedAlertLive && currentSpeed > overspeedLimit) {
@@ -1406,6 +1447,10 @@ const RuleEngineDashboard = () => {
                     MIN_TRIP_DISTANCE: parameters.MIN_TRIP_DISTANCE,
                     MIN_IGN_OFF_TIME: parameters.MIN_IGN_OFF_TIME,
                     MAX_IGN_OFF_TIME: parameters.MAX_IGN_OFF_TIME,
+                    MAX_IGN_ON_TIME: parameters.MAX_IGN_ON_TIME,
+                    OVERSPEED_THR: parameters.OVERSPEED_THR,
+                    HARSH_ACCEL_THR: parameters.HARSH_ACCEL_THR,
+                    HARD_BRAKE_THR: parameters.HARD_BRAKE_THR,
 
                     // Jeep M6 Data
                     batteryVoltage: batteryVoltage,
@@ -1613,7 +1658,14 @@ const RuleEngineDashboard = () => {
     return (
         <Flex direction="column" minH="100vh" bg="gray.50" p={5}>
             <VStack spacing={5} align="stretch" w="full">
-                <Box display="flex" justifyContent="space-between" alignItems="center">
+                {/* <Box display="flex" justifyContent="space-between" alignItems="center"> */}
+                <Box
+                    display="flex"
+                    justifyContent="space-between"
+                    alignItems="center"
+                    flexDirection={{ base: "column", md: "row" }}
+                    gap={{ base: 2, md: 0 }}
+                >
                     <Heading size="lg">Rule Engine Dashboard</Heading>
                     <HStack>
                         <Tooltip label={isRunning ? "Stop Simulation" : "Start Simulation"}>
@@ -1664,923 +1716,616 @@ const RuleEngineDashboard = () => {
                     </HStack>
                 </Box>
 
-                {/* Device State Machine Display */}
-                <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
-                    <VStack align="stretch" spacing={4}>
-                        <HStack justify="space-between">
-                            <Text fontWeight="bold">Device State Machine</Text>
-                            <HStack spacing={2}>
-                                {Object.values(DeviceStates).map((state) => {
-                                    const isTripState = state.startsWith('TRIP_');
-                                    const isLifecycleState = !isTripState;
-                                    const isActive = (isTripState && deviceState === state) ||
-                                        (isLifecycleState && tboxApplicationState === state);
+                {/* System Status - Consolidated Header */}
+                <Card variant="outline" borderColor="gray.200" boxShadow="sm" borderRadius="xl">
+                    <CardBody p={{ base: 3, md: 4 }}>
+                        <VStack align="stretch" spacing={{ base: 3, md: 4 }}>
+                            <HStack justify="space-between" align="center" wrap="wrap" gap={{ base: 2, md: 4 }} flexDirection={{ base: "column", md: "row" }}>
+                                <VStack align="flex-start" spacing={1}>
+                                    <HStack>
+                                        <Icon as={Activity} color="blue.500" />
+                                        <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>System Status</Text>
+                                    </HStack>
+                                    <Flex flexWrap="wrap" gap={2}>
+                                        {Object.values(DeviceStates).map((state) => {
+                                            const isTripState = state.startsWith('TRIP_');
+                                            const isLifecycleState = !isTripState;
+                                            const isActive = (isTripState && deviceState === state) ||
+                                                (isLifecycleState && tboxApplicationState === state);
 
-                                    let activeColor = 'blue';
-                                    if (isActive) {
-                                        if (state === 'TRIP_ACTIVE') activeColor = 'green';
-                                        else if (state === 'TRIP_PAUSED') activeColor = 'orange';
-                                        else if (state === 'TRIP_PENDING') activeColor = 'yellow';
-                                        else if (state === 'TRIP_IDLE') activeColor = 'teal';
-                                        else if (state === 'PRE-SALES') activeColor = 'gray';
-                                        else if (state === 'FACTORY') activeColor = 'purple';
-                                        else if (state === 'PROVISIONED') activeColor = 'cyan';
-                                        else if (state === 'AUTHORIZED') activeColor = 'blue';
-                                        else if (state === 'CUSTOMER') activeColor = 'pink';
-                                    }
+                                            let activeColor = 'blue';
+                                            if (isActive) {
+                                                if (state === 'TRIP_ACTIVE') activeColor = 'green';
+                                                else if (state === 'TRIP_PAUSED') activeColor = 'orange';
+                                                else if (state === 'TRIP_PENDING') activeColor = 'yellow';
+                                                else if (state === 'TRIP_IDLE') activeColor = 'teal';
+                                                else if (state === 'PRE-SALES') activeColor = 'red';
+                                                else if (state === 'FACTORY') activeColor = 'purple';
+                                                else if (state === 'PROVISIONED') activeColor = 'cyan';
+                                                else if (state === 'AUTHORIZED') activeColor = 'blue';
+                                                else if (state === 'CUSTOMER') activeColor = 'pink';
+                                            }
 
-                                    return (
-                                        <Badge
-                                            key={state}
-                                            colorScheme={isActive ? activeColor : 'gray'}
-                                            variant="solid"
-                                            fontSize={isActive ? 'xs' : '2xs'}
-                                            px={2}
-                                            py={1}
-                                            fontWeight="bold"
+                                            return (
+                                                <Badge
+                                                    key={state}
+                                                    colorScheme={isActive ? activeColor : 'gray'}
+                                                    variant={isActive ? "solid" : "outline"}
+                                                    fontSize="2xs"
+                                                    px={2}
+                                                    py={0.5}
+                                                    borderRadius="full"
+                                                    opacity={isActive ? 1 : 0.3}
+                                                >
+                                                    {state}
+                                                </Badge>
+                                            );
+                                        })}
+                                    </Flex>
+                                </VStack>
+                                <HStack spacing={{ base: 3, md: 6 }} wrap="wrap" justify={{ base: "flex-start", md: "flex-end" }} w={{ base: "full", md: "auto" }}>
+                                    <VStack align="flex-end" spacing={0}>
+                                        <Text fontSize="xs" color="gray.500">Trip Distance</Text>
+                                        <Text fontWeight="bold" fontSize="lg">{deviceVariables.current.currentTripDistance.toFixed(2)} km</Text>
+                                    </VStack>
+                                    <VStack align="flex-end" spacing={0}>
+                                        <Text fontSize="xs" color="gray.500">Ign Off Time</Text>
+                                        <Text fontWeight="bold" fontSize="lg">{deviceVariables.current.elapsedIgnitionOffTime}s</Text>
+                                    </VStack>
+                                    <FormControl display="flex" flexDirection="column" alignItems="flex-end">
+                                        <FormLabel fontSize="xs" color="gray.500" mb={0} mr={0}>Override State</FormLabel>
+                                        <Select
+                                            size="xs"
+                                            width="140px"
+                                            value={deviceState}
+                                            onChange={(e) => setDeviceState(e.target.value)}
                                             borderRadius="md"
-                                            opacity={isActive ? 1 : 0.4}
                                         >
-                                            {state}
-                                        </Badge>
-                                    );
-                                })}
-                            </HStack>
-                        </HStack>
-
-                        <HStack spacing={4} mt={1} borderTopWidth="1px" pt={2} borderColor={borderColor}>
-                            <HStack spacing={2}>
-                                <Text fontSize="xs" color="gray.500" fontWeight="bold">OPERATING:</Text>
-                                <Badge colorScheme={tboxOperatingState === 'NORMAL' ? 'green' : 'red'}>
-                                    {tboxOperatingState}
-                                </Badge>
-                            </HStack>
-                            <HStack spacing={2}>
-                                <Text fontSize="xs" color="gray.500" fontWeight="bold">eSIM:</Text>
-                                <Badge colorScheme={tboxeSimState === 'NORMAL_SIM' ? 'blue' : 'orange'}>
-                                    {tboxeSimState}
-                                </Badge>
-                            </HStack>
-                            <HStack spacing={2}>
-                                <Text fontSize="xs" color="gray.500" fontWeight="bold">BATTERY:</Text>
-                                <Badge colorScheme={batteryVoltage < 11.5 ? 'red' : 'green'}>
-                                    {batteryVoltage}V
-                                </Badge>
-                            </HStack>
-                            {isDeviceRemoved && (
-                                <Badge colorScheme="purple" variant="solid">DEVICE REMOVED</Badge>
-                            )}
-                            <Spacer />
-                            <Badge colorScheme={deviceState === DeviceStates.TRIP_ACTIVE ? 'green' : 'gray'} variant="outline">
-                                {deviceState}
-                            </Badge>
-                        </HStack>
-                    </VStack>
-                </Box>
-
-                {/* Device Lifecycle Control */}
-                <Box mt={2} mb={4}>
-                    <FormControl display="flex" alignItems="center">
-                        <FormLabel fontSize="sm" mb={0} mr={2}>Override Device State:</FormLabel>
-                        <Select
-                            size="sm"
-                            width="auto"
-                            value={deviceState}
-                            onChange={(e) => setDeviceState(e.target.value)}
-                            bg={Object.values(DeviceStates).filter(s => !s.startsWith('TRIP')).includes(deviceState) ? "yellow.100" : "white"}
-                        >
-                            <optgroup label="Trip States">
-                                <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
-                                <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
-                                <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
-                                <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
-                            </optgroup>
-                            <optgroup label="Lifecycle States">
-                                <option value={DeviceStates.FACTORY}>FACTORY</option>
-                                <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
-                                <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
-                                <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
-                            </optgroup>
-                        </Select>
-                    </FormControl>
-                </Box>
-
-                <Grid templateColumns="repeat(3, 1fr)" gap={4}>
-                    <GridItem>
-                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                            <Text fontSize="xs" color="gray.500">Current State</Text>
-                            <Text fontWeight="bold" color={
-                                deviceState === DeviceStates.TRIP_ACTIVE ? 'green.500' :
-                                    deviceState === DeviceStates.TRIP_PAUSED ? 'orange.500' : 'gray.500'
-                            } fontSize="lg">{deviceState}</Text>
-                        </Box>
-                    </GridItem>
-                    <GridItem>
-                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                            <Text fontSize="xs" color="gray.500">Trip Distance</Text>
-                            <Text fontWeight="bold" fontSize="lg">
-                                {deviceVariables.current.currentTripDistance.toFixed(2)} km
-                            </Text>
-                        </Box>
-                    </GridItem>
-                    <GridItem>
-                        <Box p={3} bg="gray.50" _dark={{ bg: "gray.700" }} borderRadius="md">
-                            <Text fontSize="xs" color="gray.500">Elapsed Ign Off</Text>
-                            <Text fontWeight="bold" fontSize="lg">
-                                {deviceVariables.current.elapsedIgnitionOffTime}s
-                            </Text>
-                        </Box>
-                    </GridItem>
-                </Grid>
-
-                {/* SouthBound Lifecycle & Config */}
-                <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
-                    <Text fontWeight="bold" mb={3}>SouthBound Interface Control</Text>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                        <GridItem colSpan={1}>
-                            <VStack align="stretch" spacing={3}>
-                                <Text fontWeight="semibold" fontSize="sm">Device Lifecycle</Text>
-                                <HStack>
-                                    <Badge colorScheme={tboxApplicationState === 'FACTORY' ? 'green' : 'gray'}>FACTORY</Badge>
-                                    <Text>→</Text>
-                                    <Badge colorScheme={tboxApplicationState === 'PROVISIONED' ? 'green' : 'gray'}>PROVISIONED</Badge>
-                                    <Text>→</Text>
-                                    <Badge colorScheme={tboxApplicationState === 'AUTHORIZED' ? 'green' : 'gray'}>AUTHORIZED</Badge>
-                                    <Text>→</Text>
-                                    <Badge colorScheme={tboxApplicationState === 'CUSTOMER' ? 'green' : 'gray'}>CUSTOMER</Badge>
-                                </HStack>
-                                <HStack>
-                                    {tboxApplicationState === 'PRE-SALES' && (
-                                        <Button
-                                            size="sm"
-                                            colorScheme="green"
-                                            onClick={handleDongleInsertion}
-                                            leftIcon={<Zap size={16} />}
-                                        >
-                                            Insert Dongle
-                                        </Button>
-                                    )}
-                                    <Button size="sm" colorScheme="blue" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={tboxApplicationState !== 'FACTORY'}>Provision</Button>
-                                    <Button size="sm" colorScheme="purple" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={tboxApplicationState !== 'PROVISIONED'}>Authorize</Button>
-                                    <Button size="sm" colorScheme="orange" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={tboxApplicationState !== 'AUTHORIZED'}>Handover</Button>
-                                    <Button size="sm" variant="ghost" onClick={() => setTboxApplicationState('PRE-SALES')}>Reset to PRE-SALES</Button>
-                                </HStack>
-                            </VStack>
-                        </GridItem>
-                        <GridItem colSpan={1}>
-                            <VStack align="stretch" spacing={2}>
-                                <Text fontWeight="semibold" fontSize="sm">Device Identity</Text>
-                                <HStack>
-                                    <Text fontSize="xs">VIN:</Text>
-                                    <Input size="xs" defaultValue={deviceVariables.current.vehicleId} readOnly color="black" />
-                                </HStack>
-                                <HStack>
-                                    <Text fontSize="xs">IMEI:</Text>
-                                    <Input size="xs" defaultValue={deviceVariables.current.imeiNo} readOnly color="black" />
-                                </HStack>
-                            </VStack>
-                        </GridItem>
-                    </Grid>
-                    <Box mt={6} p={4} borderTopWidth="1px">
-                        <Text fontWeight="bold" mb={3}>Remote Operations (Section 10)</Text>
-                        <VStack align="stretch" spacing={4}>
-                            <SimpleGrid columns={4} gap={3}>
-                                <Button size="sm" colorScheme="teal" leftIcon={<Text>🔦</Text>} onClick={() => handleRemoteCommand('Blinker')}>Blinker</Button>
-                                <Button size="sm" colorScheme="cyan" leftIcon={<Text>🔒</Text>} onClick={() => handleRemoteCommand('DoorLock')}>Lock</Button>
-                                <Button size="sm" colorScheme="cyan" variant="outline" leftIcon={<Text>🔓</Text>} onClick={() => handleRemoteCommand('DoorUnlock')}>Unlock</Button>
-                                <Button size="sm" colorScheme="red" leftIcon={<Text>📢</Text>} onClick={() => handleRemoteCommand('Honk')}>Honk</Button>
-                            </SimpleGrid>
-
-                            <SimpleGrid columns={3} gap={3}>
-                                <Button size="sm" colorScheme="blue" variant="solid" onClick={() => handleRemoteCommand('Wakeup')}>Refresh (Wakeup)</Button>
-                                <Button size="sm" colorScheme="gray" onClick={() => handleRemoteCommand('FetchLogs')}>Fetch Logs</Button>
-                                <Menu>
-                                    <MenuButton as={Button} size="sm" rightIcon={<Text>▼</Text>}>
-                                        Remote State Update
-                                    </MenuButton>
-                                    <MenuList>
-                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'PROVISIONED' })}>PROVISIONED</MenuItem>
-                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'AUTHORIZED' })}>AUTHORIZED</MenuItem>
-                                        <MenuItem onClick={() => handleRemoteCommand('TBOXStateUpdate', { targetState: 'CUSTOMER' })}>CUSTOMER</MenuItem>
-                                    </MenuList>
-                                </Menu>
-                            </SimpleGrid>
-
-                            <HStack spacing={3}>
-                                <Button size="xs" variant="outline" onClick={() => handleRemoteCommand('UserDefinedSpeed', { speed: 110 })}>Set Speed Thr (110)</Button>
-                                <Button size="xs" variant="outline" onClick={() => handleRemoteCommand('UserDefinedMinimumTripDistance', { distance: 5, engineOffTime: 30 })}>Set Trip Thr (5km/30s)</Button>
-                            </HStack>
-                        </VStack>
-                    </Box>
-                </Box>
-
-                {/* FOTA Update Center */}
-                <Box mt={6} p={4} borderTopWidth="1px" bg="blue.50" _dark={{ bg: "blue.900" }} borderRadius="md">
-                    <Text fontWeight="bold" mb={2} color="blue.700" _dark={{ color: "blue.200" }}>FOTA Update Center (Section 11)</Text>
-                    <VStack align="stretch" spacing={3}>
-                        <HStack justify="space-between">
-                            <Text fontSize="sm">Current Version: <b>{deviceVariables.current.ccpuVersion}</b></Text>
-                            <Badge colorScheme={
-                                fotaStatus === 'SUCCESS' ? 'green' :
-                                    fotaStatus === 'IDLE' ? 'gray' : 'orange'
-                            }>{fotaStatus}</Badge>
-                        </HStack>
-
-                        {fotaStatus === 'DOWNLOADING' && (
-                            <Progress value={fotaProgress} size="xs" colorScheme="blue" />
-                        )}
-
-                        <HStack>
-                            <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'}>Check for Update</Button>
-                            <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'}>Install Update (CD.02.04)</Button>
-                            <Button size="xs" variant="ghost" onClick={() => { setFotaStatus('IDLE'); setFotaProgress(0); }}>Reset</Button>
-                        </HStack>
-
-                        <Text fontSize="xs" color="gray.500 italic">Note: Ignition must be OFF to install.</Text>
-                    </VStack>
-                </Box>
-
-                <Box mt={4}>
-                    <Text fontWeight="semibold" fontSize="sm" mb={2}>Trigger Alerts (M6)</Text>
-                    <HStack wrap="wrap">
-                        <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_ACCELERATION')}>Hard Accel</Button>
-                        <Button size="sm" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_BRAKING')}>Hard Brake</Button>
-                        <Button size="sm" colorScheme="orange" variant="outline" onClick={() => triggerManualAlert('TOWING')}>Towing</Button>
-                        <Button size="sm" colorScheme="red" onClick={() => triggerManualAlert('SOS')}>SOS / Panic</Button>
-                        <Button size="sm" colorScheme="gray" variant="outline" onClick={() => triggerManualAlert('DEVICE_REMOVAL')}>Device Removal</Button>
-                    </HStack>
-                </Box>
-
-                {
-                    lastPayload && (
-                        <Box mt={4} p={2} bg="gray.900" borderRadius="md">
-                            <Text color="gray.400" fontSize="xs" mb={1}>Last Payload: {lastPayload.type}</Text>
-                            <Text color="green.300" fontFamily="monospace" fontSize="xs" whiteSpace="pre-wrap">
-                                {JSON.stringify(lastPayload.content, null, 2)}
-                            </Text>
-                        </Box>
-                    )
-                }
-
-                <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
-
-                    <Text fontWeight="bold" mb={3}>Configurable Parameters</Text>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">MIN_TRIP_DISTANCE (km)</FormLabel>
-                                <NumberInput
-                                    value={parameters.MIN_TRIP_DISTANCE}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: val }))}
-                                    min={0.1}
-                                    max={50}
-                                    step={0.5}
-                                    size="sm"
-                                >
-                                    <NumberInputField color="black" />
-                                    <NumberInputStepper>
-                                        <NumberIncrementStepper />
-                                        <NumberDecrementStepper />
-                                    </NumberInputStepper>
-                                </NumberInput>
-                                <Text fontSize="xs" color="gray.500">Distance to confirm trip</Text>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">MIN_IGN_OFF_TIME (seconds)</FormLabel>
-                                <NumberInput
-                                    value={parameters.MIN_IGN_OFF_TIME}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MIN_IGN_OFF_TIME: isNaN(val) ? 0 : val }))}
-                                    min={5}
-                                    max={3600}
-                                    step={10}
-                                    size="sm"
-                                >
-                                    <NumberInputField color="black" />
-                                    <NumberInputStepper>
-                                        <NumberIncrementStepper />
-                                        <NumberDecrementStepper />
-                                    </NumberInputStepper>
-                                </NumberInput>
-                                <Text fontSize="xs" color="gray.500">Time to pause trip</Text>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">MAX_IGN_OFF_TIME (seconds)</FormLabel>
-                                <NumberInput
-                                    value={parameters.MAX_IGN_OFF_TIME}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: isNaN(val) ? 0 : val }))}
-                                    min={10}
-                                    max={3600}
-                                    step={10}
-                                    size="sm"
-                                >
-                                    <NumberInputField color="black" />
-                                    <NumberInputStepper>
-                                        <NumberIncrementStepper />
-                                        <NumberDecrementStepper />
-                                    </NumberInputStepper>
-                                </NumberInput>
-                                <Text fontSize="xs" color="gray.500">Max Ignition Off Time</Text>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">OVERSPEED_THR (km/h)</FormLabel>
-                                <NumberInput
-                                    value={parameters.OVERSPEED_THR}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, OVERSPEED_THR: isNaN(val) ? 0 : val }))}
-                                    min={20}
-                                    max={200}
-                                    step={5}
-                                    size="sm"
-                                >
-                                    <NumberInputField color="black" />
-                                    <NumberInputStepper>
-                                        <NumberIncrementStepper />
-                                        <NumberDecrementStepper />
-                                    </NumberInputStepper>
-                                </NumberInput>
-                                <Text fontSize="xs" color="gray.500">Threshold for overspeed alerts</Text>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">HARSH_ACCEL_THR (km/h/s)</FormLabel>
-                                <NumberInput
-                                    value={parameters.HARSH_ACCEL_THR}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: val }))}
-                                    size="sm"
-                                    min={1}
-                                    max={50}
-                                >
-                                    <NumberInputField color="black" />
-                                </NumberInput>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">HARD_BRAKE_THR (km/h/s)</FormLabel>
-                                <NumberInput
-                                    value={parameters.HARD_BRAKE_THR}
-                                    onChange={(_, val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: val }))}
-                                    size="sm"
-                                    min={1}
-                                    max={50}
-                                >
-                                    <NumberInputField color="black" />
-                                </NumberInput>
-                            </FormControl>
-                        </GridItem>
-                    </Grid>
-                </Box>
-
-                {/* Simulation Controls */}
-                <Box p={4} borderWidth="1px" borderRadius="lg" bg="gray.50" _dark={{ bg: "gray.700" }}>
-                    <Text fontWeight="bold" mb={3}>Simulation Controls</Text>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                        <GridItem>
-                            <FormControl>
-                                <HStack justify="space-between" mb={2}>
-                                    <FormLabel mb={0}>Ignition</FormLabel>
-                                    <Button
-                                        size="lg"
-                                        w="100px"
-                                        colorScheme={ignition ? "green" : "gray"}
-                                        onClick={toggleIgnition}
-                                        boxShadow="md"
-                                        _hover={{ transform: 'scale(1.05)' }}
-                                        transition="all 0.2s"
-                                    >
-                                        {ignition ? "ON" : "OFF"}
-                                    </Button>
-                                </HStack>
-                                <FormLabel>Vehicle Speed: {Math.round(simSpeed)} km/h</FormLabel>
-                                <Slider
-                                    value={simSpeed}
-                                    onChange={setSimSpeed}
-                                    min={0}
-                                    max={200}
-                                    isDisabled={!ignition}
-                                >
-                                    <SliderTrack>
-                                        <SliderFilledTrack />
-                                    </SliderTrack>
-                                    <SliderThumb />
-                                </Slider>
-                                {!ignition && <Text fontSize="xs" color="red.500">Ignition is OFF</Text>}
-                                <HStack spacing={4} mt={4}>
-                                    <FormControl display="flex" alignItems="center">
-                                        <FormLabel mb="0" fontSize="sm">Brake (CONTACT_FREIN1)</FormLabel>
-                                        <Button
-                                            size="sm"
-                                            colorScheme={brakeActive ? "orange" : "gray"}
-                                            onClick={() => setBrakeActive(!brakeActive)}
-                                        >
-                                            {brakeActive ? "ACTIVE" : "OFF"}
-                                        </Button>
-                                    </FormControl>
-                                    <FormControl display="flex" alignItems="center">
-                                        <FormLabel mb="0" fontSize="sm">MIL Status</FormLabel>
-                                        <Button
-                                            size="sm"
-                                            colorScheme={milActive ? "red" : "gray"}
-                                            onClick={() => setMilActive(!milActive)}
-                                        >
-                                            {milActive ? "ON" : "OFF"}
-                                        </Button>
+                                            <optgroup label="Trip States">
+                                                <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
+                                                <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
+                                                <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
+                                                <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
+                                            </optgroup>
+                                            <optgroup label="Lifecycle States">
+                                                <option value={DeviceStates.FACTORY}>FACTORY</option>
+                                                <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
+                                                <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
+                                                <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
+                                            </optgroup>
+                                        </Select>
                                     </FormControl>
                                 </HStack>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel>Road Condition</FormLabel>
-                                <Select
-                                    value={simRoadCondition}
-                                    onChange={(e) => setSimRoadCondition(e.target.value)}
-                                    color="black"
-                                >
-                                    <option value="good">Good</option>
-                                    <option value="bad">Bad</option>
-                                    <option value="wet">Wet</option>
-                                    <option value="icy">Icy</option>
-                                </Select>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl>
-                                <FormLabel fontSize="sm">Gas Pedal: {gasPedal}%</FormLabel>
-                                <Slider
-                                    value={gasPedal}
-                                    onChange={setGasPedal}
-                                    min={0}
-                                    max={100}
-                                    size="sm"
-                                    isDisabled={!ignition}
-                                >
-                                    <SliderTrack>
-                                        <SliderFilledTrack bg="orange.500" />
-                                    </SliderTrack>
-                                    <SliderThumb />
-                                </Slider>
-                            </FormControl>
-                        </GridItem>
-                        <GridItem>
-                            <FormControl display="flex" flexDirection="column" height="100%" justify="center">
-                                <FormLabel fontSize="sm" mb={1}>Brake & MIL</FormLabel>
-                                <HStack spacing={4}>
-                                    <Button
-                                        size="sm"
-                                        colorScheme={brakeActive ? "red" : "gray"}
-                                        variant={brakeActive ? "solid" : "outline"}
-                                        onClick={() => setBrakeActive(!brakeActive)}
-                                        flex={1}
-                                        isDisabled={!ignition}
-                                    >
-                                        Brake {brakeActive ? "ON" : "OFF"}
-                                    </Button>
-                                    <Button
-                                        size="sm"
-                                        colorScheme={milActive ? "yellow" : "gray"}
-                                        variant={milActive ? "solid" : "outline"}
-                                        onClick={() => setMilActive(!milActive)}
-                                        flex={1}
-                                        isDisabled={!ignition}
-                                    >
-                                        MIL {milActive ? "ERR" : "OK"}
-                                    </Button>
+                            </HStack>
+
+                            {/* <Flex borderTopWidth="1px" pt={3} borderColor="gray.100" gap={6} alignItems="center"> */}
+                            <Flex
+                                borderTopWidth="1px"
+                                pt={3}
+                                borderColor="gray.100"
+                                gap={6}
+                                alignItems="center"
+                                direction={{ base: "column", md: "row" }}
+                            >
+
+                                <HStack spacing={2}>
+                                    <Text fontSize="xs" color="gray.500" fontWeight="bold">OP STATE:</Text>
+                                    <Badge colorScheme={tboxOperatingState === 'NORMAL' ? 'green' : 'red'} variant="subtle" px={2}>
+                                        {tboxOperatingState}
+                                    </Badge>
                                 </HStack>
-                            </FormControl>
-                        </GridItem>
-                    </Grid>
-
-                    {/* Jeep M6 Specific Controls */}
-                    <Box mt={4} pt={4} borderTopWidth="1px" borderColor={borderColor}>
-                        <Text fontWeight="bold" fontSize="sm" mb={3} color="purple.600">Jeep M6 Cloud Simulation</Text>
-                        <Grid templateColumns="repeat(3, 1fr)" gap={4}>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">Battery Voltage: {batteryVoltage}V</FormLabel>
-                                    <Slider
-                                        value={batteryVoltage}
-                                        onChange={setBatteryVoltage}
-                                        min={9}
-                                        max={15}
-                                        step={0.1}
-                                        size="sm"
-                                    >
-                                        <SliderTrack>
-                                            <SliderFilledTrack bg={batteryVoltage < 11 ? 'red.500' : 'green.500'} />
-                                        </SliderTrack>
-                                        <SliderThumb boxSize={3} />
-                                    </Slider>
-                                </FormControl>
-                            </GridItem>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">Crash Detection</FormLabel>
-                                    <Button
-                                        size="sm"
-                                        colorScheme={crashDetected ? "red" : "gray"}
-                                        variant={crashDetected ? "solid" : "outline"}
-                                        onClick={() => setCrashDetected(!crashDetected)}
-                                        w="full"
-                                    >
-                                        Crash {crashDetected ? "YES" : "NO"}
-                                    </Button>
-                                </FormControl>
-                            </GridItem>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">Device Removal</FormLabel>
-                                    <Button
-                                        size="sm"
-                                        colorScheme={isDeviceRemoved ? "red" : "gray"}
-                                        variant={isDeviceRemoved ? "solid" : "outline"}
-                                        onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}
-                                        w="full"
-                                    >
-                                        Removal {isDeviceRemoved ? "TRIP" : "OFF"}
-                                    </Button>
-                                </FormControl>
-                            </GridItem>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">FOTA Status</FormLabel>
-                                    <Select
-                                        size="sm"
-                                        value={fotaStatus}
-                                        onChange={(e) => setFotaStatus(e.target.value)}
-                                        bg={bgColor}
-                                    >
-                                        <option value="IDLE">IDLE</option>
-                                        <option value="DOWNLOADING">DOWNLOADING</option>
-                                        <option value="INSTALLING">INSTALLING</option>
-                                        <option value="SUCCESS">SUCCESS</option>
-                                        <option value="FAILED">FAILED</option>
-                                    </Select>
-                                </FormControl>
-                            </GridItem>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">Operating State</FormLabel>
-                                    <Select
-                                        size="sm"
-                                        value={tboxOperatingState}
-                                        onChange={(e) => setTboxOperatingState(e.target.value)}
-                                        bg={bgColor}
-                                    >
-                                        <option value="NORMAL">NORMAL</option>
-                                        <option value="DISCONNECTED">DISCONNECTED</option>
-                                        <option value="FAIL">FAIL</option>
-                                    </Select>
-                                </FormControl>
-                            </GridItem>
-                            <GridItem>
-                                <FormControl>
-                                    <FormLabel fontSize="xs">eSIM State</FormLabel>
-                                    <Select
-                                        size="sm"
-                                        value={tboxeSimState}
-                                        onChange={(e) => setTboxeSimState(e.target.value)}
-                                        bg={bgColor}
-                                    >
-                                        <option value="NORMAL_SIM">NORMAL_SIM</option>
-                                        <option value="NO_SIM">NO_SIM</option>
-                                        <option value="SIM_ERROR">SIM_ERROR</option>
-                                    </Select>
-                                </FormControl>
-                            </GridItem>
-                        </Grid>
-
-                        <Text fontWeight="bold" fontSize="xs" mt={3} mb={2}>Lifecycle Commands</Text>
-                        <HStack spacing={2}>
-                            <Button size="xs" colorScheme="orange" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={deviceState !== DeviceStates.FACTORY}>
-                                Provision
-                            </Button>
-                            <Button size="xs" colorScheme="cyan" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={deviceState !== DeviceStates.PROVISIONED}>
-                                Authorize
-                            </Button>
-                            <Button size="xs" colorScheme="purple" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={deviceState !== DeviceStates.AUTHORIZED}>
-                                Handover
-                            </Button>
-                            <Button size="xs" variant="outline" onClick={() => setDeviceState(DeviceStates.FACTORY)}>
-                                Reset to Factory
-                            </Button>
-                        </HStack>
-                    </Box>
-                    <HStack mt={4} spacing={4} fontSize="sm" color="gray.600">
-                        <Text>Trip Time: {Math.floor(tripStats.current.runTime / 60)}m {tripStats.current.runTime % 60}s</Text>
-                        <Text>Distance: {tripStats.current.distance.toFixed(2)} km</Text>
-                        <Text>Off Time: {Math.floor(tripStats.current.offTime / 60)}m {tripStats.current.offTime % 60}s</Text>
-                    </HStack>
-                </Box>
-
-                <Tabs variant="enclosed" colorScheme="blue" index={activeTabIndex} onChange={setActiveTabIndex}>
-                    <TabList mb="1em">
-                        <Tab>Alert Rules</Tab>
-                        <Tab>Rule Templates</Tab>
-                        <Tab>CAN Configuration</Tab>
-                        <Tab>Trip Configuration</Tab>
-                        <Tab>Lifecycle Configuration</Tab>
-                        <Tab>SouthBound Payloads</Tab>
-                    </TabList>
-
-                    <TabPanels>
-                        <TabPanel>
-                            <RuleBuilder
-                                rules={rules}
-                                savedRules={savedRules}
-                                onAddRule={handleAddRule}
-                                onDeleteRule={handleDeleteRule}
-                                onSaveToLibrary={handleSaveToLibrary}
-                                prefillRule={prefillRule}
-                            />
-                        </TabPanel>
-                        <TabPanel h="full" p={0}>
-                            {templateView === 'library' ? (
-                                <RuleTemplateLibrary
-                                    templates={libraryTemplates}
-                                    onCreateNew={() => setTemplateView('create')}
-                                    onUseTemplate={handleUseTemplate}
-                                />
-                            ) : (
-                                <CreateRuleTemplate
-                                    onSave={handleSaveTemplate}
-                                    onCancel={() => setTemplateView('library')}
-                                />
-                            )}
-                        </TabPanel>
-                        <TabPanel>
-                            <CANSignalBuilder
-                                signals={canSignalRules}
-                                onUpdateSignals={setCanSignalRules}
-                                busData={canBusData}
-                            />
-                        </TabPanel>
-                        <TabPanel>
-                            <VStack align="stretch" spacing={6}>
-                                <Box p={4} borderWidth="1px" borderRadius="lg" bg={useColorModeValue('white', 'gray.800')}>
-                                    <Heading size="sm" mb={4}>Trip Lifecycle Parameters</Heading>
-                                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={8}>
-                                        <FormControl>
-                                            <FormLabel fontWeight="bold">Min Trip Distance (km)</FormLabel>
-                                            <HStack spacing={4}>
-                                                <Slider
-                                                    flex="1"
-                                                    value={parameters.MIN_TRIP_DISTANCE || 2}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: val }))}
-                                                    min={0.1}
-                                                    max={20}
-                                                    step={0.1}
-                                                >
-                                                    <SliderTrack>
-                                                        <SliderFilledTrack />
-                                                    </SliderTrack>
-                                                    <SliderThumb />
-                                                </Slider>
-                                                <NumberInput
-                                                    maxW="100px"
-                                                    value={parameters.MIN_TRIP_DISTANCE || 2}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: Number(val) }))}
-                                                    min={0.1}
-                                                    max={20}
-                                                    step={0.1}
-                                                >
-                                                    <NumberInputField color="black" />
-                                                </NumberInput>
-                                            </HStack>
-                                            <Text fontSize="xs" color="gray.500" mt={1}>Distance needed to transition from PENDING to ACTIVE.</Text>
-                                        </FormControl>
-
-                                        <FormControl>
-                                            <FormLabel fontWeight="bold">Min Ignition Off Time (seconds)</FormLabel>
-                                            <HStack spacing={4}>
-                                                <Slider
-                                                    flex="1"
-                                                    value={parameters.MIN_IGN_OFF_TIME || 120}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MIN_IGN_OFF_TIME: val }))}
-                                                    min={1}
-                                                    max={1200}
-                                                    step={1}
-                                                >
-                                                    <SliderTrack>
-                                                        <SliderFilledTrack bg="orange.400" />
-                                                    </SliderTrack>
-                                                    <SliderThumb />
-                                                </Slider>
-                                                <NumberInput
-                                                    maxW="100px"
-                                                    value={parameters.MIN_IGN_OFF_TIME || 120}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MIN_IGN_OFF_TIME: Number(val) }))}
-                                                    min={1}
-                                                    max={1200}
-                                                >
-                                                    <NumberInputField color="black" />
-                                                </NumberInput>
-                                            </HStack>
-                                            <Text fontSize="xs" color="gray.500" mt={1}>Time after Ignition OFF before Trip enters PAUSED state.</Text>
-                                        </FormControl>
-
-                                        <FormControl>
-                                            <FormLabel fontWeight="bold">Max Ignition Off Time (seconds)</FormLabel>
-                                            <HStack spacing={4}>
-                                                <Slider
-                                                    flex="1"
-                                                    value={parameters.MAX_IGN_OFF_TIME || 300}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: val }))}
-                                                    min={2}
-                                                    max={15}
-                                                    step={1}
-                                                >
-                                                    <SliderTrack>
-                                                        <SliderFilledTrack bg="red.400" />
-                                                    </SliderTrack>
-                                                    <SliderThumb />
-                                                </Slider>
-                                                <NumberInput
-                                                    maxW="110px"
-                                                    value={parameters.MAX_IGN_OFF_TIME || 300}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, MAX_IGN_OFF_TIME: Number(val) }))}
-                                                    min={2}
-                                                    max={20}
-                                                >
-                                                    <NumberInputField color="black" />
-                                                </NumberInput>
-                                            </HStack>
-                                            <Text fontSize="xs" color="gray.500" mt={1}>Time after Ignition OFF before Trip is terminated (IDLE).</Text>
-                                        </FormControl>
-
-                                        <FormControl>
-                                            <FormLabel fontWeight="bold">Harsh Accel Threshold (km/h/s)</FormLabel>
-                                            <HStack spacing={4}>
-                                                <Slider
-                                                    flex="1"
-                                                    value={parameters.HARSH_ACCEL_THR || 10}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: val }))}
-                                                    min={1}
-                                                    max={50}
-                                                    step={1}
-                                                >
-                                                    <SliderTrack>
-                                                        <SliderFilledTrack bg="red.400" />
-                                                    </SliderTrack>
-                                                    <SliderThumb />
-                                                </Slider>
-                                                <NumberInput
-                                                    maxW="110px"
-                                                    value={parameters.HARSH_ACCEL_THR || 10}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARSH_ACCEL_THR: Number(val) }))}
-                                                    min={1}
-                                                    max={50}
-                                                >
-                                                    <NumberInputField color="black" />
-                                                </NumberInput>
-                                            </HStack>
-                                            <Text fontSize="xs" color="gray.500" mt={1}>Speed increase per second to trigger Harsh Acceleration.</Text>
-                                        </FormControl>
-
-                                        <FormControl>
-                                            <FormLabel fontWeight="bold">Hard Brake Threshold (km/h/s)</FormLabel>
-                                            <HStack spacing={4}>
-                                                <Slider
-                                                    flex="1"
-                                                    value={parameters.HARD_BRAKE_THR || 15}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: val }))}
-                                                    min={1}
-                                                    max={50}
-                                                    step={1}
-                                                >
-                                                    <SliderTrack>
-                                                        <SliderFilledTrack bg="red.600" />
-                                                    </SliderTrack>
-                                                    <SliderThumb />
-                                                </Slider>
-                                                <NumberInput
-                                                    maxW="110px"
-                                                    value={parameters.HARD_BRAKE_THR || 15}
-                                                    onChange={(val) => setParameters(prev => ({ ...prev, HARD_BRAKE_THR: Number(val) }))}
-                                                    min={1}
-                                                    max={50}
-                                                >
-                                                    <NumberInputField color="black" />
-                                                </NumberInput>
-                                            </HStack>
-                                            <Text fontSize="xs" color="gray.500" mt={1}>Speed decrease per second to trigger Hard Braking.</Text>
-                                        </FormControl>
-                                    </SimpleGrid>
-                                </Box>
-
-                                <Box>
-                                    <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
-                                    <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} mb={6}>
-                                        {rules.map(rule => (
-                                            <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
-                                                <HStack justify="space-between">
-                                                    <Text fontWeight="bold" fontSize="sm">{rule.name}</Text>
-                                                    <Badge colorScheme={rule.event.severity === 'critical' ? 'red' : rule.event.severity === 'warning' ? 'orange' : 'blue'}>
-                                                        {rule.event.severity}
-                                                    </Badge>
-                                                </HStack>
-                                            </Box>
-                                        ))}
-                                    </SimpleGrid>
-                                    {rules.length === 0 && <Text color="gray.500">No active rules.</Text>}
-                                    <DataVisualizer dataHistory={dataHistory} events={events} />
-                                </Box>
-                            </VStack>
-                        </TabPanel>
-                        <TabPanel>
-                            <LifecycleConfig
-                                rules={lifecycleRules}
-                                onUpdateRule={(state, updatedRule) => {
-                                    setLifecycleRules({ ...lifecycleRules, [state]: updatedRule });
-                                }}
-                            />
-                        </TabPanel>
-                        <TabPanel>
-                            <VStack align="stretch" spacing={4}>
-                                <Heading size="sm">SouthBound Payload Explorer</Heading>
-                                <Text fontSize="sm" color="gray.500">View generated payloads based on current state and rules.</Text>
-                                <Box overflowX="auto">
-                                    {lastPayload && (
-                                        <Box mt={4} p={4} bg="gray.900" borderRadius="md">
-                                            <Text color="gray.400" fontSize="xs" mb={1}>Last Generated {lastPayload.type} Payload:</Text>
-                                            <Text color="green.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
-                                                {JSON.stringify(lastPayload.content, null, 2)}
-                                            </Text>
-                                        </Box>
-                                    )}
-                                    {lastTripPayload && (
-                                        <Box mt={4} p={4} bg="gray.900" borderRadius="md">
-                                            <Text color="gray.400" fontSize="xs" mb={1}>Last Trip Payload:</Text>
-                                            <Text color="blue.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
-                                                {JSON.stringify(lastTripPayload, null, 2)}
-                                            </Text>
-                                        </Box>
-                                    )}
-                                </Box>
-                            </VStack>
-                        </TabPanel>
-                    </TabPanels>
-                </Tabs>
-
-                {/* Always Visible Event Log */}
-                <Box p={4} borderWidth="1px" borderRadius="lg" bg={bgColor}>
-                    <HStack justify="space-between" mb={4}>
-                        <Heading size="md">Event Log</Heading>
-                        <Badge colorScheme="blue" variant="subtle">{events.length} Events</Badge>
-                    </HStack>
-                    <Box overflowX="auto" maxHeight="300px" overflowY="auto">
-                        <Box as="table" width="100%" sx={{ borderCollapse: 'collapse' }}>
-                            <Box as="thead" bg={useColorModeValue('gray.50', 'gray.700')}>
-                                <Box as="tr">
-                                    <Box as="th" p={2} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase">Time</Box>
-                                    <Box as="th" p={2} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase">Rule</Box>
-                                    <Box as="th" p={2} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase">Message</Box>
-                                    <Box as="th" p={2} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase">Severity</Box>
-                                </Box>
-                            </Box>
-                            <Box as="tbody">
-                                {events.slice().reverse().map((event, index) => (
-                                    <Box as="tr" key={index} borderBottomWidth="1px" borderColor={borderColor}>
-                                        <Box as="td" p={2} fontSize="sm">{new Date(event.timestamp).toLocaleTimeString()}</Box>
-                                        <Box as="td" p={2} fontSize="sm" fontWeight="bold">{event.ruleName}</Box>
-                                        <Box as="td" p={2} fontSize="sm">{event.message}</Box>
-                                        <Box as="td" p={2}>
-                                            <Badge
-                                                colorScheme={
-                                                    event.severity === 'critical' ? 'red' :
-                                                        event.severity === 'warning' ? 'orange' :
-                                                            event.severity === 'success' ? 'green' : 'blue'
-                                                }
-                                            >
-                                                {event.severity}
-                                            </Badge>
-                                        </Box>
-                                    </Box>
-                                ))}
-                                {events.length === 0 && (
-                                    <Box as="tr">
-                                        <Box as="td" colSpan={4} p={4} textAlign="center" color="gray.500">No events triggered yet</Box>
-                                    </Box>
+                                <HStack spacing={2}>
+                                    <Text fontSize="xs" color="gray.500" fontWeight="bold">SIM:</Text>
+                                    <Badge colorScheme={tboxeSimState === 'NORMAL_SIM' ? 'blue' : 'orange'} variant="subtle" px={2}>
+                                        {tboxeSimState}
+                                    </Badge>
+                                </HStack>
+                                <HStack spacing={2}>
+                                    <Text fontSize="xs" color="gray.500" fontWeight="bold">BATTERY:</Text>
+                                    <Badge colorScheme={batteryVoltage < 11.5 ? 'red' : 'green'} variant="subtle" px={2}>
+                                        {batteryVoltage}V
+                                    </Badge>
+                                </HStack>
+                                {isDeviceRemoved && (
+                                    <Badge colorScheme="purple" variant="solid" fontSize="10px" px={2}>REMOVED</Badge>
                                 )}
-                            </Box>
-                        </Box>
-                    </Box>
-                </Box>
-            </VStack>
+                                <Box flex={1} />
+                                <HStack spacing={4} fontSize="xs" color="gray.500">
+                                    <Text>Time: <b>{Math.floor(tripStats.current.runTime / 60)}m {tripStats.current.runTime % 60}s</b></Text>
+                                    <Text>Off: <b>{Math.floor(tripStats.current.offTime / 60)}m {tripStats.current.offTime % 60}s</b></Text>
+                                </HStack>
+                            </Flex>
+                        </VStack>
+                    </CardBody>
+                </Card>
+
+
+                {/* Statistics Overview */}
+                <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} spacing={{ base: 3, md: 4 }} mb={{ base: 4, md: 6 }}>
+                    <Card variant="outline" bg="white" shadow="sm">
+                        <CardBody p={4}>
+                            <VStack align="flex-start" spacing={0}>
+                                <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Current State</Text>
+                                <Text fontWeight="bold" color={
+                                    deviceState === DeviceStates.TRIP_ACTIVE ? 'green.500' :
+                                        deviceState === DeviceStates.TRIP_PAUSED ? 'orange.500' : 'gray.600'
+                                } fontSize="xl">{deviceState}</Text>
+                            </VStack>
+                        </CardBody>
+                    </Card>
+                    <Card variant="outline" bg="white" shadow="sm">
+                        <CardBody p={4}>
+                            <VStack align="flex-start" spacing={0}>
+                                <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Trip Distance</Text>
+                                <Text fontWeight="bold" fontSize="xl">{deviceVariables.current.currentTripDistance.toFixed(2)} km</Text>
+                            </VStack>
+                        </CardBody>
+                    </Card>
+                    <Card variant="outline" bg="white" shadow="sm">
+                        <CardBody p={4}>
+                            <VStack align="flex-start" spacing={0}>
+                                <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Avg Speed</Text>
+                                <Text fontWeight="bold" fontSize="xl">{Math.round(simSpeed)} km/h</Text>
+                            </VStack>
+                        </CardBody>
+                    </Card>
+                    <Card variant="outline" bg="white" shadow="sm">
+                        <CardBody p={4}>
+                            <VStack align="flex-start" spacing={0}>
+                                <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">VIN / Identity</Text>
+                                <Text fontWeight="bold" fontSize="sm" isTruncated w="full">{deviceVariables.current.vehicleId}</Text>
+                            </VStack>
+                        </CardBody>
+                    </Card>
+                    <Card variant="outline" bg="white" shadow="sm">
+                        <CardBody p={4}>
+                            <VStack align="flex-start" spacing={0}>
+                                <Text fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">IMEI Number</Text>
+                                <Text fontWeight="bold" fontSize="sm" isTruncated w="full">{deviceVariables.current.imeiNo}</Text>
+                            </VStack>
+                        </CardBody>
+                    </Card>
+                </SimpleGrid>
+
+
+                {/* Main Layout */}
+                <Grid
+                    templateColumns={{ base: "1fr", lg: "400px 1fr", xl: "450px 1fr" }}
+                    gap={{ base: 4, md: 6, lg: 8 }}
+                    alignItems="start"
+                >
+                    {/* Sidebar - Control Panel */}
+                    <GridItem>
+                        <VStack spacing={{ base: 4, md: 5, lg: 6 }} align="stretch" position={{ lg: "sticky" }} top="20px" width={{ base: "85vw", md: "93vw", lg: "auto" }}>
+
+                            {/* 1. Vehicle Simulation Control */}
+                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
+                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                    <HStack>
+                                        <Icon as={Car} color="blue.500" />
+                                        <Heading size="xs" textTransform="uppercase">Vehicle Controls</Heading>
+                                    </HStack>
+                                </CardHeader>
+                                <CardBody p={{ base: 3, md: 4 }}>
+                                    <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+                                        <FormControl>
+                                            <Flex justify="space-between" align="center" mb={2}>
+                                                <FormLabel mb={0} fontWeight="bold">Ignition System</FormLabel>
+                                                <Button
+                                                    size={{ base: "sm", md: "md" }}
+                                                    colorScheme={ignition ? "green" : "gray"}
+                                                    onClick={toggleIgnition}
+                                                    boxShadow="sm"
+                                                    width={{ base: "100px", md: "120px" }}
+                                                    minH="44px"
+                                                    leftIcon={<Zap size={16} />}
+                                                >
+                                                    {ignition ? "IGN ON" : "IGN OFF"}
+                                                </Button>
+                                            </Flex>
+                                            <Text fontSize="xs" color="gray.500" mb={4}>Controls the primary engine state and enables speed manipulation.</Text>
+                                        </FormControl>
+
+                                        <FormControl>
+                                            <HStack justify="space-between" mb={2}>
+                                                <FormLabel mb={0} fontWeight="bold">Vehicle Speed</FormLabel>
+                                                <Badge colorScheme="blue" fontSize="md" px={2} py={0.5} borderRadius="md">
+                                                    {Math.round(simSpeed)} km/h
+                                                </Badge>
+                                            </HStack>
+                                            <Slider
+                                                value={simSpeed}
+                                                onChange={setSimSpeed}
+                                                min={0}
+                                                max={200}
+                                                isDisabled={!ignition}
+                                                focusThumbOnChange={false}
+                                            >
+                                                <SliderTrack h={{ base: 3, md: 2 }} borderRadius="full">
+                                                    <SliderFilledTrack bg="blue.500" />
+                                                </SliderTrack>
+                                                <SliderThumb boxSize={6} border="2px solid white" shadow="md" />
+                                            </Slider>
+                                            {!ignition && <Text fontSize="2xs" color="red.500" mt={1}>Required: Ignition ON to adjust speed</Text>}
+                                        </FormControl>
+
+                                        <SimpleGrid columns={2} spacing={4}>
+                                            <Button
+                                                size={{ base: "sm", md: "md" }}
+                                                colorScheme={brakeActive ? "orange" : "gray"}
+                                                variant={brakeActive ? "solid" : "outline"}
+                                                onClick={() => setBrakeActive(!brakeActive)}
+                                                leftIcon={<Circle size={12} />}
+                                                minH="44px"
+                                            >
+                                                Brake {brakeActive ? "ON" : "OFF"}
+                                            </Button>
+                                            <Button
+                                                size={{ base: "sm", md: "md" }}
+                                                colorScheme={milActive ? "red" : "gray"}
+                                                variant={milActive ? "solid" : "outline"}
+                                                onClick={() => setMilActive(!milActive)}
+                                                leftIcon={<AlertTriangle size={16} />}
+                                                minH="44px"
+                                            >
+                                                MIL {milActive ? "ACTIVE" : "OFF"}
+                                            </Button>
+                                        </SimpleGrid>
+
+                                        <FormControl>
+                                            <HStack justify="space-between" mb={2}>
+                                                <FormLabel mb={0} fontSize="sm">Gas Pedal Position: {gasPedal}%</FormLabel>
+                                            </HStack>
+                                            <Slider
+                                                value={gasPedal}
+                                                onChange={setGasPedal}
+                                                min={0}
+                                                max={100}
+                                                isDisabled={!ignition}
+                                            >
+                                                <SliderTrack h={1.5}>
+                                                    <SliderFilledTrack bg="orange.500" />
+                                                </SliderTrack>
+                                                <SliderThumb boxSize={4} />
+                                            </Slider>
+                                        </FormControl>
+                                    </VStack>
+                                </CardBody>
+                            </Card>
+
+                            {/* 2. Cloud & Environment Simulation */}
+                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
+                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                    <HStack>
+                                        <Icon as={Shield} color="purple.500" />
+                                        <Heading size="xs" textTransform="uppercase">Cloud Simulation</Heading>
+                                    </HStack>
+                                </CardHeader>
+                                <CardBody>
+                                    <VStack spacing={4} align="stretch">
+                                        <SimpleGrid columns={2} spacing={4}>
+                                            <FormControl>
+                                                <FormLabel fontSize="xs" fontWeight="bold">Battery Voltage</FormLabel>
+                                                <HStack spacing={2}>
+                                                    <Slider
+                                                        value={batteryVoltage}
+                                                        onChange={setBatteryVoltage}
+                                                        min={9}
+                                                        max={15}
+                                                        step={0.1}
+                                                        flex={1}
+                                                    >
+                                                        <SliderTrack><SliderFilledTrack bg={batteryVoltage < 11.5 ? "red.500" : "green.500"} /></SliderTrack>
+                                                        <SliderThumb boxSize={3} />
+                                                    </Slider>
+                                                    <Text fontSize="xs" fontWeight="bold" w="40px">{batteryVoltage}V</Text>
+                                                </HStack>
+                                            </FormControl>
+                                            <FormControl>
+                                                <FormLabel fontSize="xs" fontWeight="bold">Road Surface</FormLabel>
+                                                <Select size="sm" value={simRoadCondition} onChange={(e) => setSimRoadCondition(e.target.value)}>
+                                                    <option value="good">Good / Dry</option>
+                                                    <option value="bad">Damaged Path</option>
+                                                    <option value="wet">Wet Surface</option>
+                                                    <option value="icy">Icy / Slippery</option>
+                                                </Select>
+                                            </FormControl>
+                                        </SimpleGrid>
+
+                                        <SimpleGrid columns={2} spacing={3}>
+                                            <FormControl>
+                                                <FormLabel fontSize="xs" fontWeight="bold">eSIM Connectivity</FormLabel>
+                                                <Select size="xs" value={tboxeSimState} onChange={(e) => setTboxeSimState(e.target.value)}>
+                                                    <option value="NORMAL_SIM">NORMAL_SIM</option>
+                                                    <option value="NO_SIM">NO_SIM</option>
+                                                    <option value="SIM_ERROR">SIM_ERROR</option>
+                                                </Select>
+                                            </FormControl>
+                                            <FormControl>
+                                                <FormLabel fontSize="xs" fontWeight="bold">Operation State</FormLabel>
+                                                <Select size="xs" value={tboxOperatingState} onChange={(e) => setTboxOperatingState(e.target.value)}>
+                                                    <option value="NORMAL">NORMAL</option>
+                                                    <option value="DISCONNECTED">DISCONNECTED</option>
+                                                    <option value="FAIL">FAIL</option>
+                                                </Select>
+                                            </FormControl>
+                                        </SimpleGrid>
+
+                                        <Divider />
+
+                                        <HStack spacing={2} wrap="wrap">
+                                            <Button size="xs" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_ACCELERATION')}>Crash Log</Button>
+                                            <Button size="xs" colorScheme="orange" variant="outline" onClick={() => triggerManualAlert('TOWING')}>Tow Log</Button>
+                                            <Button size="sm" colorScheme={isDeviceRemoved ? "purple" : "gray"} variant="solid" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)} w="full">
+                                                {isDeviceRemoved ? "Dismantle Detected" : "Dismantle Check"}
+                                            </Button>
+                                        </HStack>
+                                    </VStack>
+                                </CardBody>
+                            </Card>
+
+                            {/* 3. Device Lifecycle & Remote Ops */}
+                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
+                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                    <HStack>
+                                        <Icon as={Cpu} color="orange.500" />
+                                        <Heading size="xs" textTransform="uppercase">Device Lifecycle</Heading>
+                                    </HStack>
+                                </CardHeader>
+                                <CardBody>
+                                    <VStack spacing={4} align="stretch">
+                                        <Box p={3} bg="blue.50" borderRadius="md" borderLeft="4px solid" borderColor="blue.400">
+                                            <Text fontSize="2xs" color="blue.700" fontWeight="bold" mb={1}>CURRENT LIFECYCLE STATE</Text>
+                                            <Text fontWeight="bold" color="blue.800">{tboxApplicationState}</Text>
+                                        </Box>
+
+                                        <SimpleGrid columns={2} spacing={2}>
+                                            <Button size="sm" colorScheme="green" onClick={handleDongleInsertion} isDisabled={tboxApplicationState !== 'PRE-SALES'}>Insert Dongle</Button>
+                                            <Button size="sm" colorScheme="blue" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={tboxApplicationState !== 'FACTORY'}>Provision</Button>
+                                            <Button size="sm" colorScheme="purple" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={tboxApplicationState !== 'PROVISIONED'}>Authorize</Button>
+                                            <Button size="sm" colorScheme="orange" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={tboxApplicationState !== 'AUTHORIZED'}>Handover</Button>
+                                        </SimpleGrid>
+                                        <Button size="xs" variant="ghost" onClick={() => setTboxApplicationState('PRE-SALES')}>Reset to PRE-SALES</Button>
+
+                                        <Divider />
+
+                                        <Text fontWeight="bold" fontSize="xs" color="gray.600">REMOTE COMMANDS</Text>
+                                        <SimpleGrid columns={2} spacing={2}>
+                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Zap} size={10} />} onClick={() => handleRemoteCommand('Blinker')}>Blinker</Button>
+                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Shield} size={10} />} onClick={() => handleRemoteCommand('DoorLock')}>Lock</Button>
+                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Shield} size={10} />} onClick={() => handleRemoteCommand('DoorUnlock')}>Unlock</Button>
+                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Activity} size={10} />} onClick={() => handleRemoteCommand('Honk')}>Honk</Button>
+                                        </SimpleGrid>
+                                    </VStack>
+                                </CardBody>
+                            </Card>
+
+                            {/* 4. FOTA Update Center */}
+                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="blue.100" bg="blue.50">
+                                <CardBody p={4}>
+                                    <VStack align="stretch" spacing={3}>
+                                        <HStack justify="space-between">
+                                            <HStack>
+                                                <Icon as={Activity} color="blue.600" />
+                                                <Text fontWeight="bold" fontSize="sm" color="blue.800">FOTA Status</Text>
+                                            </HStack>
+                                            <Badge colorScheme={fotaStatus === 'SUCCESS' ? 'green' : 'blue'}>{fotaStatus}</Badge>
+                                        </HStack>
+
+                                        {fotaStatus === 'DOWNLOADING' && (
+                                            <VStack align="stretch" spacing={1}>
+                                                <Progress value={fotaProgress} size="xs" borderRadius="full" colorScheme="blue" />
+                                                <Text fontSize="10px" textAlign="right">{fotaProgress}%</Text>
+                                            </VStack>
+                                        )}
+
+                                        <Flex gap={2}>
+                                            <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'} flex={1}>Check Updates</Button>
+                                            <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'} flex={1}>Install</Button>
+                                        </Flex>
+                                    </VStack>
+                                </CardBody>
+                            </Card>
+
+                            {lastPayload && (
+                                <Box p={3} bg="gray.800" borderRadius="lg" shadow="inner">
+                                    <HStack justify="space-between" mb={2}>
+                                        <Text color="gray.400" fontSize="2xs" fontWeight="bold">LAST SOUTHBOUND PAYLOAD</Text>
+                                        <Badge variant="outline" colorScheme="green" fontSize="10px">{lastPayload.type}</Badge>
+                                    </HStack>
+                                    <Box maxH="150px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#4A5568', borderRadius: '4px' } }}>
+                                        <Text color="green.300" fontFamily="monospace" fontSize="xs" whiteSpace="pre-wrap">
+                                            {JSON.stringify(lastPayload.content, null, 2)}
+                                        </Text>
+                                    </Box>
+                                </Box>
+                            )}
+                        </VStack>
+                    </GridItem>
+
+
+                    {/* Main Content Area */}
+                    <GridItem>
+                        <Tabs variant="enclosed" colorScheme="blue" index={activeTabIndex} onChange={setActiveTabIndex} isLazy width={{ base: "93vw", md: "93vw", lg: "60vw" }}>
+                            <TabList
+                                mb="1em"
+                                overflowX="auto"
+                                overflowY="hidden"
+                                whiteSpace="nowrap"
+                                pb={2}
+                                maxWidth="100%"
+                                sx={{
+                                    '&::-webkit-scrollbar': { height: '4px', display: { base: 'none', md: 'block' } },
+                                    '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' }
+                                }}
+                            >
+                                <Tab flexShrink={0}>Alert Rules</Tab>
+                                <Tab flexShrink={0}>Rule Templates</Tab>
+                                <Tab flexShrink={0}>Trip Configuration</Tab>
+                                <Tab flexShrink={0}>CAN Configuration</Tab>
+                                <Tab>Lifecycle Configuration</Tab>
+                                <Tab>SouthBound Payloads</Tab>
+                            </TabList>
+
+                            <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden">
+                                <TabPanels bg="white">
+                                    <TabPanel>
+                                        <Box mb={6}>
+                                            <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
+                                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} mb={6}>
+                                                {rules.map(rule => (
+                                                    <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
+                                                        <HStack justify="space-between">
+                                                            <Text fontWeight="bold" fontSize="sm">{rule.name}</Text>
+                                                            <Badge colorScheme={rule.event.severity === 'critical' ? 'red' : rule.event.severity === 'warning' ? 'orange' : 'blue'}>
+                                                                {rule.event.severity}
+                                                            </Badge>
+                                                        </HStack>
+                                                    </Box>
+                                                ))}
+                                            </SimpleGrid>
+                                            {rules.length === 0 && <Text color="gray.500" mb={4}>No active rules.</Text>}
+                                            <DataVisualizer dataHistory={dataHistory} events={events} />
+                                        </Box>
+
+                                        <RuleBuilder
+                                            rules={rules}
+                                            savedRules={savedRules}
+                                            onAddRule={handleAddRule}
+                                            onDeleteRule={handleDeleteRule}
+                                            onSaveToLibrary={handleSaveToLibrary}
+                                            prefillRule={prefillRule}
+                                        />
+                                    </TabPanel>
+                                    <TabPanel h="full" p={0}>
+                                        {templateView === 'library' ? (
+                                            <RuleTemplateLibrary
+                                                templates={libraryTemplates}
+                                                onCreateNew={() => setTemplateView('create')}
+                                                onUseTemplate={handleUseTemplate}
+                                            />
+                                        ) : (
+                                            <CreateRuleTemplate
+                                                onSave={handleSaveTemplate}
+                                                onCancel={() => setTemplateView('library')}
+                                            />
+                                        )}
+                                    </TabPanel>
+                                    <TabPanel>
+                                        <TripConfiguration parameters={parameters} setParameters={setParameters} />
+                                    </TabPanel>
+                                    <TabPanel>
+                                        <CANSignalBuilder
+                                            signals={canSignalRules}
+                                            onUpdateSignals={setCanSignalRules}
+                                            busData={canBusData}
+                                        />
+                                    </TabPanel>
+                                    <TabPanel>
+                                        <LifecycleConfig
+                                            rules={lifecycleRules}
+                                            onUpdateRule={(state, updatedRule) => {
+                                                setLifecycleRules({ ...lifecycleRules, [state]: updatedRule });
+                                            }}
+                                        />
+                                    </TabPanel>
+                                    <TabPanel>
+                                        <VStack align="stretch" spacing={4}>
+                                            <Heading size="sm">SouthBound Payload Explorer</Heading>
+                                            <Text fontSize="sm" color="gray.500">View generated payloads based on current state and rules.</Text>
+                                            <Box overflowX="auto">
+                                                {lastPayload && (
+                                                    <Box mt={4} p={4} bg="gray.900" borderRadius="md">
+                                                        <Text color="gray.400" fontSize="xs" mb={1}>Last Generated {lastPayload.type} Payload:</Text>
+                                                        <Text color="green.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
+                                                            {JSON.stringify(lastPayload.content, null, 2)}
+                                                        </Text>
+                                                    </Box>
+                                                )}
+                                                {lastTripPayload && (
+                                                    <Box mt={4} p={4} bg="gray.900" borderRadius="md">
+                                                        <Text color="gray.400" fontSize="xs" mb={1}>Last Trip Payload:</Text>
+                                                        <Text color="blue.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
+                                                            {JSON.stringify(lastTripPayload, null, 2)}
+                                                        </Text>
+                                                    </Box>
+                                                )}
+                                            </Box>
+                                        </VStack>
+                                    </TabPanel>
+                                </TabPanels>
+                            </Card>
+                        </Tabs>
+                        {/* Always Visible Event Log */}
+                        <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" mt={6}>
+                            <CardHeader borderBottomWidth="1px" py={{ base: 2, md: 3 }} px={{ base: 3, md: 4 }} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                <HStack justify="space-between">
+                                    <HStack>
+                                        <Icon as={Activity} color="orange.500" />
+                                        <Heading size={{ base: "2xs", md: "xs" }} textTransform="uppercase">Live Event Log</Heading>
+                                    </HStack>
+                                    <Badge colorScheme="blue" variant="solid" borderRadius="full" px={2}>{events.length}</Badge>
+                                </HStack>
+                            </CardHeader>
+                            <CardBody p={0}>
+                                <Box overflowX="auto" maxHeight="400px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' } }}>
+                                    <Box as="table" width="100%">
+                                        <Box as="thead" bg="gray.50">
+                                            <Box as="tr">
+                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Time</Box>
+                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Rule</Box>
+                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold" display={{ base: "none", md: "table-cell" }}>Message</Box>
+                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Status</Box>
+                                            </Box>
+                                        </Box>
+                                        <Box as="tbody">
+                                            {events.slice().reverse().map((event, index) => (
+                                                <Box as="tr" key={index} borderBottomWidth="1px" borderColor="gray.100" _hover={{ bg: 'gray.50' }}>
+                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" color="gray.600">{new Date(event.timestamp).toLocaleTimeString()}</Box>
+                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" fontWeight="bold">{event.ruleName}</Box>
+                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" display={{ base: "none", md: "table-cell" }}>{event.message}</Box>
+                                                    <Box as="td" p={{ base: 2, md: 3 }}>
+                                                        <Badge
+                                                            size="xs"
+                                                            variant="subtle"
+                                                            colorScheme={
+                                                                event.severity === 'critical' ? 'red' :
+                                                                    event.severity === 'warning' ? 'orange' :
+                                                                        event.severity === 'success' ? 'green' : 'blue'
+                                                            }
+                                                            borderRadius="md"
+                                                        >
+                                                            {event.severity}
+                                                        </Badge>
+                                                    </Box>
+                                                </Box>
+                                            ))}
+                                            {events.length === 0 && (
+                                                <Box as="tr">
+                                                    <Box as="td" colSpan={4} p={8} textAlign="center" color="gray.400">
+                                                        <VStack spacing={2}>
+                                                            <Icon as={Activity} size={24} opacity={0.3} />
+                                                            <Text fontSize="sm">No events triggered yet</Text>
+                                                        </VStack>
+                                                    </Box>
+                                                </Box>
+                                            )}
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            </CardBody>
+                        </Card>
+                    </GridItem>
+                </Grid >
+            </VStack >
 
             {/* Dongle Alert Popup */}
-            <DongleAlertPopup
+            < DongleAlertPopup
                 isOpen={isAlertPopupOpen}
                 onClose={() => setIsAlertPopupOpen(false)}
                 alert={activePopupAlert}
             />
-        </Flex>
+        </Flex >
     );
 };
 

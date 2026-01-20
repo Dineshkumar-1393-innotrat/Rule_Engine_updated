@@ -8,6 +8,9 @@ import {
     Select,
     VStack,
     HStack,
+    Stack,
+    SimpleGrid,
+    Flex,
     Table,
     Thead,
     Tbody,
@@ -26,12 +29,49 @@ import {
     Badge,
     Grid,
     GridItem,
+    Modal,
+    ModalOverlay,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalCloseButton,
+    Tabs,
+    TabList,
+    TabPanels,
+    Tab,
+    TabPanel,
+    Code,
+    useClipboard,
+    useToast
 } from '@chakra-ui/react';
-import { FaTrash, FaPlus, FaEdit } from 'react-icons/fa';
+import { FaTrash, FaPlus, FaEdit, FaCode, FaCopy } from 'react-icons/fa';
+import {
+    generateCanConfigH,
+    generateCanConfigC,
+    generateCanDecodeH,
+    generateCanDecodeC
+} from '../../utils/canCodeGenerator';
 
 const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
     const bgColor = useColorModeValue('white', 'gray.800');
     const borderColor = useColorModeValue('gray.200', 'gray.700');
+    const toast = useToast();
+
+    const [isCodeModalOpen, setIsCodeModalOpen] = useState(false);
+    const [generatedCode, setGeneratedCode] = useState({
+        configH: '',
+        configC: '',
+        decodeH: '',
+        decodeC: ''
+    });
+
+    // Converter Modal State
+    const [isConverterModalOpen, setIsConverterModalOpen] = useState(false);
+    const [converterInput, setConverterInput] = useState({
+        header: '',
+        data: ''
+    });
+    const [converterOutput, setConverterOutput] = useState('');
 
     const [editingId, setEditingId] = useState(null);
     const [formData, setFormData] = useState({
@@ -97,13 +137,102 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
         setEditingId(null);
     };
 
+    const handleGenerateCode = () => {
+        if (signals.length === 0) {
+            toast({
+                title: 'No Signals Defined',
+                description: 'Please add at least one signal to generate code.',
+                status: 'warning',
+                duration: 3000,
+                isClosable: true,
+            });
+            return;
+        }
+
+        const configH = generateCanConfigH();
+        const configC = generateCanConfigC(signals);
+        const decodeH = generateCanDecodeH();
+        const decodeC = generateCanDecodeC();
+
+        setGeneratedCode({ configH, configC, decodeH, decodeC });
+        setIsCodeModalOpen(true);
+    };
+
+    const handleConverterCode = () => {
+        setIsConverterModalOpen(true);
+    };
+
+    const runConverter = () => {
+        // Parse Header
+        const headerStr = converterInput.header.trim();
+        const headerVal = headerStr.startsWith('0x') ? headerStr : `0x${parseInt(headerStr || '0').toString(16).toUpperCase()}`;
+
+        // Parse Data (assume space separated hex or just hex string)
+        const dataStr = converterInput.data.replace(/\s+/g, '');
+        const dataBytes = [];
+        for (let i = 0; i < dataStr.length; i += 2) {
+            const byte = dataStr.substring(i, i + 2);
+            if (byte.length === 2) {
+                dataBytes.push(`0x${byte.toUpperCase()}`);
+            }
+        }
+
+        // Format Output (MISRA-C compliant array)
+        // Example: { 0x123U, { 0x11U, 0x22U, ... } }
+        const output = `{ ${headerVal}, { ${dataBytes.join(', ')} } }`;
+        setConverterOutput(output);
+    };
+
+    const CodeBlock = ({ code, filename }) => {
+        const { hasCopied, onCopy } = useClipboard(code);
+        return (
+            <Box position="relative" my={2}>
+                <HStack justify="space-between" mb={2}>
+                    <Text fontWeight="bold" fontSize="sm">{filename}</Text>
+                    <Button size="xs" leftIcon={<FaCopy />} onClick={onCopy} colorScheme={hasCopied ? "green" : "gray"}>
+                        {hasCopied ? "Copied" : "Copy"}
+                    </Button>
+                </HStack>
+                <Box
+                    as="pre"
+                    p={4}
+                    bg="gray.900"
+                    color="green.300"
+                    borderRadius="md"
+                    overflowX="auto"
+                    fontSize="xs"
+                    maxH="400px"
+                >
+                    {code}
+                </Box>
+            </Box>
+        );
+    };
+
     return (
         <Box>
             <Grid templateColumns={{ base: "1fr", lg: "1fr 2fr" }} gap={6}>
                 {/* Form Section */}
                 <GridItem>
                     <Box p={5} bg={bgColor} borderWidth="1px" borderRadius="lg" borderColor={borderColor}>
-                        <Heading size="md" mb={4}>{editingId ? 'Edit Signal' : 'Add New Signal'}</Heading>
+                        <Flex justify="space-between" align="center" mb={4} wrap="wrap" gap={2}>
+                            <Heading size="md">{editingId ? 'Edit Signal' : 'Add New Signal'}</Heading>
+                            <Button leftIcon={<FaCode />}
+                                colorScheme="purple"
+                                size="sm"
+                                onClick={handleGenerateCode}
+                            >
+                                Generate Code
+                            </Button>
+                            <Button
+                                leftIcon={<FaCode />}
+                                colorScheme="purple"
+                                size="sm"
+                                onClick={handleConverterCode}
+                            >
+                                Converter
+                            </Button>
+                        </Flex>
                         <VStack spacing={4}>
                             <FormControl isRequired>
                                 <FormLabel>Signal Name</FormLabel>
@@ -115,7 +244,7 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                 />
                             </FormControl>
 
-                            <HStack width="full">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} width="full">
                                 <FormControl isRequired>
                                     <FormLabel>Identifier (Hex)</FormLabel>
                                     <Input
@@ -136,9 +265,9 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                         <option value="big">Big Endian</option>
                                     </Select>
                                 </FormControl>
-                            </HStack>
+                            </SimpleGrid>
 
-                            <HStack width="full">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} width="full">
                                 <FormControl>
                                     <FormLabel>Start Bit</FormLabel>
                                     <NumberInput min={0} max={63} value={formData.startBit} onChange={(v) => handleInputChange('startBit', Number(v))}>
@@ -153,9 +282,9 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                         <NumberInputStepper><NumberIncrementStepper /><NumberDecrementStepper /></NumberInputStepper>
                                     </NumberInput>
                                 </FormControl>
-                            </HStack>
+                            </SimpleGrid>
 
-                            <HStack width="full">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} width="full">
                                 <FormControl>
                                     <FormLabel>Factor</FormLabel>
                                     <NumberInput value={formData.factor} onChange={(v) => handleInputChange('factor', Number(v))}>
@@ -168,9 +297,9 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                         <NumberInputField color="black" />
                                     </NumberInput>
                                 </FormControl>
-                            </HStack>
+                            </SimpleGrid>
 
-                            <HStack width="full">
+                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4} width="full">
                                 <FormControl>
                                     <FormLabel>Min</FormLabel>
                                     <NumberInput value={formData.min} onChange={(v) => handleInputChange('min', Number(v))}>
@@ -183,20 +312,20 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                         <NumberInputField color="black" />
                                     </NumberInput>
                                 </FormControl>
-                            </HStack>
+                            </SimpleGrid>
                             <FormControl>
                                 <FormLabel>Unit</FormLabel>
                                 <Input value={formData.unit} onChange={(e) => handleInputChange('unit', e.target.value)} placeholder="e.g. km/h, rpm" color="black" />
                             </FormControl>
 
-                            <HStack width="full" spacing={4} mt={4}>
-                                <Button colorScheme="blue" leftIcon={editingId ? <FaEdit /> : <FaPlus />} onClick={handleSave} flex={1}>
+                            <Stack direction={{ base: "column", md: "row" }} width="full" spacing={4} mt={4}>
+                                <Button colorScheme="blue" leftIcon={editingId ? <FaEdit /> : <FaPlus />} onClick={handleSave} flex={1} width="full">
                                     {editingId ? 'Update Signal' : 'Add Signal'}
                                 </Button>
                                 {editingId && (
-                                    <Button variant="ghost" onClick={resetForm}>Cancel</Button>
+                                    <Button variant="ghost" onClick={resetForm} flex={1} width="full">Cancel</Button>
                                 )}
-                            </HStack>
+                            </Stack>
                         </VStack>
                     </Box>
                 </GridItem>
@@ -258,41 +387,123 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
             </Grid>
 
             {/* Live Monitor Section */}
-            {busData.length > 0 && (
-                <Box mt={6} p={5} bg={bgColor} borderWidth="1px" borderRadius="lg" borderColor={borderColor}>
-                    <Heading size="md" mb={4}>Live CAN Bus Monitor (Simulation)</Heading>
-                    <Box overflowX="auto" maxHeight="300px">
-                        <Table variant="striped" size="sm">
-                            <Thead position="sticky" top={0} bg={bgColor} zIndex={1}>
-                                <Tr>
-                                    <Th>Time</Th>
-                                    <Th>ID (Hex)</Th>
-                                    <Th>Decoded Signals</Th>
-                                </Tr>
-                            </Thead>
-                            <Tbody>
-                                {busData.map((frame, idx) => (
-                                    <Tr key={idx}>
-                                        <Td>{frame.timestamp}</Td>
-                                        <Td><Badge colorScheme="green">{frame.id}</Badge></Td>
-                                        <Td>
-                                            <VStack align="start" spacing={1}>
-                                                {frame.signals.map((sig, sIdx) => (
-                                                    <HStack key={sIdx} fontSize="xs">
-                                                        <Text fontWeight="bold">{sig.name}:</Text>
-                                                        <Text>{sig.value}</Text>
-                                                        <Text color="gray.500">({sig.raw})</Text>
-                                                    </HStack>
-                                                ))}
-                                            </VStack>
-                                        </Td>
+            {
+                busData.length > 0 && (
+                    <Box mt={6} p={5} bg={bgColor} borderWidth="1px" borderRadius="lg" borderColor={borderColor}>
+                        <Heading size="md" mb={4}>Live CAN Bus Monitor (Simulation)</Heading>
+                        <Box overflowX="auto" maxHeight="300px">
+                            <Table variant="striped" size="sm">
+                                <Thead position="sticky" top={0} bg={bgColor} zIndex={1}>
+                                    <Tr>
+                                        <Th>Time</Th>
+                                        <Th>ID (Hex)</Th>
+                                        <Th>Decoded Signals</Th>
                                     </Tr>
-                                ))}
-                            </Tbody>
-                        </Table>
+                                </Thead>
+                                <Tbody>
+                                    {busData.map((frame, idx) => (
+                                        <Tr key={idx}>
+                                            <Td>{frame.timestamp}</Td>
+                                            <Td><Badge colorScheme="green">{frame.id}</Badge></Td>
+                                            <Td>
+                                                <VStack align="start" spacing={1}>
+                                                    {frame.signals.map((sig, sIdx) => (
+                                                        <HStack key={sIdx} fontSize="xs">
+                                                            <Text fontWeight="bold">{sig.name}:</Text>
+                                                            <Text>{sig.value}</Text>
+                                                            <Text color="gray.500">({sig.raw})</Text>
+                                                        </HStack>
+                                                    ))}
+                                                </VStack>
+                                            </Td>
+                                        </Tr>
+                                    ))}
+                                </Tbody>
+                            </Table>
+                        </Box>
                     </Box>
-                </Box>
-            )}
+                )
+            }
+
+
+            {/* Generated Code Modal */}
+            <Modal isOpen={isCodeModalOpen} onClose={() => setIsCodeModalOpen(false)} size="xl" scrollBehavior="inside">
+                <ModalOverlay />
+                <ModalContent maxW="800px">
+                    <ModalHeader>Generated MISRA-C Code</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody>
+                        <Tabs variant="enclosed">
+                            <TabList>
+                                <Tab>can_config.h</Tab>
+                                <Tab>can_config.c</Tab>
+                                <Tab>can_decode.h</Tab>
+                                <Tab>can_decode.c</Tab>
+                            </TabList>
+                            <TabPanels>
+                                <TabPanel>
+                                    <CodeBlock code={generatedCode.configH} filename="can_config.h" />
+                                </TabPanel>
+                                <TabPanel>
+                                    <CodeBlock code={generatedCode.configC} filename="can_config.c" />
+                                </TabPanel>
+                                <TabPanel>
+                                    <CodeBlock code={generatedCode.decodeH} filename="can_decode.h" />
+                                </TabPanel>
+                                <TabPanel>
+                                    <CodeBlock code={generatedCode.decodeC} filename="can_decode.c" />
+                                </TabPanel>
+                            </TabPanels>
+                        </Tabs>
+                    </ModalBody>
+                </ModalContent>
+            </Modal>
+
+            {/* Converter Modal */}
+            <Modal isOpen={isConverterModalOpen} onClose={() => setIsConverterModalOpen(false)} size="lg">
+                <ModalOverlay />
+                <ModalContent>
+                    <ModalHeader>Hex Converter</ModalHeader>
+                    <ModalCloseButton />
+                    <ModalBody pb={6}>
+                        <VStack spacing={4}>
+                            <FormControl>
+                                <FormLabel>CAN Header</FormLabel>
+                                <Input
+                                    placeholder="e.g. 0x123"
+                                    value={converterInput.header}
+                                    onChange={(e) => setConverterInput(prev => ({ ...prev, header: e.target.value }))}
+                                    color="black"
+                                />
+                            </FormControl>
+                            <FormControl>
+                                <FormLabel>CAN DATA</FormLabel>
+                                <Input
+                                    placeholder="e.g. 11 22 33 44 55 66 77 88"
+                                    value={converterInput.data}
+                                    onChange={(e) => setConverterInput(prev => ({ ...prev, data: e.target.value }))}
+                                    color="black"
+                                />
+                            </FormControl>
+                            <Button colorScheme="purple" width="full" onClick={runConverter}>
+                                Convert
+                            </Button>
+                            <FormControl>
+                                <FormLabel>Hex Code</FormLabel>
+                                <Box
+                                    p={3}
+                                    bg="gray.100"
+                                    _dark={{ bg: 'gray.700' }}
+                                    borderRadius="md"
+                                    fontFamily="monospace"
+                                >
+                                    {converterOutput || 'Output will appear here...'}
+                                </Box>
+                            </FormControl>
+                        </VStack>
+                    </ModalBody>
+                </ModalContent>
+            </Modal>
         </Box>
     );
 };

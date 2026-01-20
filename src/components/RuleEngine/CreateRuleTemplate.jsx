@@ -82,7 +82,7 @@ const CreateRuleTemplate = ({ onCancel, onSave }) => {
                         value={tags}
                         onChange={(e) => setTags(e.target.value)}
                     />
-                    <HStack spacing={2} mt={2}>
+                    <Flex wrap="wrap" gap={2} mt={2}>
                         <Tag size="md" borderRadius="full" variant="subtle" colorScheme="red" cursor="pointer" onClick={() => setTags(prev => prev ? `${prev}, Temperature` : 'Temperature')}>
                             <TagLeftIcon boxSize="12px" as={FaThermometerHalf} />
                             <TagLabel>Temperature</TagLabel>
@@ -95,7 +95,7 @@ const CreateRuleTemplate = ({ onCancel, onSave }) => {
                             <TagLeftIcon boxSize="12px" as={FaBatteryThreeQuarters} />
                             <TagLabel>Battery</TagLabel>
                         </Tag>
-                    </HStack>
+                    </Flex>
                 </FormControl>
 
                 <FormControl mt={4}>
@@ -130,7 +130,7 @@ const CreateRuleTemplate = ({ onCancel, onSave }) => {
                 <FormControl mt={6}>
                     <FormLabel fontSize="sm" fontWeight="medium">Severity</FormLabel>
                     <RadioGroup value={severity} onChange={setSeverity}>
-                        <Stack direction="row" spacing={8}>
+                        <Stack direction={{ base: "column", sm: "row" }} spacing={8}>
                             <Radio value="error" colorScheme="red">
                                 <HStack spacing={1}><Box w={2} h={2} borderRadius="full" bg="red.500" /> <Text fontSize="sm">Error</Text></HStack>
                             </Radio>
@@ -148,7 +148,7 @@ const CreateRuleTemplate = ({ onCancel, onSave }) => {
                     <FormLabel fontSize="md" fontWeight="bold" mb={4}>Value Constraints</FormLabel>
                     <Text fontSize="sm" color="gray.500" mb={4}>Define Acceptable Ranges For Numeric Values In Your Code</Text>
 
-                    <Grid templateColumns="repeat(3, 1fr)" gap={4}>
+                    <Grid templateColumns={{ base: "1fr", md: "repeat(3, 1fr)" }} gap={4}>
                         <GridItem>
                             <FormControl>
                                 <FormLabel fontSize="xs">Min Value</FormLabel>

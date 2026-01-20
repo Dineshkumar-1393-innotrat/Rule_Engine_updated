@@ -20,6 +20,7 @@ import {
     Tooltip,
     Grid,
     GridItem,
+    Stack
 } from '@chakra-ui/react';
 import { FaTrash, FaPlus, FaChevronDown, FaChevronRight, FaInfoCircle } from 'react-icons/fa';
 import { AvailableFacts, DeviceStates, DeviceVariables, ConfigurableParameters } from '../../utils/RuleEngine';
@@ -141,7 +142,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
     return (
         <VStack spacing={6} align="stretch">
             {/* Device States Section */}
-            <Box p={4} bg={bgColor} borderRadius="lg" borderWidth="1px" borderColor={borderColor}>
+            <Box bg={bgColor} borderRadius="lg" borderWidth="1px" borderColor={borderColor}>
                 <HStack
                     justify="space-between"
                     cursor="pointer"
@@ -155,7 +156,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                     <Badge colorScheme="purple">{Object.keys(DeviceStates).length} states</Badge>
                 </HStack>
                 <Collapse in={showStates}>
-                    <Grid templateColumns="repeat(3, 1fr)" gap={3}>
+                    <Grid templateColumns={{ base: "1fr", md: "repeat(3, 1fr)" }} gap={3}>
                         {Object.entries(DeviceStates).map(([key, value]) => (
                             <Box
                                 key={key}
@@ -178,7 +179,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
             </Box>
 
             {/* Device Variables Section */}
-            <Box p={4} bg={bgColor} borderRadius="lg" borderWidth="1px" borderColor={borderColor}>
+            <Box p={1} bg={bgColor} borderRadius="lg" borderWidth="1px" borderColor={borderColor}>
                 <HStack
                     justify="space-between"
                     cursor="pointer"
@@ -192,7 +193,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                     <Badge colorScheme="blue">{DeviceVariables.length} variables</Badge>
                 </HStack>
                 <Collapse in={showVariables}>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={3}>
+                    <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={3}>
                         {DeviceVariables.map((variable) => (
                             <Box
                                 key={variable.name}
@@ -231,7 +232,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                     <Badge colorScheme="teal">{ConfigurableParameters.length} parameters</Badge>
                 </HStack>
                 <Collapse in={showParameters}>
-                    <Grid templateColumns="repeat(2, 1fr)" gap={3}>
+                    <Grid templateColumns={{ base: "1fr", md: "repeat(2, 1fr)" }} gap={3}>
                         {ConfigurableParameters.map((param) => (
                             <Box
                                 key={param.name}
@@ -281,67 +282,71 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
 
                     <Text fontWeight="bold" alignSelf="start">Conditions (AND)</Text>
                     {conditions.map((condition, index) => (
-                        <HStack key={index} width="100%">
-                            <Select
-                                value={condition.fact}
-                                onChange={(e) => handleConditionChange(index, 'fact', e.target.value)}
-                                width="200px"
-                                color="black"
-                            >
-                                {/* Group facts by category */}
-                                <optgroup label="📊 Sensor Data">
-                                    {AvailableFacts.filter(f => f.category === 'sensor').map(fact => (
-                                        <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="🔄 Device State">
-                                    {AvailableFacts.filter(f => f.category === 'state').map(fact => (
-                                        <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="📝 Internal Variables">
-                                    {AvailableFacts.filter(f => f.category === 'variable').map(fact => (
-                                        <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="🚗 Trip Statistics">
-                                    {AvailableFacts.filter(f => f.category === 'trip').map(fact => (
-                                        <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                    ))}
-                                </optgroup>
-                                <optgroup label="⚙️ Parameters">
-                                    {AvailableFacts.filter(f => f.category === 'parameter').map(fact => (
-                                        <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                    ))}
-                                </optgroup>
-                            </Select>
-                            <Select
-                                value={condition.operator}
-                                onChange={(e) => handleConditionChange(index, 'operator', e.target.value)}
-                                width="120px"
-                                color="black"
-                            >
-                                <option value=">">&gt;</option>
-                                <option value="<">&lt;</option>
-                                <option value="==">==</option>
-                                <option value="!=">!=</option>
-                                <option value=">=">&gt;=</option>
-                                <option value="<=">&lt;=</option>
-                            </Select>
-                            <Input
-                                placeholder="Value"
-                                value={condition.value}
-                                onChange={(e) => handleConditionChange(index, 'value', e.target.value)}
-                                color="black"
-                            />
-                            <IconButton
-                                icon={<FaTrash />}
-                                colorScheme="red"
-                                size="sm"
-                                onClick={() => handleRemoveCondition(index)}
-                                isDisabled={conditions.length === 1}
-                            />
-                        </HStack>
+                        <Box key={index} width="100%">
+                            <Stack direction={{ base: 'column', md: 'row' }} spacing={2} align="center">
+                                <Select
+                                    value={condition.fact}
+                                    onChange={(e) => handleConditionChange(index, 'fact', e.target.value)}
+                                    width={{ base: "full", md: "200px" }}
+                                    color="black"
+                                >
+                                    {/* Group facts by category */}
+                                    <optgroup label="📊 Sensor Data">
+                                        {AvailableFacts.filter(f => f.category === 'sensor').map(fact => (
+                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="🔄 Device State">
+                                        {AvailableFacts.filter(f => f.category === 'state').map(fact => (
+                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="📝 Internal Variables">
+                                        {AvailableFacts.filter(f => f.category === 'variable').map(fact => (
+                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="🚗 Trip Statistics">
+                                        {AvailableFacts.filter(f => f.category === 'trip').map(fact => (
+                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="⚙️ Parameters">
+                                        {AvailableFacts.filter(f => f.category === 'parameter').map(fact => (
+                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                        ))}
+                                    </optgroup>
+                                </Select>
+                                <Select
+                                    value={condition.operator}
+                                    onChange={(e) => handleConditionChange(index, 'operator', e.target.value)}
+                                    width={{ base: "full", md: "120px" }}
+                                    color="black"
+                                >
+                                    <option value=">">&gt;</option>
+                                    <option value="<">&lt;</option>
+                                    <option value="==">==</option>
+                                    <option value="!=">!=</option>
+                                    <option value=">=">&gt;=</option>
+                                    <option value="<=">&lt;=</option>
+                                </Select>
+                                <Input
+                                    placeholder="Value"
+                                    value={condition.value}
+                                    onChange={(e) => handleConditionChange(index, 'value', e.target.value)}
+                                    color="black"
+                                    flex={1}
+                                />
+                                <IconButton
+                                    icon={<FaTrash />}
+                                    colorScheme="red"
+                                    size="sm"
+                                    onClick={() => handleRemoveCondition(index)}
+                                    isDisabled={conditions.length === 1}
+                                    width={{ base: "full", md: "auto" }}
+                                />
+                            </Stack>
+                        </Box>
                     ))}
                     <Button leftIcon={<FaPlus />} size="xs" onClick={handleAddCondition} alignSelf="start">
                         Add Condition
