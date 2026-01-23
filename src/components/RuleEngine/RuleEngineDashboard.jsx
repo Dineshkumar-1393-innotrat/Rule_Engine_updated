@@ -474,21 +474,47 @@ const RuleEngineDashboard = () => {
         // Reset trip stats
         tripStats.current = { runTime: 0, distance: 0, offTime: 0 };
 
-        // Reset device variables
+        // Reset device variables - preserving IDs but clearing counters/state
         deviceVariables.current = {
+            ...deviceVariables.current,
             tripStartTime: null,
             tripStartOdo: 0,
             currentTripDistance: 0,
             lastIgnitionOffTime: null,
-            elapsedIgnitionOffTime: 0
+            elapsedIgnitionOffTime: 0,
+            journeyId: null,
+            harshAccCnt: 0,
+            hardBrakeCnt: 0,
+            harshTurnCnt: 0,
+            idlingCnt: 0,
+            idleDuration: 0,
+            tripType: 'Idle',
+            highSpeedCnt: 0,
+            currentTripTime: 0,
+            gnssInfoStart: null,
+            tripStartTimeEpoch: null,
+            topSpeed: 0,
+            vinFragments: {},
+            vinProgress: 0,
+            drivingScore: 100
         };
 
         // Reset device state to IDLE
         setDeviceState(DeviceStates.TRIP_IDLE);
+        setTboxApplicationState(DeviceStates.PRE_SALES);
+        setTboxOperatingState('NORMAL');
+        setTboxeSimState('NORMAL_SIM');
         prevIgnitionRef.current = false;
 
+        // Reset pedal and alert states
+        setGasPedal(0);
+        setBrakeActive(false);
+        setMilActive(false);
+        setIsDeviceRemoved(false);
+        setIsSpeedAlertLive(false);
+
         // Clear active alerts tracking
-        activeCriticalAlerts.current = {};
+        activeAlertInstances.current = {};
 
         // Clear any running demo timeouts
         demoTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
@@ -854,24 +880,49 @@ const RuleEngineDashboard = () => {
 
         // 8. Start Driving & Trips
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setSimSpeed(45);
-            // Lower trip distance threshold for demo purposes so we hit TRIP_ACTIVE quickly
-            setParameters(prev => ({ ...prev, MIN_TRIP_DISTANCE: 0.1 }));
+            setGasPedal(80); // High acceleration for demo
+            // Set thresholds low for demo purposes so we hit states quickly
+            setParameters(prev => ({
+                ...prev,
+                MIN_TRIP_DISTANCE: 0.02, // 20 meters
+                MIN_IGN_OFF_TIME: 10,    // 10 seconds for TRIP_PAUSED
+                MAX_IGN_OFF_TIME: 15     // 15 seconds for TRIP_IDLE
+            }));
             setRules([...rules, ...JeepM6DefaultRules]);
-            toast({ title: 'Trip Started', description: 'Driving at 45 km/h. Adjusted MIN_TRIP_DISTANCE to 0.1km for demo.', status: 'info' });
+            toast({ title: 'Step 7: Trip Started', description: 'Applying Gas Pedal (80%). thresholds lowered for demo.', status: 'info' });
         }, 34000));
 
         // 9. Trigger Overspeed
         demoTimeoutsRef.current.push(setTimeout(() => {
-            setSimSpeed(115);
-            toast({ title: 'Simulating Alert', description: 'Exceeding speed threshold...', status: 'warning' });
+            setGasPedal(100); // Max acceleration
+            toast({ title: 'Step 8: Simulating Alert', description: 'Full Gas (100%) to trigger Overspeed Alert (> 100 km/h)...', status: 'warning' });
         }, 40000));
 
-        // 10. End Trip
+        // 10. End Driving
         demoTimeoutsRef.current.push(setTimeout(() => {
+            setGasPedal(0);
             setSimSpeed(0);
-            toggleIgnition();
-            // Reset parameters to defaults
+            setIgnition(false);
+            deviceVariables.current.lastIgnitionOffTime = Date.now();
+            toast({ title: 'Step 9: Ignition OFF', description: 'Monitoring for Pause/End thresholds... (Waiting 10s)', status: 'info' });
+        }, 48000));
+
+        // 11. Observe TRIP_PAUSED (after MIN_IGN_OFF_TIME = 10s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Step 10: State TRIP_PAUSED', description: 'Threshold met! Trip moved to Paused state.', status: 'warning' });
+        }, 60000));
+
+        // 12. Observe TRIP_IDLE (after MAX_IGN_OFF_TIME = 15s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Step 11: State TRIP_IDLE', description: 'Max Off Time met! Trip finalized and joined with IDLE records.', status: 'info' });
+        }, 66000));
+
+        // 13. Final Demo Completion
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            // Full Reset
+            clearData();
+
+            // Reset parameters to defaults (clearData resets variables but we want to ensure params are back to standard too)
             setParameters({
                 MIN_TRIP_DISTANCE: 2,
                 MIN_IGN_OFF_TIME: 120,
@@ -881,8 +932,8 @@ const RuleEngineDashboard = () => {
                 HARSH_ACCEL_THR: 10,
                 HARD_BRAKE_THR: 15
             });
-            toast({ title: 'Demo Completed', description: 'Full lifecycle and trip scenario finished. Parameters reset.', status: 'success', duration: 10000 });
-        }, 50000));
+            toast({ title: 'Demo Completed', description: 'Full lifecycle and trip scenario finished. Dashboard fully reset.', status: 'success', duration: 10000 });
+        }, 72000));
     };
 
     const runCANDemo = () => {
@@ -1060,10 +1111,35 @@ const RuleEngineDashboard = () => {
                         }].slice(-100));
                     }
 
-                    // Default behavior
-                    const fluctuation = Math.floor(Math.random() * 5) - 2;
-                    currentSpeed = Math.max(0, Math.min(200, simSpeed + fluctuation));
-                    currentRpm = Math.floor(1000 + Math.random() * 7000);
+                    // Advanced Simulation: Calculate speed and RPM based on Gas Pedal, Brake, and Ignition
+                    const targetSpeed = (gasPedal / 100) * 200; // Max speed 200 km/h
+                    const acceleration = (gasPedal / 100) * 5;  // Max acceleration 5 km/h per second
+                    const braking = brakeActive ? 15 : 1.5;   // Braking is much stronger than natural deceleration
+
+                    let nextSpeed = simSpeed;
+                    if (nextSpeed < targetSpeed) {
+                        nextSpeed = Math.min(targetSpeed, nextSpeed + acceleration);
+                    } else if (nextSpeed > targetSpeed) {
+                        nextSpeed = Math.max(targetSpeed, nextSpeed - braking);
+                    }
+
+                    // Add small fluctuation for realism
+                    const fluctuation = (Math.random() * 0.4) - 0.2;
+                    currentSpeed = Math.max(0, Math.min(200, nextSpeed + fluctuation));
+
+                    // Update the state so the slider and UI reflect the simulated speed
+                    setSimSpeed(currentSpeed);
+
+                    // Dynamic RPM calculation: Base idle (800) + gas influence + speed influence
+                    if (currentSpeed < 1) {
+                        currentRpm = 800 + (gasPedal * 10) + (Math.random() * 50);
+                    } else {
+                        // Simple gear simulation logic (simulating 6 gears)
+                        const gear = Math.min(6, Math.floor(currentSpeed / 35) + 1);
+                        const gearRatio = 1.0 - ((gear - 1) * 0.1);
+                        currentRpm = 1000 + ((currentSpeed % 35) * 100 * gearRatio) + (gasPedal * 15);
+                    }
+                    currentRpm = Math.floor(Math.min(8000, currentRpm));
 
                     // Unified Simulation: Add noise to battery voltage if engine is ON
                     // Simulate alternator fluctuating between 13.5V and 14.5V
@@ -1727,7 +1803,11 @@ const RuleEngineDashboard = () => {
                                         <Text fontWeight="bold" fontSize={{ base: "sm", md: "md" }}>System Status</Text>
                                     </HStack>
                                     <Flex flexWrap="wrap" gap={2}>
-                                        {Object.values(DeviceStates).map((state) => {
+                                        {Object.values(DeviceStates).filter(state => {
+                                            const isTripState = state.startsWith('TRIP_');
+                                            if (isTripState && tboxApplicationState !== DeviceStates.CUSTOMER) return false;
+                                            return true;
+                                        }).map((state) => {
                                             const isTripState = state.startsWith('TRIP_');
                                             const isLifecycleState = !isTripState;
                                             const isActive = (isTripState && deviceState === state) ||
@@ -1781,12 +1861,14 @@ const RuleEngineDashboard = () => {
                                             onChange={(e) => setDeviceState(e.target.value)}
                                             borderRadius="md"
                                         >
-                                            <optgroup label="Trip States">
-                                                <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
-                                                <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
-                                                <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
-                                                <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
-                                            </optgroup>
+                                            {tboxApplicationState === DeviceStates.CUSTOMER && (
+                                                <optgroup label="Trip States">
+                                                    <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
+                                                    <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
+                                                    <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
+                                                    <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
+                                                </optgroup>
+                                            )}
                                             <optgroup label="Lifecycle States">
                                                 <option value={DeviceStates.FACTORY}>FACTORY</option>
                                                 <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
@@ -2064,8 +2146,8 @@ const RuleEngineDashboard = () => {
                                 </CardBody>
                             </Card>
 
-                            {/* 3. Device Lifecycle & Remote Ops */}
-                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
+                            {/* 3. Device Lifecycle & Remote Ops - HIDDEN BY USER REQUEST */}
+                            {/* <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
                                 <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
                                     <HStack>
                                         <Icon as={Cpu} color="orange.500" />
@@ -2098,7 +2180,7 @@ const RuleEngineDashboard = () => {
                                         </SimpleGrid>
                                     </VStack>
                                 </CardBody>
-                            </Card>
+                            </Card> */}
 
                             {/* 4. FOTA Update Center */}
                             <Card variant="outline" shadow="md" borderRadius="xl" borderColor="blue.100" bg="blue.50">

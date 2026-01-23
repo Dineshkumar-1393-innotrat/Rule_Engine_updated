@@ -151,12 +151,12 @@ const TripConfiguration = ({ parameters, setParameters }) => {
                                 value={parameters.MAX_IGN_OFF_TIME}
                                 onChange={(val) => handleParameterChange('MAX_IGN_OFF_TIME', val)}
                                 min={10}
-                                max={3600}
+                                max={20}
                                 step={10}
                                 icon={Timer}
                                 unit="Seconds (s)"
                             />
-                            <ParameterItem
+                            {/* <ParameterItem
                                 label="Max Ignition On Time"
                                 description="The maximum allowed duration for a single trip while ignition remains ON."
                                 value={parameters.MAX_IGN_ON_TIME}
@@ -166,7 +166,7 @@ const TripConfiguration = ({ parameters, setParameters }) => {
                                 step={60}
                                 icon={Timer}
                                 unit="Seconds (s)"
-                            />
+                            /> */}
                         </VStack>
                     </CardBody>
                 </Card>
