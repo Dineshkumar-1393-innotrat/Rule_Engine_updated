@@ -575,6 +575,8 @@ export const AvailableFacts = [
     { name: 'idlingCnt', label: 'Idling Count', type: 'number', category: 'trip' },
     { name: 'idleDuration', label: 'Idle Duration (min)', type: 'number', category: 'trip' },
     { name: 'tripType', label: 'Trip Type (Active/Idle)', type: 'string', category: 'trip' },
+    { name: 'crashLogFlag', label: 'Crash Log Pending', type: 'boolean', category: 'diagnostic' },
+    { name: 'towLogFlag', label: 'Tow Log Pending', type: 'boolean', category: 'diagnostic' },
 
 
     // Device State
@@ -609,6 +611,9 @@ export const AvailableFacts = [
     { name: 'ETAT_MT', label: 'Engine State (CAN)', type: 'number', category: 'state' },
     { name: 'TowCondition', label: 'Tow Condition (Flag)', type: 'number', category: 'state' },
     { name: 'MovDetect', label: 'Motion Detect (Flag)', type: 'number', category: 'state' },
+
+    { name: 'isDeviceRemoved', label: 'Is Device Removed', type: 'boolean', category: 'security' },
+    { name: 'dismantleStatus', label: 'Dismantle Status', type: 'string', category: 'security' },
 
     // Parameters (for reference in conditions)
     { name: 'MIN_TRIP_DISTANCE', label: 'Min Trip Distance (km)', type: 'parameter', category: 'parameter' },

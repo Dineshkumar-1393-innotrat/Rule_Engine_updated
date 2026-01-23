@@ -211,6 +211,38 @@ export const generateFetchLogsResponsePayload = (commandId, status, errorCode, d
 };
 
 /**
+ * Specialized Crash Log Response 
+ */
+export const generateCrashLogPayload = (commandId, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'FetchCrashLog', 'Success', deviceData, {
+        fileUploadStatus: 'successful',
+        logType: 'CRASH_DATA_RECORDER',
+        fileUrl: 'https://Tbox_debugger/logs/crash_log_latest.tar.gz'
+    });
+};
+
+/**
+ * Specialized Tow Log Response 
+ */
+export const generateTowLogPayload = (commandId, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'FetchTowLog', 'Success', deviceData, {
+        fileUploadStatus: 'successful',
+        logType: 'TOW_EVENT_LOG',
+        fileUrl: 'https://Tbox_debugger/logs/tow_log_latest.tar.gz'
+    });
+};
+
+/**
+ * Specialized Dismantle Check Response
+ */
+export const generateDismantleCheckPayload = (commandId, status, deviceData) => {
+    return generateCommandResponsePayload(commandId, 'DismantleCheck', status, deviceData, {
+        dismantleStatus: status === 'Success' ? 'SECURE' : 'TAMPERED',
+        checkTimestamp: new Date().toISOString()
+    });
+};
+
+/**
  * Specialized TBOX State Update Response (Section 10.5)
  */
 export const generateStateUpdateResponsePayload = (commandId, status, nextState, deviceData) => {

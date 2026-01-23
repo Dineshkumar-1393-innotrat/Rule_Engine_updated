@@ -78,7 +78,10 @@ import {
     generateWakeupResponsePayload,
     generateFetchLogsResponsePayload,
     generateStateUpdateResponsePayload,
-    generateThresholdUpdateResponsePayload
+    generateThresholdUpdateResponsePayload,
+    generateCrashLogPayload,
+    generateTowLogPayload,
+    generateDismantleCheckPayload
 } from '../../utils/SouthBoundPayloads';
 
 // Default initial state for the Rule Engine screen
@@ -188,7 +191,10 @@ const RuleEngineDashboard = () => {
         msisdn: '9123456789',
         drivingScore: 100,
         batteryVoltage: 12.8,
-        isDeviceRemoved: false
+        isDeviceRemoved: false,
+        crashLogFlag: false,
+        towLogFlag: false,
+        dismantleStatus: 'SECURE'
     });
 
     const [tboxApplicationState, setTboxApplicationState] = useState(DeviceStates.PRE_SALES);
@@ -600,6 +606,35 @@ const RuleEngineDashboard = () => {
                     toast({ title: 'Overspeed Updated', description: `New threshold: ${newSpeed} km/h` });
                     break;
 
+                case 'FetchCrashLog':
+                    responsePayload = generateCrashLogPayload(commandId, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    deviceVariables.current.crashLogFlag = true;
+                    break;
+
+                case 'FetchTowLog':
+                    responsePayload = generateTowLogPayload(commandId, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    deviceVariables.current.towLogFlag = true;
+                    break;
+
+                case 'DismantleCheck':
+                    const dStatus = isDeviceRemoved ? 'Failure' : 'Success';
+                    responsePayload = generateDismantleCheckPayload(commandId, dStatus, {
+                        ...deviceVariables.current,
+                        tboxApplicationState
+                    });
+                    deviceVariables.current.dismantleStatus = isDeviceRemoved ? 'TAMPERED' : 'SECURE';
+                    if (isDeviceRemoved) {
+                        status = 'Failure';
+                        extraMsg = ' (Device Removed)';
+                    }
+                    break;
+
                 case 'UserDefinedMinimumTripDistance':
                     const newDist = payload.distance || 5;
                     const newOff = payload.engineOffTime || 15;
@@ -769,6 +804,70 @@ const RuleEngineDashboard = () => {
                 duration: 2000
             });
         }
+    };
+
+    const handleTriggerCrashLog = () => {
+        const cmdId = 'man-' + Math.random().toString(36).substring(7);
+        const payload = generateCrashLogPayload(cmdId, {
+            ...deviceVariables.current,
+            tboxApplicationState
+        });
+        setLastPayload({ type: 'deviceFetchLogs', content: payload });
+        deviceVariables.current.crashLogFlag = true;
+        setEvents(prev => [...prev, {
+            ruleId: 'crash-log-trigger',
+            ruleName: 'Manual Crash Log',
+            type: 'event',
+            message: 'Manual Crash Log fetch triggered',
+            severity: 'info',
+            timestamp: new Date().toISOString()
+        }].slice(-100));
+        toast({ title: 'Crash Log Published', status: 'info', duration: 2000 });
+    };
+
+    const handleTriggerTowLog = () => {
+        const cmdId = 'man-' + Math.random().toString(36).substring(7);
+        const payload = generateTowLogPayload(cmdId, {
+            ...deviceVariables.current,
+            tboxApplicationState
+        });
+        setLastPayload({ type: 'deviceFetchLogs', content: payload });
+        deviceVariables.current.towLogFlag = true;
+        setEvents(prev => [...prev, {
+            ruleId: 'tow-log-trigger',
+            ruleName: 'Manual Tow Log',
+            type: 'event',
+            message: 'Manual Tow Log fetch triggered',
+            severity: 'info',
+            timestamp: new Date().toISOString()
+        }].slice(-100));
+        toast({ title: 'Tow Log Published', status: 'info', duration: 2000 });
+    };
+
+    const handleDismantleCheck = () => {
+        const cmdId = 'man-' + Math.random().toString(36).substring(7);
+        const dStatus = isDeviceRemoved ? 'Failure' : 'Success';
+        const payload = generateDismantleCheckPayload(cmdId, dStatus, {
+            ...deviceVariables.current,
+            tboxApplicationState
+        });
+        setLastPayload({ type: 'commandResponse', content: payload });
+        deviceVariables.current.dismantleStatus = isDeviceRemoved ? 'TAMPERED' : 'SECURE';
+
+        setEvents(prev => [...prev, {
+            ruleId: 'dismantle-check',
+            ruleName: 'Dismantle Check',
+            type: 'diagnostic',
+            message: `Dismantle status: ${isDeviceRemoved ? 'TAMPERED' : 'SECURE'}`,
+            severity: isDeviceRemoved ? 'critical' : 'success',
+            timestamp: new Date().toISOString()
+        }].slice(-100));
+
+        toast({
+            title: 'Dismantle Check Complete',
+            description: `Status: ${isDeviceRemoved ? 'TAMPERED' : 'SECURE'}`,
+            status: isDeviceRemoved ? 'error' : 'success'
+        });
     };
 
     const triggerManualAlert = (alertType) => {
@@ -2136,10 +2235,13 @@ const RuleEngineDashboard = () => {
                                         <Divider />
 
                                         <HStack spacing={2} wrap="wrap">
-                                            <Button size="xs" colorScheme="red" variant="outline" onClick={() => triggerManualAlert('HARD_ACCELERATION')}>Crash Log</Button>
-                                            <Button size="xs" colorScheme="orange" variant="outline" onClick={() => triggerManualAlert('TOWING')}>Tow Log</Button>
-                                            <Button size="sm" colorScheme={isDeviceRemoved ? "purple" : "gray"} variant="solid" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)} w="full">
-                                                {isDeviceRemoved ? "Dismantle Detected" : "Dismantle Check"}
+                                            <Button size="xs" colorScheme="red" variant="outline" onClick={handleTriggerCrashLog}>Crash Log</Button>
+                                            <Button size="xs" colorScheme="orange" variant="outline" onClick={handleTriggerTowLog}>Tow Log</Button>
+                                            <Button size="xs" colorScheme="purple" variant="outline" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}>
+                                                {isDeviceRemoved ? "Device Inserted" : "Device Removed"}
+                                            </Button>
+                                            <Button size="sm" colorScheme="teal" variant="solid" onClick={handleDismantleCheck} w="full">
+                                                Dismantle Check
                                             </Button>
                                         </HStack>
                                     </VStack>
