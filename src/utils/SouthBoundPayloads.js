@@ -82,6 +82,8 @@ export const generateTelemetryPayload = (deviceData, sensorData) => {
                 heading: 0,
                 speed: sensorData.speed
             },
+            engineMilStat: sensorData.engineMilStat || 0,
+            brakeStatus: sensorData.brakeActive ? 1 : 0,
             tripId: deviceData.journeyId
         }
     };

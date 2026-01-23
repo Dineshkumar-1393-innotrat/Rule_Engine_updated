@@ -1679,7 +1679,9 @@ const RuleEngineDashboard = () => {
                         rpm: currentRpm,
                         batteryVoltage,
                         engineTemp: 85,
-                        fuelLevel: 75
+                        fuelLevel: 75,
+                        engineMilStat: currentData.engineMilStat,
+                        brakeActive: currentData.brakeActive
                     });
                 }
 

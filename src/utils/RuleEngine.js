@@ -614,6 +614,8 @@ export const AvailableFacts = [
 
     { name: 'isDeviceRemoved', label: 'Is Device Removed', type: 'boolean', category: 'security' },
     { name: 'dismantleStatus', label: 'Dismantle Status', type: 'string', category: 'security' },
+    { name: 'engineMilStat', label: 'MIL Status (0/1)', type: 'number', category: 'diagnostic' },
+    { name: 'brakeActive', label: 'Brake Active (T/F)', type: 'boolean', category: 'sensor' },
 
     // Parameters (for reference in conditions)
     { name: 'MIN_TRIP_DISTANCE', label: 'Min Trip Distance (km)', type: 'parameter', category: 'parameter' },
@@ -896,6 +898,21 @@ export const JeepM6DefaultRules = [
             type: 'fota_error',
             message: 'FOTA Rejected: Ignition is ON.',
             severity: 'critical'
+        }
+    },
+    {
+        id: 'm6-mil-active',
+        name: 'MIL Active Alert',
+        conditions: {
+            all: [
+                { fact: 'engineMilStat', operator: '==', value: 1 }
+            ]
+        },
+        event: {
+            type: 'diagnostic_alert',
+            message: 'Malfunction Indicator Lamp (MIL) is ACTIVE',
+            severity: 'warning',
+            alertDetails: { type: 'MIL_STATUS', code: 'DI01' }
         }
     },
     {
