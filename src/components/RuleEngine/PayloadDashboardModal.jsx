@@ -18,9 +18,10 @@ import {
     Flex,
     Spacer,
     Spinner,
-    Badge
+    Badge,
+    IconButton
 } from '@chakra-ui/react';
-import { RotateCcw, LayoutDashboard, Wifi, WifiOff } from 'lucide-react';
+import { RotateCcw, LayoutDashboard, Wifi, WifiOff, ArrowLeft } from 'lucide-react';
 import { TraxoApi } from '../../utils/TraxoApi';
 
 const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869" }) => {
@@ -167,9 +168,17 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869"
                 <ModalCloseButton />
                 <ModalBody p={8}>
                     {/* Header */}
-                    <Flex mb={8} align="center">
+                    <Flex mb={8} align="center" gap={4}>
+                        <IconButton
+                            icon={<ArrowLeft size={20} />}
+                            aria-label="Back to Dashboard"
+                            variant="ghost"
+                            colorScheme="blue"
+                            onClick={onClose}
+                            borderRadius="full"
+                        />
                         <VStack align="flex-start" spacing={1}>
-                            <Heading size="lg" color="black">Rule Engine Dashboard</Heading>
+                            <Heading size="lg" color="black">Payload Dashboard</Heading>
                             <HStack spacing={4} mt={4}>
                                 <Text fontWeight="bold">VIN</Text>
                                 <Input
