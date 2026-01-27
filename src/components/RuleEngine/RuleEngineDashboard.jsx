@@ -46,7 +46,7 @@ import {
     Icon,
     Divider
 } from '@chakra-ui/react';
-import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle } from 'lucide-react';
+import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle, LayoutDashboard } from 'lucide-react';
 import {
     RuleEngine,
     defaultRules, // Keep defaultRules as it's used in DEFAULT_RULE_ENGINE_STATE
@@ -66,6 +66,7 @@ import RuleTemplateLibrary from './RuleTemplateLibrary';
 import TripConfiguration from './TripConfiguration';
 import CANSignalBuilder from './CANSignalBuilder'; // Added
 import DongleAlertPopup from './DongleAlertPopup'; // Added
+import PayloadDashboardModal from './PayloadDashboardModal'; // Added
 
 import { useAutoPersist } from '../../hooks/useAutoPersist';
 import {
@@ -166,7 +167,7 @@ const RuleEngineDashboard = () => {
         lastIgnitionOffTime: null,
         elapsedIgnitionOffTime: 0,
         // SouthBound Variables
-        vehicleId: 'WAUD2AFD7DN006931',
+        vehicleId: 'T123ZTZT396798869',
         imeiNo: '356741000000021',
         tboxSerialNum: 'SN29482029',
         protocolVersion: '2.0.0',
@@ -263,6 +264,7 @@ const RuleEngineDashboard = () => {
 
     const [activeTabIndex, setActiveTabIndex] = useState(0);
     const [prefillRule, setPrefillRule] = useState(null);
+    const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
 
 
     // Handlers
@@ -2349,8 +2351,17 @@ const RuleEngineDashboard = () => {
                                 <Tab flexShrink={0}>Rule Templates</Tab>
                                 <Tab flexShrink={0}>Trip Configuration</Tab>
                                 <Tab flexShrink={0}>CAN Configuration</Tab>
-                                <Tab>Lifecycle Configuration</Tab>
-                                <Tab>SouthBound Payloads</Tab>
+                                <Tab flexShrink={0}>Lifecycle Configuration</Tab>
+                                <Tab flexShrink={0}>SouthBound Payloads</Tab>
+                                <Tab
+                                    flexShrink={0}
+                                    onClick={() => setIsDashboardModalOpen(true)}
+                                >
+                                    <HStack spacing={2}>
+                                        <LayoutDashboard size={14} />
+                                        <Text>Dashboard</Text>
+                                    </HStack>
+                                </Tab>
                             </TabList>
 
                             <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden">
@@ -2439,6 +2450,15 @@ const RuleEngineDashboard = () => {
                                             </Box>
                                         </VStack>
                                     </TabPanel>
+                                    <TabPanel>
+                                        <VStack align="center" justify="center" h="200px" spacing={4}>
+                                            <Icon as={LayoutDashboard} size={40} color="gray.300" />
+                                            <Text color="gray.500">Payload Dashboard is open in a modal.</Text>
+                                            <Button size="sm" colorScheme="blue" onClick={() => setIsDashboardModalOpen(true)}>
+                                                Re-open Dashboard
+                                            </Button>
+                                        </VStack>
+                                    </TabPanel>
                                 </TabPanels>
                             </Card>
                         </Tabs>
@@ -2506,12 +2526,19 @@ const RuleEngineDashboard = () => {
             </VStack >
 
             {/* Dongle Alert Popup */}
-            < DongleAlertPopup
+            <DongleAlertPopup
                 isOpen={isAlertPopupOpen}
                 onClose={() => setIsAlertPopupOpen(false)}
                 alert={activePopupAlert}
             />
-        </Flex >
+
+            {/* Payload Dashboard Modal */}
+            <PayloadDashboardModal
+                isOpen={isDashboardModalOpen}
+                onClose={() => setIsDashboardModalOpen(false)}
+                vinValue={deviceVariables.current.vehicleId}
+            />
+        </Flex>
     );
 };
 
