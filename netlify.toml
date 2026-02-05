@@ -1,0 +1,5 @@
+[[redirects]]
+  from = "/api/traxo/*"
+  to = "https://lb2.cvip-preprod.citroen.in:40543/:splat"
+  status = 200
+  force = true
