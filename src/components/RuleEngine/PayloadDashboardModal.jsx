@@ -24,7 +24,7 @@ import {
 import { RotateCcw, LayoutDashboard, Wifi, WifiOff, ArrowLeft } from 'lucide-react';
 import { TraxoApi } from '../../utils/TraxoApi';
 
-const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869" }) => {
+const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104" }) => {
     const [vin, setVin] = useState(vinValue);
     const [signals, setSignals] = useState([
         { name: "Fuel Level", apiName: "FuelLevel", id: "0x356", isChecked: false, data: null, loading: false, error: null },
@@ -34,6 +34,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869"
         { name: "Battery Voltage Level", apiName: "BatteryVoltageLevel", id: "0x46C", isChecked: false, data: null, loading: false, error: null },
         { name: "Ignition Status", apiName: "CmdIgnSts", id: "0x46C", isChecked: false, data: null, loading: false, error: null, fetchType: 'events' },
         { name: "External Temperature (F)", apiName: "ExternalTemperatureF", id: "0x46C", isChecked: false, data: null, loading: false, error: null },
+        { name: "External Temperature (C)", apiName: "ExternalTemperatureC", id: "0x46C", isChecked: false, data: null, loading: false, error: null },
     ]);
     const [isLive, setIsLive] = useState(false);
     const [deviceEvents, setDeviceEvents] = useState(null);
@@ -316,7 +317,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869"
                         ))}
                     </Grid>
                     {/* Device Events Section */}
-                    <Box mt={12} borderTop="1px solid" borderColor="gray.300" pt={8}>
+                    {/* <Box mt={12} borderTop="1px solid" borderColor="gray.300" pt={8}>
                         <Flex align="center" mb={4}>
                             <HStack>
                                 <LayoutDashboard size={20} />
@@ -359,7 +360,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T123ZTZT396798869"
                                 }
                             </pre>
                         </Box>
-                    </Box>
+                    </Box> */}
                 </ModalBody>
             </ModalContent>
         </Modal>
