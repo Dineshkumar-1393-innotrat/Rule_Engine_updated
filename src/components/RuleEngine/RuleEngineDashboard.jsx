@@ -2334,7 +2334,20 @@ const RuleEngineDashboard = () => {
 
                     {/* Main Content Area */}
                     <GridItem>
-                        <Tabs variant="enclosed" colorScheme="blue" index={activeTabIndex} onChange={setActiveTabIndex} isLazy width={{ base: "93vw", md: "93vw", lg: "60vw" }}>
+                        <Tabs
+                            variant="line"
+                            colorScheme="blue"
+                            index={activeTabIndex}
+                            onChange={setActiveTabIndex}
+                            isLazy
+                            width={{ base: "93vw", md: "93vw", lg: "60vw" }}
+                            sx={{
+                                '.chakra-tabs__tab[aria-selected=true]': {
+                                    borderBottomWidth: '4px',
+                                    fontWeight: 'bold'
+                                }
+                            }}
+                        >
                             <TabList
                                 mb="1em"
                                 overflowX="auto"
@@ -2343,8 +2356,9 @@ const RuleEngineDashboard = () => {
                                 pb={2}
                                 maxWidth="100%"
                                 sx={{
-                                    '&::-webkit-scrollbar': { height: '4px', display: { base: 'none', md: 'block' } },
-                                    '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' }
+                                    '&::-webkit-scrollbar': { height: '10px', display: 'block' },
+                                    '&::-webkit-scrollbar-thumb': { background: '#A0AEC0', borderRadius: '10px' },
+                                    '&::-webkit-scrollbar-track': { background: '#EDF2F7', borderRadius: '10px' }
                                 }}
                             >
                                 <Tab flexShrink={0}>Alert Rules</Tab>

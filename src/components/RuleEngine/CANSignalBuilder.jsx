@@ -215,24 +215,43 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                 {/* Form Section */}
                 <GridItem>
                     <Box p={5} bg={bgColor} borderWidth="1px" borderRadius="lg" borderColor={borderColor}>
-                        <Flex justify="space-between" align="center" mb={4} wrap="wrap" gap={2}>
+                        <VStack align="flex-start" mb={4} spacing={3}>
                             <Heading size="md">{editingId ? 'Edit Signal' : 'Add New Signal'}</Heading>
-                            <Button leftIcon={<FaCode />}
-                                colorScheme="purple"
-                                size="sm"
-                                onClick={handleGenerateCode}
-                            >
-                                Generate Code
-                            </Button>
-                            <Button
-                                leftIcon={<FaCode />}
-                                colorScheme="purple"
-                                size="sm"
-                                onClick={handleConverterCode}
-                            >
-                                Converter
-                            </Button>
-                        </Flex>
+                            <VStack spacing={3} align="flex-start">
+                                <Button
+                                    leftIcon={<FaCode />}
+                                    bgGradient="linear(to-br, #13428E, #2458AC)"
+                                    color="white"
+                                    _hover={{
+                                        bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                        transform: "translateY(-2px)",
+                                        boxShadow: "lg"
+                                    }}
+                                    transition="all 0.2s"
+                                    boxShadow="md"
+                                    size="sm"
+                                    onClick={handleGenerateCode}
+                                >
+                                    Generate Code
+                                </Button>
+                                <Button
+                                    leftIcon={<FaCode />}
+                                    bgGradient="linear(to-br, #13428E, #2458AC)"
+                                    color="white"
+                                    _hover={{
+                                        bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                        transform: "translateY(-2px)",
+                                        boxShadow: "lg"
+                                    }}
+                                    transition="all 0.2s"
+                                    boxShadow="md"
+                                    size="sm"
+                                    onClick={handleConverterCode}
+                                >
+                                    Converter
+                                </Button>
+                            </VStack>
+                        </VStack>
                         <VStack spacing={4}>
                             <FormControl isRequired>
                                 <FormLabel>Signal Name</FormLabel>
@@ -485,7 +504,19 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                     color="black"
                                 />
                             </FormControl>
-                            <Button colorScheme="purple" width="full" onClick={runConverter}>
+                            <Button
+                                bgGradient="linear(to-br, #13428E, #2458AC)"
+                                color="white"
+                                _hover={{
+                                    bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                    transform: "translateY(-2px)",
+                                    boxShadow: "lg"
+                                }}
+                                transition="all 0.2s"
+                                boxShadow="md"
+                                width="full"
+                                onClick={runConverter}
+                            >
                                 Convert
                             </Button>
                             <FormControl>
