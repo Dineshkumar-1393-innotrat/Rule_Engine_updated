@@ -1,5 +1,5 @@
 [[redirects]]
   from = "/api/traxo/*"
-  to = "https://lb2.cvip-preprod.citroen.in:40543/:splat"
+  to = "/.netlify/functions/traxo-proxy"
   status = 200
   force = true
