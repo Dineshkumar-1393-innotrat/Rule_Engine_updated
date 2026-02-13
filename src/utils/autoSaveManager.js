@@ -19,7 +19,7 @@ class AutoSaveManager {
       debounceDelay: 2000,     // 2 seconds debounce for changes
       maxRetries: 3,
       retryDelay: 1000,
-      enableLogging: true
+      enableLogging: false
     };
 
     this.init();

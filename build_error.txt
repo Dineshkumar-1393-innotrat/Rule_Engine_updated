@@ -1,0 +1,19 @@
+[36mvite v7.2.6 [32mbuilding client environment for production...[36m[39m
+transforming...
+[33m[plugin vite:esbuild] src/components/RuleEngine/RuleEngineDashboard.jsx: [33mDuplicate key "lastIgnitionOffTime" in object literal[33m
+185 |          currentTripTime: 0,
+186 |          gnssInfoStart: null,
+187 |          lastIgnitionOffTime: null,
+    |          ^
+188 |          tripStartTimeEpoch: null, // Section 16 epoch
+189 |          topSpeed: 0,
+[39m
+[32m✓[39m 2312 modules transformed.
+[31m✗[39m Build failed in 3.29s
+[31merror during build:
+[31mCould not resolve "../../utils/canCodeGenerator" from "src/components/RuleEngine/CANSignalBuilder.jsx"[31m
+file: [36mD:/Rule_Engine_updated/src/components/RuleEngine/CANSignalBuilder.jsx[31m
+    at getRollupError (file:///D:/Rule_Engine_updated/node_modules/rollup/dist/es/shared/parseAst.js:401:41)
+    at error (file:///D:/Rule_Engine_updated/node_modules/rollup/dist/es/shared/parseAst.js:397:42)
+    at ModuleLoader.handleInvalidResolvedId (file:///D:/Rule_Engine_updated/node_modules/rollup/dist/es/shared/node-entry.js:21590:24)
+    at file:///D:/Rule_Engine_updated/node_modules/rollup/dist/es/shared/node-entry.js:21550:26[39m

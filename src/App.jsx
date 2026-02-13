@@ -1,28 +1,15 @@
-import React, { useState, useEffect } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import "bootstrap/dist/css/bootstrap.min.css";
+import React, { useEffect } from "react";
+import { Routes, Route } from "react-router-dom";
 import { ChakraProvider, Box } from "@chakra-ui/react";
 import { AuthProvider } from "./contexts/AuthContext";
-import { ProjectProvider } from "./ProjectContext";
+import { ProjectProvider } from "./contexts/ProjectContext";
 import { WorkspaceStateProvider } from "./contexts/WorkspaceStateContext";
-// import AutoSaveStatus from "./components/AutoSaveStatus";
+
 import { autoSaveManager } from "./utils/autoSaveManager";
 import RuleEngineDashboard from "./components/RuleEngine/RuleEngineDashboard";
 
 const App = () => {
-  const [currentPanel, setCurrentPanel] = useState("fileExplorer");
 
-  const handleToggleDebug = () => {
-    setCurrentPanel((prevPanel) =>
-      prevPanel === "debug" ? "fileExplorer" : "debug",
-    );
-  };
-
-  const handleToggleFlash = () => {
-    setCurrentPanel((prevPanel) =>
-      prevPanel === "flash" ? "fileExplorer" : "flash",
-    );
-  };
 
   // Initialize auto-save system and cleanup old data on app start
   useEffect(() => {
@@ -32,12 +19,12 @@ const App = () => {
     // Start global auto-save
     autoSaveManager.startGlobalAutoSave();
 
-    console.log("[App] Auto-save system initialized");
+    // console.log("[App] Auto-save system initialized");
 
     return () => {
       // Save all data before app unmounts
       autoSaveManager.saveAll({ parallel: false });
-      console.log("[App] Auto-save cleanup completed");
+      // console.log("[App] Auto-save cleanup completed");
     };
   }, []);
 
@@ -46,17 +33,13 @@ const App = () => {
       <ProjectProvider>
         <WorkspaceStateProvider>
           <AuthProvider>
-            {/* <Navbar /> */}
 
             <Routes>
               <Route path="/" element={<RuleEngineDashboard />} />
-             
+
             </Routes>
 
-            {/* Auto-save status indicator */}
-            {/* <AutoSaveStatus position="corner" /> */}
 
-            {/* <Footer /> */}
           </AuthProvider>
         </WorkspaceStateProvider>
       </ProjectProvider>

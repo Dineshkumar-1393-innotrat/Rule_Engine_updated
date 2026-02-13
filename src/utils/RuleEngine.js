@@ -581,7 +581,7 @@ export const AvailableFacts = [
 
     // Device State
     { name: 'deviceState', label: 'Device State', type: 'state', category: 'state' },
-    { name: 'ignition', label: 'Ignition (ON/OFF)', type: 'boolean', category: 'state' },
+
     // Jeep M6 States
     { name: 'crashDetected', label: 'Crash Detected', type: 'boolean', category: 'state' },
     { name: 'fotaStatus', label: 'FOTA Status', type: 'string', category: 'state' },
@@ -614,8 +614,8 @@ export const AvailableFacts = [
 
     { name: 'isDeviceRemoved', label: 'Is Device Removed', type: 'boolean', category: 'security' },
     { name: 'dismantleStatus', label: 'Dismantle Status', type: 'string', category: 'security' },
-    { name: 'engineMilStat', label: 'MIL Status (0/1)', type: 'number', category: 'diagnostic' },
-    { name: 'brakeActive', label: 'Brake Active (T/F)', type: 'boolean', category: 'sensor' },
+
+
 
     // Parameters (for reference in conditions)
     { name: 'MIN_TRIP_DISTANCE', label: 'Min Trip Distance (km)', type: 'parameter', category: 'parameter' },

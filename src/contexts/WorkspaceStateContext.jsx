@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { useProject } from "../ProjectContext";
+import { useProject } from "./ProjectContext";
 import { autoSaveManager } from "../utils/autoSaveManager";
 
 const WorkspaceStateContext = createContext(null);
@@ -34,7 +34,7 @@ const loadFromStorage = (userId, projectId) => {
     const stored = localStorage.getItem(key);
     if (stored) {
       const parsed = JSON.parse(stored);
-      console.log("[WorkspaceState] Loaded from storage:", key);
+      // console.log("[WorkspaceState] Loaded from storage:", key);
       return parsed;
     }
   } catch (error) {
@@ -54,7 +54,7 @@ const saveToStorage = (userId, projectId, state) => {
       lastSaved: new Date().toISOString(),
     };
     localStorage.setItem(key, JSON.stringify(payload));
-    console.log("[WorkspaceState] Saved to storage:", key);
+    // console.log("[WorkspaceState] Saved to storage:", key);
     return true;
   } catch (error) {
     console.error("[WorkspaceState] Error saving to storage:", error);
@@ -156,7 +156,7 @@ export const WorkspaceStateProvider = ({ children }) => {
       });
 
       autoSaveRegisteredRef.current = true;
-      console.log("[WorkspaceState] Registered with auto-save manager");
+      // console.log("[WorkspaceState] Registered with auto-save manager");
     }
 
     return () => {
@@ -184,17 +184,17 @@ export const WorkspaceStateProvider = ({ children }) => {
         setActiveScreen(stored.activeScreen || null);
         setLastSaved(stored.lastSaved || null);
         isHydratedRef.current = true;
-        console.log(
-          "[WorkspaceState] Hydrated state for user:",
-          userId,
-          "project:",
-          activeProjectId,
-        );
+        // console.log(
+        //   "[WorkspaceState] Hydrated state for user:",
+        //   userId,
+        //   "project:",
+        //   activeProjectId,
+        // );
       } else {
         // Initialize with empty states
         setScreenStates({});
         isHydratedRef.current = true;
-        console.log("[WorkspaceState] No stored state found, starting fresh");
+        // console.log("[WorkspaceState] No stored state found, starting fresh");
       }
 
       setIsLoading(false);
@@ -269,7 +269,7 @@ export const WorkspaceStateProvider = ({ children }) => {
         activeScreen,
       });
 
-      console.log("[WorkspaceState] Emergency save completed");
+      // console.log("[WorkspaceState] Emergency save completed");
       return true;
     } catch (error) {
       console.error("[WorkspaceState] Emergency save failed:", error);
@@ -380,7 +380,7 @@ export const WorkspaceStateProvider = ({ children }) => {
     const key = getStorageKey(userId, activeProjectId);
     try {
       localStorage.removeItem(key);
-      console.log("[WorkspaceState] Cleared all state");
+      // console.log("[WorkspaceState] Cleared all state");
     } catch (error) {
       console.error("[WorkspaceState] Error clearing storage:", error);
     }
@@ -444,9 +444,9 @@ export const WorkspaceStateProvider = ({ children }) => {
             parsed.userId === userId &&
             parsed.projectId === activeProjectId
           ) {
-            console.log(
-              "[WorkspaceState] Found recent emergency save, will restore",
-            );
+            // console.log(
+            //   "[WorkspaceState] Found recent emergency save, will restore",
+            // );
             // Emergency save will be handled by normal hydration
           }
         }

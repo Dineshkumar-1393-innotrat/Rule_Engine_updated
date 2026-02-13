@@ -184,7 +184,6 @@ const RuleEngineDashboard = () => {
         highSpeedCnt: 0,
         currentTripTime: 0,
         gnssInfoStart: null,
-        lastIgnitionOffTime: null,
         tripStartTimeEpoch: null, // Section 16 epoch
         topSpeed: 0,
         vinFragments: {}, // Track fragments for 0x3E0
@@ -262,7 +261,7 @@ const RuleEngineDashboard = () => {
 
     const activeCriticalAlerts = useRef({}); // Track rule IDs that have already shown a toast
 
-    const [activeTabIndex, setActiveTabIndex] = useState(0);
+    const [activeTabIndex, setActiveTabIndex] = useState(1);
     const [prefillRule, setPrefillRule] = useState(null);
     const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
 
@@ -292,7 +291,7 @@ const RuleEngineDashboard = () => {
 
     const handleUseTemplate = (template) => {
         setPrefillRule(template);
-        setActiveTabIndex(0); // Switch to Rule Builder tab (Index 0)
+        setActiveTabIndex(1); // Switch to Rule Builder tab (Index 1)
         toast({ title: 'Template Loaded', description: 'Rule Builder prefilled with template data.', status: 'info', duration: 2000 });
     };
 
@@ -1102,7 +1101,7 @@ const RuleEngineDashboard = () => {
         // 4. Start Simulation and watch data
         demoTimeoutsRef.current.push(setTimeout(() => {
             setIsRunning(true);
-            setActiveTabIndex(2); // Switch to CAN Configuration tab to see the bus
+            setActiveTabIndex(4); // Switch to CAN Configuration tab to see the bus
             toast({
                 title: 'Step 3: Simulation Active',
                 description: 'Watch the CAN Bus table. Decoded value will fluctuate toward 105°C.',
@@ -2361,25 +2360,30 @@ const RuleEngineDashboard = () => {
                                     '&::-webkit-scrollbar-track': { background: '#EDF2F7', borderRadius: '10px' }
                                 }}
                             >
+                                <Tab
+                                    flexShrink={0}
+                                    onClick={() => setIsDashboardModalOpen(true)}
+                                >
+                                    Dashboard
+                                </Tab>
                                 <Tab flexShrink={0}>Alert Rules</Tab>
                                 <Tab flexShrink={0}>Rule Templates</Tab>
                                 <Tab flexShrink={0}>Trip Configuration</Tab>
                                 <Tab flexShrink={0}>CAN Configuration</Tab>
                                 <Tab flexShrink={0}>Lifecycle Configuration</Tab>
                                 <Tab flexShrink={0}>SouthBound Payloads</Tab>
-                                <Tab
-                                    flexShrink={0}
-                                    onClick={() => setIsDashboardModalOpen(true)}
-                                >
-                                    <HStack spacing={2}>
-                                        <LayoutDashboard size={14} />
-                                        <Text>Dashboard</Text>
-                                    </HStack>
-                                </Tab>
                             </TabList>
 
                             <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden">
                                 <TabPanels bg="white">
+                                    <TabPanel>
+                                        <VStack align="center" justify="center" h="200px" spacing={4}>
+                                            <Text color="gray.500">Payload Dashboard is open in a modal.</Text>
+                                            <Button size="sm" colorScheme="blue" onClick={() => setIsDashboardModalOpen(true)}>
+                                                Re-open Dashboard
+                                            </Button>
+                                        </VStack>
+                                    </TabPanel>
                                     <TabPanel>
                                         <Box mb={6}>
                                             <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
@@ -2462,15 +2466,6 @@ const RuleEngineDashboard = () => {
                                                     </Box>
                                                 )}
                                             </Box>
-                                        </VStack>
-                                    </TabPanel>
-                                    <TabPanel>
-                                        <VStack align="center" justify="center" h="200px" spacing={4}>
-                                            <Icon as={LayoutDashboard} size={40} color="gray.300" />
-                                            <Text color="gray.500">Payload Dashboard is open in a modal.</Text>
-                                            <Button size="sm" colorScheme="blue" onClick={() => setIsDashboardModalOpen(true)}>
-                                                Re-open Dashboard
-                                            </Button>
                                         </VStack>
                                     </TabPanel>
                                 </TabPanels>

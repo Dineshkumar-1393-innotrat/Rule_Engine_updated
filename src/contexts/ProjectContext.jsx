@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { getUserInfo } from "./utilities";
+import { getUserInfo } from "../utils/platformUtils";
 
 const ProjectContext = createContext();
 
@@ -60,7 +60,7 @@ export function ProjectProvider({ children }) {
   }, [activeProductName]);
 
   useEffect(() => {
-    console.log("Updated Project:", activeProjectId, activeProjectName);
+    // console.log("Updated Project:", activeProjectId, activeProjectName);
   }, [activeProjectId, activeProjectName]);
 
   return (
