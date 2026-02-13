@@ -3,7 +3,7 @@
   to = "/.netlify/functions/traxo-proxy"
   status = 200
   force = true
-  force = true
+  
 
 [[redirects]]
   from = "/api/jeep/*"
