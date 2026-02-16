@@ -105,6 +105,61 @@ export const TraxoApi = {
         }
     },
 
+    // In your TraxoApi.js or wherever your API calls are defined
+    async getIgnitionEvents(vin, starttime, endtime) {
+        return withRetry(async () => {
+            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
+
+            const formatDate = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
+            const finalStartTime = starttime || formatDate(new Date(Date.now() - 7 * 86400000)); // 7 days ago
+            const finalEndTime = endtime || formatDate(new Date());
+
+            const response = await axios.get(`${BASE_URL}/events/${vin}/DEVICE`, {
+                params: {
+                    limit: 500,
+                    starttime: finalStartTime,
+                    endtime: finalEndTime
+                },
+                headers: {
+                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
+                    'Accept': 'application/json'
+                },
+                timeout: 30000
+            });
+
+            console.log("📡 API Response Status:", response.data);
+
+            // Filter and format ignition events
+            const ignitionEvents = (response.data.events || [])
+                .filter(event => event.eventtype === "IGNITIONSTATUS")
+                .map(event => {
+                    let details = {};
+                    try {
+                        details = typeof event.eventdetails === 'string'
+                            ? JSON.parse(event.eventdetails)
+                            : event.eventdetails || {};
+                    } catch (e) {
+                        console.warn("Failed to parse ignition details", e);
+                    }
+
+                    return {
+                        sourceid: event.sourceid,
+                        eventtype: event.eventtype,
+                        sourcetimestamp: event.sourcetimestamp,
+                        signalValue: details.eventValue || details.value || 'OFF',
+                        eventValue: details.eventValue || '',
+                        message: details.message || '',
+                        details: details,
+                        updatedTimeStamp: event.sourcetimestamp
+                    };
+                });
+
+            return ignitionEvents;
+        }, 'PRIMARY');
+    },
+
+
+
     getVehicleTelemetry: async (vin, signalName) => {
         return withRetry(async () => {
             if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
@@ -157,6 +212,31 @@ export const TraxoApi = {
             } catch (error) {
                 console.warn(`Failed to fetch location states for ${vin}:`, error.message);
                 return null;
+            }
+        }, 'FACTORY');
+    },
+
+    // Get raw location telemetry array for console view
+    getLocationTelemetryArray: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
+
+            try {
+                const response = await axios.get(`${BASE_URL}/devices/vin/${vin}/states`, {
+                    params: { subcategory: 'LocationTelemetry' },
+                    headers: {
+                        'Authorization': `Bearer ${authTokens.FACTORY}`,
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                console.log("Location API raw response:", response.data);
+                console.log("Location API response type:", typeof response.data, "isArray:", Array.isArray(response.data));
+                // Return raw array for console view
+                return Array.isArray(response.data) ? response.data : (response.data.events || response.data);
+            } catch (error) {
+                console.warn(`Failed to fetch location telemetry array for ${vin}:`, error.message);
+                return [];
             }
         }, 'FACTORY');
     },
@@ -304,6 +384,8 @@ export const TraxoApi = {
         }, 'JEEP');
     },
 
+
+
     // Remote Commands map to JEEP
     lockDoor: async (vin) => withRetry(async () => {
         if (!authTokens.JEEP) await TraxoApi.login('JEEP');
@@ -349,6 +431,13 @@ export const TraxoApi = {
         if (!authTokens.JEEP) await TraxoApi.login('JEEP');
         return (await axios.post(`${JEEP_BASE_URL}/concurrentcommands/vinno`,
             { deviceVinno: vin, actionType: "speedalertcommand", command: { speed: String(speed) } },
+            { headers: { 'Authorization': `Bearer ${authTokens.JEEP}` }, timeout: 30000 }
+        )).data;
+    }, 'JEEP'),
+
+    getCommandStatus: async (vin, commandId) => withRetry(async () => {
+        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+        return (await axios.get(`${JEEP_BASE_URL}/commands/device/vin/${vin}/command/${commandId}`,
             { headers: { 'Authorization': `Bearer ${authTokens.JEEP}` }, timeout: 30000 }
         )).data;
     }, 'JEEP')

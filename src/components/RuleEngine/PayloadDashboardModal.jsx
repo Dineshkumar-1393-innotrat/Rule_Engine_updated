@@ -240,6 +240,52 @@ const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false })
     );
 };
 
+
+
+const DeviceEventsList = ({ events }) => {
+    // Filter events to only show those from the last 15 seconds
+    const recentEvents = (events || []).filter(evt => {
+        if (!evt.sourcetimestamp) return false;
+        const evtTime = new Date(evt.sourcetimestamp).getTime();
+        const now = Date.now();
+        return (now - evtTime) < 15000; // 15 seconds window
+    }).slice(0, 3); // Then take top 3
+
+    if (recentEvents.length === 0) return null;
+
+    return (
+        <Box position="absolute" top={20} right={8} maxW="280px" zIndex={9} pointerEvents="none">
+            <VStack spacing={2} align="stretch">
+                {recentEvents.map((evt, i) => {
+                    let details = {};
+                    try { details = JSON.parse(evt.eventdetails || '{}'); } catch (e) { }
+                    const type = evt.eventtype || 'Event';
+                    const time = evt.sourcetimestamp ? new Date(evt.sourcetimestamp).toLocaleTimeString() : '';
+
+                    return (
+                        <motion.div
+                            key={evt.eventid || i}
+                            initial={{ x: 50, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            transition={{ delay: i * 0.1 }}
+                        >
+                            <Box bg="whiteAlpha.900" backdropFilter="blur(8px)" p={3} borderRadius="lg" boxShadow="sm" borderLeft="3px solid" borderColor="purple.400" pointerEvents="auto">
+                                <HStack justify="space-between" mb={1}>
+                                    <Text fontSize="10px" fontWeight="bold" color="purple.600" textTransform="uppercase">{type}</Text>
+                                    <Text fontSize="9px" color="gray.400">{time}</Text>
+                                </HStack>
+                                <Text fontSize="9px" color="gray.600" noOfLines={2} lineHeight="1.2">
+                                    {details.status || details.message || "Event Received"}
+                                </Text>
+                            </Box>
+                        </motion.div>
+                    );
+                })}
+            </VStack>
+        </Box>
+    );
+};
+
 const VisualDashboardView = ({ signals, deviceState }) => {
     // ... [Values logic kept same] ...
     const getVal = (name, defaultValue = 0) => {
@@ -273,12 +319,20 @@ const VisualDashboardView = ({ signals, deviceState }) => {
     const batteryPercent = Math.min(Math.round((batteryRaw / 15) * 100), 100);
     const engineTemp = getVal("Engine Water Temp", 0);
     const extTemp = getVal("External Temperature (C)", 0);
-    const ignition = deviceState?.ignition ?? getVal("Ignition Status", "OFF");
+
+    // Prioritize Ignition Status from events if available, otherwise fallback to deviceState
+    const ignitionSignal = signals.find(s => s.name === "Ignition Status");
+    const hasIgnitionEvent = ignitionSignal && ignitionSignal.data && ignitionSignal.data.length > 0;
+    const ignition = hasIgnitionEvent ? getVal("Ignition Status") : (deviceState?.ignition ?? "OFF");
+
     const odometer = getVal("Total Odometer", 0);
 
     const locationData = getComplexVal("Location");
     const alertsData = getComplexVal("Alerts");
     const hasEmergency = Array.isArray(alertsData) ? alertsData.length > 0 : !!alertsData;
+
+    const eventsSignal = signals.find(s => s.name === "Device Events");
+    const deviceEvents = eventsSignal?.data || [];
 
     const lat = locationData?.gpsLat || locationData?.latitude || locationData?.Latitude || locationData?.gps_lat;
     const long = locationData?.gpsLong || locationData?.longitude || locationData?.Longitude || locationData?.gps_lng || locationData?.gpsLong;
@@ -289,21 +343,40 @@ const VisualDashboardView = ({ signals, deviceState }) => {
     const getMostRecentTimestamp = () => {
         let mostRecent = null;
         signals.forEach(signal => {
+            // Exclude Remote Commands as they use local system time for their 'time' field
+            if (signal.name === "Remote Commands") return;
+
             if (signal.data && signal.data.length > 0) {
+                // Check all items in the data array, not just the first one, to be safe (though usually 0 is latest)
+                // But typically signal.data is sorted new -> old.
                 const latest = signal.data[0];
-                const timestamp = latest.updatedTimeStamp || latest.timestamp || latest.time;
+
+                // User screenshot shows UPDATEDTIMESTAMP (all caps). Checking all variants.
+                const timestamp = latest.updatedTimeStamp ||
+                    latest.UPDATEDTIMESTAMP ||
+                    latest.updatedtimestamp ||
+                    latest.sourcetimestamp ||
+                    latest.timestamp ||
+                    latest.time;
+
                 if (timestamp) {
                     const date = new Date(timestamp);
-                    if (!mostRecent || date > mostRecent) mostRecent = date;
+                    if (!isNaN(date.getTime())) {
+                        if (!mostRecent || date > mostRecent) mostRecent = date;
+                    }
                 }
             }
         });
-        return mostRecent || new Date();
+        return mostRecent;
     };
 
     const lastUpdate = getMostRecentTimestamp();
-    const formattedDate = lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-    const formattedTime = lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const formattedDate = lastUpdate
+        ? lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+        : '--';
+    const formattedTime = lastUpdate
+        ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
+        : '--:--';
 
     return (
         <Box w="full" bg="#f8faff" p={8} borderRadius="none" minH="100vh" position="relative" overflow="hidden">
@@ -316,6 +389,8 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                 opacity={0.4}
                 zIndex={0}
             />
+
+            <DeviceEventsList events={deviceEvents} />
 
             <Box position="relative" zIndex={1}>
                 {/* Top Row: Status Toggles */}
@@ -386,6 +461,14 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                                                         <Activity size={10} color="white" />
                                                     </HStack>
                                                     <Text fontSize="8px" fontWeight="bold" opacity={0.9}>{cmd.time}</Text>
+                                                    {/* API Response Snippet */}
+                                                    {cmd.apiResponse && (
+                                                        <Box mt={1} pt={1} borderTop="1px solid" borderColor="whiteAlpha.300">
+                                                            <Text fontSize="7px" fontFamily="monospace" noOfLines={3}>
+                                                                {JSON.stringify(cmd.apiResponse).substring(0, 100)}
+                                                            </Text>
+                                                        </Box>
+                                                    )}
                                                 </Box>
                                             </motion.div>
                                         ))}
@@ -477,6 +560,13 @@ const VisualDashboardView = ({ signals, deviceState }) => {
 };
 
 // Sub-components kept simple
+
+
+
+
+
+
+
 const TempCard = ({ temp, label, interiorTemp = "45" }) => (
     <Box bg="white" p={5} borderRadius="2xl" border="1px solid" borderColor="rgba(0,0,0,0.06)" boxShadow="sm" height="full" position="relative" overflow="hidden">
         <Flex justify="space-between" align="start" mb={4}>
@@ -518,20 +608,26 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         { name: "Total Odometer", apiName: "TotalOdometer", id: "0x760", isChecked: true, data: [], loading: false, error: null },
         { name: "Engine Water Temp", apiName: "EngineWaterTemp", id: "0x3E2", isChecked: true, data: [], loading: false, error: null },
         { name: "Engine Speed", apiName: "EngineSpeed", id: "0x3E6", isChecked: true, data: [], loading: false, error: null },
-        { name: "Vehicle Speed", apiName: "VehicleSpeed", id: "0x3E8", isChecked: true, data: [], loading: false, error: null },
+        { name: "Vehicle Speed", apiName: "VehicleSpeed", id: "0x3E8", isChecked: true, data: [], loading: false, error: null, hideInConsole: true },
         { name: "Battery Voltage Level", apiName: "BatteryVoltageLevel", id: "0x46C", isChecked: true, data: [], loading: false, error: null },
-        { name: "Ignition Status", apiName: "CmdIgnSts", id: "0x46C", isChecked: true, data: [], loading: false, error: null },
+        { name: "IGNITION STATUS", apiName: "CmdIgnSts", id: "0x46C", isChecked: true, data: [], loading: false, error: null, fetchType: 'ignition' },
         { name: "External Temperature (F)", apiName: "ExternalTemperatureF", id: "0x46C", isChecked: true, data: [], loading: false, error: null },
         { name: "External Temperature (C)", apiName: "ExternalTemperatureC", id: "0x46C", isChecked: true, data: [], loading: false, error: null },
         { name: "Location", apiName: "Location", id: "location", isChecked: true, data: [], loading: false, error: null, fetchType: 'location' },
         { name: "Alerts", apiName: "Alerts", id: "alerts", isChecked: true, data: [], loading: false, error: null, fetchType: 'alerts' },
+        { name: "Device Events", apiName: "DeviceEvents", id: "events", isChecked: true, data: [], loading: false, error: null, fetchType: 'events' },
         { name: "Remote Commands", apiName: "CommandLog", id: "action", isChecked: true, data: [], loading: false, error: null, fetchType: 'manual' },
     ]);
     const [viewMode, setViewMode] = useState('visual');
     const [isLive, setIsLive] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
-    const [deviceEvents, setDeviceEvents] = useState(null);
-    const [isEventsLoading, setIsEventsLoading] = useState(false);
+
+    // Authentication state
+    const [accessToken, setAccessToken] = useState(null);
+    const [refreshToken, setRefreshToken] = useState(null);
+    const [tokenExpiry, setTokenExpiry] = useState(null);
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [isAuthenticating, setIsAuthenticating] = useState(false);
 
     // ... [Traxo State & Effects kept same] ...
     const [deviceState, setDeviceState] = useState(null);
@@ -550,7 +646,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
             // Reset signal data for new VIN to prevent data leakage
             setSignals(prev => prev.map(s => ({ ...s, data: [], loading: false, error: null, hasFetched: false })));
-            setDeviceEvents(null);
+
             setDeviceState(null);
             setOngoingTrip(null);
 
@@ -558,7 +654,6 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
             (async () => {
                 await Promise.all([
                     fetchCheckedSignals(),
-                    fetchDeviceEvents(),
                     fetchOtherData()
                 ]);
                 if (isLive) startPolling();
@@ -592,7 +687,6 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 // Note: fetch routines below already use the 'vin' state variable
                 await Promise.all([
                     fetchCheckedSignals(),
-                    fetchDeviceEvents(),
                     fetchOtherData()
                 ]);
             } catch (err) {
@@ -616,18 +710,112 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }
     };
 
-    const fetchDeviceEvents = async () => {
-        const today = new Date().toISOString().split('T')[0];
+    // Authentication function
+    const loginToAPI = async () => {
+        setIsAuthenticating(true);
         try {
-            setIsEventsLoading(true);
-            const data = await TraxoApi.getEvents(vin, 500, `${today} 00:00:00`, `${today} 23:59:59`);
-            setDeviceEvents({ data, lastUpdated: new Date().toLocaleTimeString() });
-            setIsEventsLoading(false);
+            const response = await fetch('/api/traxo/authentication/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: "admin",
+                    password: "VdP5REwF5VA",
+                    accountId: "factorytenant",
+                    clientId: "getAv29550cxRVHcHOEUGVEs",
+                    clientSecret: "0KiS1VyOuIc0B2qFcTqZTsRv1As"
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Authentication failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            setAccessToken(data.access_token);
+            setRefreshToken(data.refresh_token);
+
+            // Calculate token expiry time
+            const expiryTime = Date.now() + (data.expires_in * 1000);
+            setTokenExpiry(expiryTime);
+            setIsAuthenticated(true);
+
+            toast({
+                title: 'Authentication Successful',
+                description: 'Connected to API',
+                status: 'success',
+                duration: 3000,
+            });
+
+            return data.access_token;
         } catch (error) {
-            console.error('Failed to fetch device events', error);
-            setIsEventsLoading(false);
+            console.error('Authentication error:', error);
+            toast({
+                title: 'Authentication Failed',
+                description: error.message,
+                status: 'error',
+                duration: 5000,
+            });
+            setIsAuthenticated(false);
+            return null;
+        } finally {
+            setIsAuthenticating(false);
         }
     };
+
+    // Check if token needs refresh
+    const ensureValidToken = async () => {
+        // If no token or token expired, login
+        if (!accessToken || !tokenExpiry || Date.now() >= tokenExpiry - 60000) {
+            return await loginToAPI();
+        }
+        return accessToken;
+    };
+
+    // Fetch location telemetry data with authentication
+    const fetchLocationTelemetry = async () => {
+        try {
+            const token = await ensureValidToken();
+            if (!token) {
+                throw new Error('No valid authentication token');
+            }
+
+            const response = await fetch(
+                `/api/traxo/devices/vin/${vin}/states?subcategory=Location:Telemetry`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    }
+                }
+            );
+
+            if (response.status === 401) {
+                // Token expired, try to re-authenticate
+                setIsAuthenticated(false);
+                const newToken = await loginToAPI();
+                if (newToken) {
+                    // Retry with new token
+                    return await fetchLocationTelemetry();
+                }
+                throw new Error('Authentication failed');
+            }
+
+            if (!response.ok) {
+                throw new Error(`Location fetch failed: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('Location telemetry error:', error);
+            return null;
+        }
+    };
+
 
     const fetchOtherData = async () => {
         try {
@@ -645,23 +833,77 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }
     };
 
+    const pollCommandStatus = async (commandName, commandId) => {
+        const maxRetries = 20; // 20 * 3s = 60s max polling
+        let attempts = 0;
+
+        const interval = setInterval(async () => {
+            attempts++;
+            if (attempts > maxRetries) {
+                clearInterval(interval);
+                return;
+            }
+
+            try {
+                const statusData = await TraxoApi.getCommandStatus(vin, commandId);
+                const status = statusData.commandStatus || "Unknown";
+
+                // Update specific command in log
+                setSignals(prev => prev.map(s => {
+                    if (s.name === "Remote Commands") {
+                        const newData = s.data.map(cmd =>
+                            cmd.commandId === commandId ? { ...cmd, status: status, ...statusData } : cmd
+                        );
+                        return { ...s, data: newData };
+                    }
+                    return s;
+                }));
+
+                // Stop polling if terminal state
+                if (["Success", "Timed Out", "Failed", "Cancelled"].includes(status)) {
+                    clearInterval(interval);
+                    if (status === "Success") {
+                        toast({ title: `${commandName} Success`, status: "success", duration: 3000 });
+                    } else if (status === "Timed Out") {
+                        toast({ title: `${commandName} Timed Out`, status: "warning", duration: 3000 });
+                    }
+                }
+            } catch (error) {
+                console.warn("Polling status failed", error);
+            }
+        }, 3000);
+    };
+
     const handleCommand = async (commandName, apiCall, params = []) => {
         setCommandLoading(commandName);
         const timestamp = new Date().toLocaleTimeString();
         try {
             const result = await apiCall(vin, ...params);
-            toast({ title: `${commandName} Command Sent`, status: "success", duration: 3000, isClosable: true });
+            const commandId = result.commandId || result.data?.commandId;
 
-            // Update commands log for console view
+            toast({ title: `${commandName} Sent`, description: "Waiting for device response...", status: "info", duration: 2000, isClosable: true });
+
+            // Update commands log
             setSignals(prev => prev.map(s => {
                 if (s.name === "Remote Commands") {
+                    const fullResponse = {
+                        command: commandName,
+                        status: 'PENDING',
+                        time: timestamp,
+                        commandId: commandId,
+                        apiResponse: result // Store full API response
+                    };
                     return {
                         ...s,
-                        data: [{ command: commandName, status: 'SUCCESS', time: timestamp, ...result }, ...s.data].slice(0, 50)
+                        data: [fullResponse, ...s.data].slice(0, 50)
                     };
                 }
                 return s;
             }));
+
+            if (commandId) {
+                pollCommandStatus(commandName, commandId);
+            }
         } catch (error) {
             toast({ title: `Failed to send ${commandName}`, description: error.message, status: "error", duration: 3000, isClosable: true });
 
@@ -669,7 +911,13 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 if (s.name === "Remote Commands") {
                     return {
                         ...s,
-                        data: [{ command: commandName, status: 'FAILED', time: timestamp, error: error.message }, ...s.data].slice(0, 50)
+                        data: [{
+                            command: commandName,
+                            status: 'FAILED',
+                            time: timestamp,
+                            error: error.message,
+                            apiResponse: error.response?.data || { message: error.message } // Store error response
+                        }, ...s.data].slice(0, 50)
                     };
                 }
                 return s;
@@ -679,8 +927,161 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }
     };
 
+    //original code feb16
+    // const fetchCheckedSignals = async () => {
+    //     const today = new Date().toISOString().split('T')[0];
+
+    //     // Fetch all in parallel
+    //     const fetchPromises = signals.map(async (signal) => {
+    //         if (!signal.isChecked) return null;
+
+    //         try {
+    //             let newData;
+    //             if (signal.fetchType === 'events') {
+    //                 newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
+    //             } else if (signal.fetchType === 'ignition') {
+    //                 // Fetch last 7 days to ensure we get a status even if car hasn't moved recently
+    //                 const sevenDaysAgo = new Date();
+    //                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    //                 const formattedStart = sevenDaysAgo.toISOString().split('T')[0] + ' 00:00:00';
+
+    //                 const events = await TraxoApi.getEvents(vin, 500, formattedStart);
+    //                 console.log("Raw Ignition Events Fetched:", events?.events?.length || 0, events);
+
+    //                 // Filter ignition events correctly
+    //                 newData = (events?.events || [])
+    //                     .filter(e => {
+    //                         // Check various possible event type formats
+    //                         const eventType = (e.eventtype || '').toUpperCase();
+    //                         return eventType === 'IGNITIONSTATUS' ||
+    //                             eventType === 'IGNITION_STATUS' ||
+    //                             eventType === 'IGNITION';
+    //                     })
+    //                     .map(e => {
+    //                         let status = 'OFF';
+    //                         let rawValue = '';
+
+    //                         try {
+    //                             // Parse event details
+    //                             const details = typeof e.eventdetails === 'string'
+    //                                 ? JSON.parse(e.eventdetails)
+    //                                 : e.eventdetails || {};
+
+    //                             // Get the event value from various possible fields
+    //                             rawValue = details.eventValue || details.value || details.status || '';
+
+    //                             // Convert to ON/OFF based on common ignition values
+    //                             const upperValue = String(rawValue).toUpperCase();
+    //                             if (upperValue === 'RUN' ||
+    //                                 upperValue === 'START' ||
+    //                                 upperValue === 'ON' ||
+    //                                 upperValue === 'TRUE' ||
+    //                                 upperValue === '1' ||
+    //                                 upperValue.includes('RUN') ||
+    //                                 upperValue.includes('START')) {
+    //                                 status = 'ON';
+    //                             }
+    //                         } catch (err) {
+    //                             console.warn("Failed to parse ignition details", err, e.eventdetails);
+    //                         }
+
+    //                         return {
+    //                             ...e,
+    //                             value: status,
+    //                             signalValue: status,
+    //                             rawValue: rawValue,
+    //                             updatedTimeStamp: e.sourcetimestamp,
+    //                             timestamp: e.sourcetimestamp
+    //                         };
+    //                     });
+    //                 console.log("Filtered Ignition Events:", newData);
+    //             } else if (signal.fetchType === 'location') {
+    //                 // Use location telemetry array for console view
+    //                 newData = await TraxoApi.getLocationTelemetryArray(vin);
+    //                 console.log("Location Telemetry Data (raw):", newData);
+    //                 console.log("Location Telemetry Data type:", typeof newData, "isArray:", Array.isArray(newData));
+    //             } else if (signal.fetchType === 'alerts') {
+    //                 newData = await TraxoApi.getAlerts(vin);
+    //             } else {
+    //                 newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
+    //             }
+
+    //             const returnData = (newData && newData.events) ? newData.events : newData;
+    //             if (signal.fetchType === 'location') {
+    //                 console.log("Location return data:", returnData, "length:", returnData?.length);
+    //             }
+    //             return { name: signal.name, newData: returnData };
+    //         } catch (error) {
+    //             console.error(`Failed to fetch ${signal.name}`, error);
+    //             return { name: signal.name, error: error.message || "Fetch failed" };
+    //         }
+    //     });
+
+    //     const results = await Promise.all(fetchPromises);
+
+    //     setSignals(prevSignals => {
+    //         return prevSignals.map(signal => {
+    //             const result = results.find(r => r && r.name === signal.name);
+    //             if (!result) return signal;
+
+    //             const { newData, error } = result;
+    //             if (error) return { ...signal, error, loading: false, hasFetched: true };
+
+    //             if (newData !== null && newData !== undefined) {
+    //                 const existingData = signal.data || [];
+    //                 const isArray = Array.isArray(newData);
+    //                 const hasData = isArray ? newData.length > 0 : !!newData;
+
+    //                 let updatedData = existingData;
+    //                 if (hasData) {
+    //                     const lastEntry = existingData[0];
+    //                     const newEntryStr = JSON.stringify(isArray ? newData[0] : newData);
+    //                     const lastEntryStr = JSON.stringify(lastEntry);
+
+    //                     if (newEntryStr !== lastEntryStr) {
+    //                         if (isArray) {
+    //                             const newItems = newData.filter(newItem =>
+    //                                 !existingData.some(oldItem => JSON.stringify(oldItem) === JSON.stringify(newItem))
+    //                             );
+    //                             updatedData = [...newItems, ...existingData].slice(0, 100);
+    //                         } else {
+    //                             updatedData = [newData, ...existingData].slice(0, 100);
+    //                         }
+    //                     }
+    //                 }
+
+    //                 return {
+    //                     ...signal,
+    //                     data: updatedData,
+    //                     loading: false,
+    //                     lastUpdated: new Date().toLocaleTimeString(),
+    //                     hasFetched: true,
+    //                     error: null
+    //                 };
+    //             }
+    //             return { ...signal, loading: false };
+    //         });
+
+    //         // Log location signal data after update
+    //         const locationSignal = updatedSignals.find(s => s.name === 'Location');
+    //         if (locationSignal) {
+    //             console.log("Location signal after update:", {
+    //                 name: locationSignal.name,
+    //                 dataLength: locationSignal.data?.length,
+    //                 data: locationSignal.data
+    //             });
+    //         }
+    //         return updatedSignals;
+    //     });
+    // };
+
+
     const fetchCheckedSignals = async () => {
         const today = new Date().toISOString().split('T')[0];
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        const formattedStart = sevenDaysAgo.toISOString().split('T')[0] + ' 00:00:00';
+        const formattedEnd = today + ' 23:59:59';
 
         // Fetch all in parallel
         const fetchPromises = signals.map(async (signal) => {
@@ -690,15 +1091,20 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 let newData;
                 if (signal.fetchType === 'events') {
                     newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
+                } else if (signal.fetchType === 'ignition') {
+                    // Use the new dedicated ignition events function
+                    newData = await TraxoApi.getIgnitionEvents(vin, formattedStart, formattedEnd);
+                    console.log("Formatted Ignition Events:", newData);
                 } else if (signal.fetchType === 'location') {
-                    newData = await TraxoApi.getLocationTelemetry(vin);
+                    newData = await TraxoApi.getLocationTelemetryArray(vin);
                 } else if (signal.fetchType === 'alerts') {
                     newData = await TraxoApi.getAlerts(vin);
                 } else {
                     newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
                 }
 
-                return { name: signal.name, newData };
+                const returnData = (newData && newData.events) ? newData.events : newData;
+                return { name: signal.name, newData: returnData };
             } catch (error) {
                 console.error(`Failed to fetch ${signal.name}`, error);
                 return { name: signal.name, error: error.message || "Fetch failed" };
@@ -708,7 +1114,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         const results = await Promise.all(fetchPromises);
 
         setSignals(prevSignals => {
-            return prevSignals.map(signal => {
+            const updatedSignals = prevSignals.map(signal => {
                 const result = results.find(r => r && r.name === signal.name);
                 if (!result) return signal;
 
@@ -716,31 +1122,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 if (error) return { ...signal, error, loading: false, hasFetched: true };
 
                 if (newData !== null && newData !== undefined) {
-                    const existingData = signal.data || [];
-                    const isArray = Array.isArray(newData);
-                    const hasData = isArray ? newData.length > 0 : !!newData;
-
-                    let updatedData = existingData;
-                    if (hasData) {
-                        const lastEntry = existingData[0];
-                        const newEntryStr = JSON.stringify(isArray ? newData[0] : newData);
-                        const lastEntryStr = JSON.stringify(lastEntry);
-
-                        if (newEntryStr !== lastEntryStr) {
-                            if (isArray) {
-                                const newItems = newData.filter(newItem =>
-                                    !existingData.some(oldItem => JSON.stringify(oldItem) === JSON.stringify(newItem))
-                                );
-                                updatedData = [...newItems, ...existingData].slice(0, 100);
-                            } else {
-                                updatedData = [newData, ...existingData].slice(0, 100);
-                            }
-                        }
-                    }
-
                     return {
                         ...signal,
-                        data: updatedData,
+                        data: Array.isArray(newData) ? newData : [newData],
                         loading: false,
                         lastUpdated: new Date().toLocaleTimeString(),
                         hasFetched: true,
@@ -749,14 +1133,140 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 }
                 return { ...signal, loading: false };
             });
+
+            return updatedSignals;
         });
     };
+
+    // const fetchCheckedSignals = async () => {
+    //     const today = new Date().toISOString().split('T')[0];
+
+    //     // Fetch all in parallel
+    //     const fetchPromises = signals.map(async (signal) => {
+    //         if (!signal.isChecked) return null;
+
+    //         try {
+    //             let newData;
+    //             if (signal.fetchType === 'events') {
+    //                 newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
+    //             } else if (signal.fetchType === 'ignition') {
+    //                 // Fetch last 7 days to ensure we get a status even if car hasn't moved recently
+    //                 const sevenDaysAgo = new Date();
+    //                 sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    //                 const formattedStart = sevenDaysAgo.toISOString().split('T')[0] + ' 00:00:00';
+
+    //                 const events = await TraxoApi.getEvents(vin, 500, formattedStart);
+
+    //                 // FIXED: Filter ignition events correctly
+    //                 newData = (events?.events || [])
+    //                     .filter(e => {
+    //                         // Check various possible event type formats
+    //                         const eventType = (e.eventtype || '').toUpperCase();
+    //                         return eventType === 'IGNITIONSTATUS' ||
+    //                             eventType === 'IGNITION_STATUS' ||
+    //                             eventType === 'IGNITION';
+    //                     })
+    //                     .map(e => {
+    //                         let status = 'OFF';
+    //                         let rawValue = '';
+
+    //                         try {
+    //                             // Parse event details
+    //                             const details = typeof e.eventdetails === 'string'
+    //                                 ? JSON.parse(e.eventdetails)
+    //                                 : e.eventdetails || {};
+
+    //                             // Get the event value from various possible fields
+    //                             rawValue = details.eventValue || details.value || details.status || '';
+
+    //                             // Convert to ON/OFF based on common ignition values
+    //                             const upperValue = String(rawValue).toUpperCase();
+    //                             if (upperValue === 'RUN' ||
+    //                                 upperValue === 'START' ||
+    //                                 upperValue === 'ON' ||
+    //                                 upperValue === 'TRUE' ||
+    //                                 upperValue === '1' ||
+    //                                 upperValue.includes('RUN') ||
+    //                                 upperValue.includes('START')) {
+    //                                 status = 'ON';
+    //                             }
+    //                         } catch (err) {
+    //                             console.warn("Failed to parse ignition details", err, e.eventdetails);
+    //                         }
+
+    //                         return {
+    //                             ...e,
+    //                             value: status,
+    //                             signalValue: status,
+    //                             rawValue: rawValue,
+    //                             updatedTimeStamp: e.sourcetimestamp,
+    //                             timestamp: e.sourcetimestamp
+    //                         };
+    //                     });
+
+    //                 console.log("Filtered Ignition Events:", newData);
+    //             } else if (signal.fetchType === 'location') {
+    //                 newData = await TraxoApi.getLocationTelemetryArray(vin);
+    //             } else if (signal.fetchType === 'alerts') {
+    //                 newData = await TraxoApi.getAlerts(vin);
+    //             } else {
+    //                 newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
+    //             }
+
+    //             const returnData = (newData && newData.events) ? newData.events : newData;
+    //             return { name: signal.name, newData: returnData };
+    //         } catch (error) {
+    //             console.error(`Failed to fetch ${signal.name}`, error);
+    //             return { name: signal.name, error: error.message || "Fetch failed" };
+    //         }
+    //     });
+
+    //     const results = await Promise.all(fetchPromises);
+
+    //     setSignals(prevSignals => {
+    //         const updatedSignals = prevSignals.map(signal => {
+    //             const result = results.find(r => r && r.name === signal.name);
+    //             if (!result) return signal;
+
+    //             const { newData, error } = result;
+    //             if (error) return { ...signal, error, loading: false, hasFetched: true };
+
+    //             if (newData !== null && newData !== undefined) {
+    //                 const existingData = signal.data || [];
+    //                 const isArray = Array.isArray(newData);
+    //                 const hasData = isArray ? newData.length > 0 : !!newData;
+
+    //                 let updatedData = existingData;
+    //                 if (hasData) {
+    //                     if (isArray) {
+    //                         // For ignition, we want to keep all events but ensure latest is first
+    //                         const allEvents = [...newData];
+    //                         updatedData = allEvents.slice(0, 50); // Keep last 50 events
+    //                     } else {
+    //                         updatedData = [newData, ...existingData].slice(0, 100);
+    //                     }
+    //                 }
+
+    //                 return {
+    //                     ...signal,
+    //                     data: updatedData,
+    //                     loading: false,
+    //                     lastUpdated: new Date().toLocaleTimeString(),
+    //                     hasFetched: true,
+    //                     error: null
+    //                 };
+    //             }
+    //             return { ...signal, loading: false };
+    //         });
+
+    //         return updatedSignals;
+    //     });
+    // };
 
     const handleRefresh = async () => {
         try {
             await Promise.all([
                 fetchCheckedSignals(),
-                fetchDeviceEvents(),
                 fetchOtherData()
             ]);
             toast({
@@ -779,6 +1289,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
     // ... [Table and Filter Logic kept same] ...
     const filteredSignals = signals.filter(signal => {
+
         const term = searchTerm.toLowerCase();
         return (
             signal.name.toLowerCase().includes(term) ||
@@ -787,49 +1298,504 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         );
     });
 
-    const renderDataAsTable = (data, name) => {
+    // const renderDataAsTable = (data, name) => {
+    //     if (!data || data.length === 0) return null;
+    //     const term = searchTerm.toLowerCase();
+    //     console.log("term----", term);
+
+    //     const signalMatchesName = name.toLowerCase().includes(term);
+    //     let allKeys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
+    //     const priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
+    //     const keys = allKeys.sort((a, b) => {
+    //         const indexA = priorityKeys.indexOf(a);
+    //         const indexB = priorityKeys.indexOf(b);
+    //         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    //         if (indexA !== -1) return -1;
+    //         if (indexB !== -1) return 1;
+    //         return 0;
+    //     }).slice(0, 5);
+    //     const filteredRows = signalMatchesName
+    //         ? data.slice(0, 20)
+    //         : data.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 20);
+
+    //     if (filteredRows.length === 0) return <Text fontSize="xs" color="gray.500" p={4} textAlign="center">No matching records.</Text>;
+
+    //     return (
+    //         <TableContainer overflowY="auto" maxH="100%">
+    //             <Table size="sm" variant="simple">
+    //                 <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+    //                     <Tr>{keys.map(key => (
+    //                         <Th key={key} fontSize="8px" color="gray.600" textTransform="uppercase" px={2} py={2} borderBottom="1px solid" borderColor="gray.100" letterSpacing="0.5px">{key}</Th>
+    //                     ))}</Tr>
+    //                 </Thead>
+    //                 <Tbody>
+    //                     {filteredRows.map((item, idx) => (
+    //                         <Tr key={idx} _hover={{ bg: "gray.50" }}>
+    //                             {keys.map(key => (
+    //                                 <Td key={key} fontSize="9px" py={1.5} px={2} borderBottom="1px solid" borderColor="gray.100" color="gray.800" fontFamily="monospace" fontWeight="bold">
+    //                                     {typeof item[key] === 'object' ? JSON.stringify(item[key]) : String(item[key] ?? '')}
+    //                                 </Td>
+    //                             ))}
+    //                         </Tr>
+    //                     ))}
+    //                 </Tbody>
+    //             </Table>
+    //         </TableContainer>
+    //     );
+    // };
+
+    // const renderDataAsTable = (data, name, isOdometer = false) => {
+    //     if (!data || data.length === 0) return null;
+    //     const term = searchTerm.toLowerCase();
+    //     const signalMatchesName = name.toLowerCase().includes(term);
+
+    //     let allKeys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
+
+    //     // Priority keys based on signal type
+    //     let priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
+
+    //     // Special handling for Ignition Status
+    //     if (name === "Ignition Status") {
+    //         priorityKeys = ['signalValue', 'sourcetimestamp', 'eventtype', 'eventValue', 'details'];
+    //     }
+    //     // For Odometer, show only essential columns
+    //     else if (isOdometer) {
+    //         priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp'];
+    //     }
+
+    //     const keys = allKeys.sort((a, b) => {
+    //         const indexA = priorityKeys.indexOf(a);
+    //         const indexB = priorityKeys.indexOf(b);
+    //         if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    //         if (indexA !== -1) return -1;
+    //         if (indexB !== -1) return 1;
+    //         return 0;
+    //     }).slice(0, name === "Ignition Status" ? 5 : (isOdometer ? 4 : 6));
+
+    //     const filteredRows = signalMatchesName
+    //         ? data.slice(0, 25)
+    //         : data.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 25);
+
+    //     if (filteredRows.length === 0) {
+    //         return (
+    //             <Flex align="center" justify="center" h="100%" p={4}>
+    //                 <Text fontSize="14px" color="gray.500" textAlign="center">No matching records.</Text>
+    //             </Flex>
+    //         );
+    //     }
+
+    //     // Format the cell value based on the key
+    //     const formatCellValue = (item, key) => {
+    //         const value = item[key];
+
+    //         // Handle undefined/null
+    //         if (value === undefined || value === null) return '';
+
+    //         // Handle objects (like details)
+    //         if (typeof value === 'object') {
+    //             // For details object, show a summary
+    //             if (key === 'details') {
+    //                 const details = value;
+    //                 return `${details.eventValue || ''} ${details.message || ''}`.trim() || JSON.stringify(value).substring(0, 30);
+    //             }
+    //             return JSON.stringify(value).substring(0, 30);
+    //         }
+
+    //         // Handle timestamps - format nicely
+    //         if (key === 'sourcetimestamp' || key === 'updatedTimeStamp' || key === 'timestamp') {
+    //             try {
+    //                 const date = new Date(value);
+    //                 if (!isNaN(date.getTime())) {
+    //                     return date.toLocaleString('en-US', {
+    //                         month: '2-digit',
+    //                         day: '2-digit',
+    //                         hour: '2-digit',
+    //                         minute: '2-digit',
+    //                         second: '2-digit'
+    //                     });
+    //                 }
+    //             } catch (e) {
+    //                 return String(value);
+    //             }
+    //         }
+
+    //         return String(value);
+    //     };
+
+    //     return (
+    //         <Box width="100%" overflowX="auto">
+    //             <Table size="sm" variant="simple" width="100%">
+    //                 <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+    //                     <Tr>
+    //                         {keys.map(key => (
+    //                             <Th
+    //                                 key={key}
+    //                                 fontSize="14px"
+    //                                 color="gray.700"
+    //                                 textTransform="uppercase"
+    //                                 px={4}
+    //                                 py={3}
+    //                                 borderBottom="2px solid"
+    //                                 borderColor="gray.300"
+    //                                 letterSpacing="0.5px"
+    //                                 whiteSpace="nowrap"
+    //                                 fontWeight="800"
+    //                             >
+    //                                 {key}
+    //                             </Th>
+    //                         ))}
+    //                     </Tr>
+    //                 </Thead>
+    //                 <Tbody>
+    //                     {filteredRows.map((item, idx) => (
+    //                         <Tr key={idx} _hover={{ bg: "gray.50" }}>
+    //                             {keys.map(key => {
+    //                                 // Add color coding for signalValue in Ignition Status
+    //                                 const isIgnitionStatus = name === "Ignition Status" && key === "signalValue";
+    //                                 const value = formatCellValue(item, key);
+
+    //                                 return (
+    //                                     <Td
+    //                                         key={key}
+    //                                         fontSize="12px"
+    //                                         py={3}
+    //                                         px={4}
+    //                                         borderBottom="1px solid"
+    //                                         borderColor="gray.100"
+    //                                         color={isIgnitionStatus && value === 'ON' ? 'green.600' :
+    //                                             isIgnitionStatus && value === 'OFF' ? 'gray.600' : 'gray.800'}
+    //                                         fontFamily="monospace"
+    //                                         fontWeight={isIgnitionStatus ? "700" : "500"}
+    //                                         whiteSpace="nowrap"
+    //                                         bg={isIgnitionStatus && value === 'ON' ? 'green.50' :
+    //                                             isIgnitionStatus && value === 'OFF' ? 'gray.50' : 'transparent'}
+    //                                     >
+    //                                         {value}
+    //                                     </Td>
+    //                                 );
+    //                             })}
+    //                         </Tr>
+    //                     ))}
+    //                 </Tbody>
+    //             </Table>
+    //         </Box>
+    //     );
+    // };
+
+
+    const renderDataAsTable = (data, name, isOdometer = false) => {
         if (!data || data.length === 0) return null;
         const term = searchTerm.toLowerCase();
         const signalMatchesName = name.toLowerCase().includes(term);
-        let allKeys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
-        const priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
+
+        // Special handling for Remote Commands
+        if (name === "Remote Commands") {
+            return (
+                <VStack align="stretch" spacing={3} w="full">
+                    {data.map((cmd, idx) => (
+                        <Box key={idx} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
+                            <HStack justify="space-between" mb={2}>
+                                <HStack>
+                                    <Badge colorScheme={cmd.status === 'SUCCESS' ? 'green' : cmd.status === 'PENDING' ? 'yellow' : 'red'}>
+                                        {cmd.status}
+                                    </Badge>
+                                    <Text fontWeight="bold" fontSize="sm">{cmd.command}</Text>
+                                </HStack>
+                                <Text fontSize="xs" color="gray.500">{cmd.time}</Text>
+                            </HStack>
+
+                            {/* API Response Display */}
+                            <Box bg="gray.900" p={2} borderRadius="md" mt={2} overflowX="auto">
+                                <Text color="green.400" fontSize="xs" fontFamily="monospace" mb={1}>
+                                    // API Response
+                                </Text>
+                                <pre style={{ color: '#e2e8f0', fontSize: '10px' }}>
+                                    {JSON.stringify(cmd.apiResponse, null, 2)}
+                                </pre>
+                            </Box>
+                        </Box>
+                    ))}
+                </VStack>
+            );
+        }
+
+        // Special handling for Ignition Status
+        if (name === "Ignition Status") {
+            // Filter to show only IGNITIONSTATUS events
+            const ignitionEvents = data.filter(item =>
+                item.eventtype === "IGNITIONSTATUS"
+            );
+
+            console.log("🔥 Ignition Events to display:", ignitionEvents);
+
+            if (ignitionEvents.length === 0) {
+                return (
+                    <Flex align="center" justify="center" h="100%" p={4}>
+                        <Text fontSize="14px" color="gray.500" textAlign="center">No ignition events found</Text>
+                    </Flex>
+                );
+            }
+
+            // Get all unique keys from all ignition events
+            const allKeys = Array.from(new Set(
+                ignitionEvents.flatMap(item => {
+                    // Parse eventdetails to get nested keys
+                    let details = {};
+                    try {
+                        details = typeof item.eventdetails === 'string'
+                            ? JSON.parse(item.eventdetails)
+                            : item.eventdetails || {};
+                    } catch (e) { }
+
+                    // Combine top-level keys with details keys (prefixed with 'details.')
+                    const topLevelKeys = Object.keys(item).filter(k => k !== 'eventdetails');
+                    const detailsKeys = Object.keys(details).map(k => `details.${k}`);
+
+                    return [...topLevelKeys, ...detailsKeys];
+                })
+            ));
+
+            // Priority keys to show first
+            const priorityKeys = [
+                'eventtype',
+                'sourcetimestamp',
+                'details.eventValue',
+                'details.ecuCommunicationEventValue',
+                'details.eventName',
+                'details.timestamp',
+                'sourceid',
+                'eventid',
+                'eventsubcategory',
+                'accountId'
+            ];
+
+            // Sort keys with priority keys first
+            const keys = allKeys.sort((a, b) => {
+                const indexA = priorityKeys.indexOf(a);
+                const indexB = priorityKeys.indexOf(b);
+                if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                if (indexA !== -1) return -1;
+                if (indexB !== -1) return 1;
+                return a.localeCompare(b);
+            }).slice(0, 10); // Show top 10 columns to avoid overcrowding
+
+            return (
+                <Box width="100%" overflowX="auto">
+                    <Table size="sm" variant="simple" width="100%">
+                        <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+                            <Tr>
+                                {keys.map(key => (
+                                    <Th
+                                        key={key}
+                                        fontSize="14px"
+                                        color="gray.700"
+                                        textTransform="uppercase"
+                                        px={3}
+                                        py={3}
+                                        borderBottom="2px solid"
+                                        borderColor="gray.300"
+                                        letterSpacing="0.5px"
+                                        whiteSpace="nowrap"
+                                        fontWeight="800"
+                                    >
+                                        {key.replace('details.', '')}
+                                    </Th>
+                                ))}
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {ignitionEvents.slice(0, 20).map((item, idx) => {
+                                // Parse eventdetails
+                                let details = {};
+                                try {
+                                    details = typeof item.eventdetails === 'string'
+                                        ? JSON.parse(item.eventdetails)
+                                        : item.eventdetails || {};
+                                } catch (e) {
+                                    details = {};
+                                }
+
+                                return (
+                                    <Tr key={item.eventid || idx} _hover={{ bg: "gray.50" }}>
+                                        {keys.map(key => {
+                                            // Get value based on key path
+                                            let value;
+                                            if (key.startsWith('details.')) {
+                                                const detailKey = key.replace('details.', '');
+                                                value = details[detailKey];
+                                            } else {
+                                                value = item[key];
+                                            }
+
+                                            // Format the value for display
+                                            let displayValue = value;
+
+                                            // Handle objects
+                                            if (typeof displayValue === 'object' && displayValue !== null) {
+                                                displayValue = JSON.stringify(displayValue);
+                                            }
+
+                                            // Handle timestamps
+                                            if (key.includes('timestamp') || key.includes('TimeStamp')) {
+                                                try {
+                                                    const date = new Date(displayValue);
+                                                    if (!isNaN(date.getTime())) {
+                                                        displayValue = date.toLocaleString('en-US', {
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                            year: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                            second: '2-digit'
+                                                        });
+                                                    }
+                                                } catch (e) { }
+                                            }
+
+                                            // Handle eventValue with color coding
+                                            const isEventValue = key === 'details.eventValue' || key === 'eventValue';
+                                            const isOn = displayValue === 'RUN' || displayValue === 'START';
+                                            const isAcc = displayValue === 'ACC';
+
+                                            return (
+                                                <Td
+                                                    key={key}
+                                                    fontSize="12px"
+                                                    py={2.5}
+                                                    px={3}
+                                                    borderBottom="1px solid"
+                                                    borderColor="gray.100"
+                                                    color={isEventValue && isOn ? 'green.600' :
+                                                        isEventValue && isAcc ? 'orange.600' : 'gray.800'}
+                                                    fontFamily="monospace"
+                                                    fontWeight={isEventValue ? "700" : "500"}
+                                                    bg={isEventValue && isOn ? 'green.50' :
+                                                        isEventValue && isAcc ? 'orange.50' : 'transparent'}
+                                                    whiteSpace="nowrap"
+                                                >
+                                                    {displayValue !== null && displayValue !== undefined
+                                                        ? String(displayValue)
+                                                        : '-'}
+                                                </Td>
+                                            );
+                                        })}
+                                    </Tr>
+                                );
+                            })}
+                        </Tbody>
+                    </Table>
+                </Box>
+            );
+        }
+
+        // For other signals, show all data
+        // Get all unique keys from all items
+        const allKeys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
+
+        // Priority keys based on signal type
+        let priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
+
+        if (isOdometer) {
+            priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp'];
+        }
+
         const keys = allKeys.sort((a, b) => {
             const indexA = priorityKeys.indexOf(a);
             const indexB = priorityKeys.indexOf(b);
             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
             if (indexA !== -1) return -1;
             if (indexB !== -1) return 1;
-            return 0;
-        }).slice(0, 5);
-        const filteredRows = signalMatchesName
-            ? data.slice(0, 20)
-            : data.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 20);
+            return a.localeCompare(b);
+        }).slice(0, 8); // Show up to 8 columns
 
-        if (filteredRows.length === 0) return <Text fontSize="xs" color="gray.500" p={4} textAlign="center">No matching records.</Text>;
+        const filteredRows = signalMatchesName
+            ? data.slice(0, 25)
+            : data.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 25);
+
+        if (filteredRows.length === 0) {
+            return (
+                <Flex align="center" justify="center" h="100%" p={4}>
+                    <Text fontSize="14px" color="gray.500" textAlign="center">No matching records.</Text>
+                </Flex>
+            );
+        }
 
         return (
-            <TableContainer overflowY="auto" maxH="100%">
-                <Table size="sm" variant="simple">
+            <Box width="100%" overflowX="auto">
+                <Table size="sm" variant="simple" width="100%">
                     <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
-                        <Tr>{keys.map(key => (
-                            <Th key={key} fontSize="8px" color="gray.600" textTransform="uppercase" px={2} py={2} borderBottom="1px solid" borderColor="gray.100" letterSpacing="0.5px">{key}</Th>
-                        ))}</Tr>
+                        <Tr>
+                            {keys.map(key => (
+                                <Th
+                                    key={key}
+                                    fontSize="14px"
+                                    color="gray.700"
+                                    textTransform="uppercase"
+                                    px={4}
+                                    py={3}
+                                    borderBottom="2px solid"
+                                    borderColor="gray.300"
+                                    letterSpacing="0.5px"
+                                    whiteSpace="nowrap"
+                                    fontWeight="800"
+                                >
+                                    {key}
+                                </Th>
+                            ))}
+                        </Tr>
                     </Thead>
                     <Tbody>
                         {filteredRows.map((item, idx) => (
                             <Tr key={idx} _hover={{ bg: "gray.50" }}>
-                                {keys.map(key => (
-                                    <Td key={key} fontSize="9px" py={1.5} px={2} borderBottom="1px solid" borderColor="gray.100" color="gray.800" fontFamily="monospace" fontWeight="bold">
-                                        {typeof item[key] === 'object' ? JSON.stringify(item[key]) : String(item[key] ?? '')}
-                                    </Td>
-                                ))}
+                                {keys.map(key => {
+                                    let value = item[key];
+
+                                    // Format objects
+                                    if (typeof value === 'object' && value !== null) {
+                                        value = JSON.stringify(value);
+                                    }
+
+                                    // Format timestamps
+                                    if (key.includes('timestamp') || key.includes('TimeStamp')) {
+                                        try {
+                                            const date = new Date(value);
+                                            if (!isNaN(date.getTime())) {
+                                                value = date.toLocaleString('en-US', {
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    second: '2-digit'
+                                                });
+                                            }
+                                        } catch (e) { }
+                                    }
+
+                                    return (
+                                        <Td
+                                            key={key}
+                                            fontSize="12px"
+                                            py={3}
+                                            px={4}
+                                            borderBottom="1px solid"
+                                            borderColor="gray.100"
+                                            color="gray.800"
+                                            fontFamily="monospace"
+                                            fontWeight="500"
+                                            whiteSpace="nowrap"
+                                        >
+                                            {value !== null && value !== undefined ? String(value) : '-'}
+                                        </Td>
+                                    );
+                                })}
                             </Tr>
                         ))}
                     </Tbody>
                 </Table>
-            </TableContainer>
+            </Box>
         );
     };
+
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="full" scrollBehavior="inside">
@@ -895,73 +1861,106 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                     </Box>
 
                     {/* Main Content Area */}
+
+
+
+                    {/* duplicate version  */}
                     {viewMode === 'visual' ? (
                         <VisualDashboardView signals={signals} deviceState={deviceState} />
                     ) : (
-                        <Grid
-                            templateColumns={{ base: "1fr", md: "repeat(2, 1fr)", xl: "repeat(3, 1fr)" }}
-                            gap={6} p={8} bg="#f8faff" position="relative"
-                        >
-                            {/* Terminal Grid Background for Console View */}
-                            <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px)" backgroundSize="40px 40px" pointerEvents="none" />
+                        <Box p={8} bg="#f8faff" position="relative" width="100%">
+                            <Box position="absolute" top={0} left={0} right={0} bottom={0}
+                                backgroundImage="linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px)"
+                                backgroundSize="40px 40px"
+                                pointerEvents="none" />
 
-                            {filteredSignals.map((signal, index) => (
-                                <VStack key={index} align="stretch" spacing={2} w="full" position="relative" zIndex={1}>
-                                    <HStack justify="space-between" h="30px" px={1}>
-                                        <HStack spacing={3}>
-                                            <Text fontWeight="800" fontSize="xs" color="gray.700" letterSpacing="0.5px">
-                                                {signal.name}
-                                            </Text>
-                                            <Badge variant="outline" colorScheme="gray" fontSize="8px" fontFamily="monospace" borderRadius="sm">
-                                                {signal.id}
-                                            </Badge>
-                                        </HStack>
-                                        {signal.loading && <Spinner size="xs" color="blue.500" />}
-                                    </HStack>
+                            <Grid
+                                templateColumns={{
+                                    base: "1fr",
+                                    md: "repeat(2, 1fr)",
+                                    xl: "repeat(2, 1fr)"
+                                }}
+                                gap={6}
+                                width="100%"
+                                position="relative"
+                                zIndex={1}
+                            >
+                                {(() => {
+                                    const consoleSignals = filteredSignals.filter(s => !s.hideInConsole);
+                                    return consoleSignals.map((signal, index) => {
+                                        const isOdometer = signal.name === "Total Odometer";
 
-                                    <Box
-                                        bg="white"
-                                        borderRadius="xl"
-                                        height="280px"
-                                        width="100%"
-                                        position="relative"
-                                        overflow="hidden"
-                                        border="1px solid"
-                                        borderColor="gray.200"
-                                        boxShadow="sm"
-                                    >
-                                        <Box p={0} height="100%" overflow="auto">
-                                            {signal.error ? (
-                                                <Flex align="center" justify="center" h="100%" p={4}>
-                                                    <Text color="red.500" fontSize="xs" fontWeight="bold" fontFamily="monospace">
-                                                        {`> ERROR: ${signal.error}`}
-                                                    </Text>
-                                                </Flex>
-                                            ) : signal.data && signal.data.length > 0 ? (
-                                                renderDataAsTable(signal.data, signal.name)
-                                            ) : signal.loading ? (
-                                                <Flex align="center" justify="center" h="100%">
-                                                    <VStack spacing={2}>
-                                                        <Spinner size="sm" color="blue.400" thickness="2px" />
-                                                        <Text color="gray.500" fontSize="xs" fontWeight="bold" fontFamily="monospace">
-                                                            {`> ESTABLISHING LINK...`}
+                                        return (
+                                            <VStack
+                                                key={index}
+                                                align="stretch"
+                                                spacing={2}
+                                                w="full"
+                                                maxW={isOdometer ? "450px" : "600px"} // Increased by 50% (300px -> 450px, 400px -> 600px)
+                                                justifySelf="center"
+                                            >
+                                                <HStack justify="space-between" h="35px" px={2}>
+                                                    <HStack spacing={3}>
+                                                        <Text fontWeight="800" fontSize="14px" color="gray.700" letterSpacing="0.5px">
+                                                            {signal.name}
                                                         </Text>
-                                                    </VStack>
-                                                </Flex>
-                                            ) : (
-                                                <Flex align="center" justify="center" h="100%">
-                                                    <Text color="gray.400" fontSize="xs" fontWeight="bold" fontFamily="monospace">
-                                                        {`> NO DATA PACKETS`}
-                                                    </Text>
-                                                </Flex>
-                                            )}
-                                        </Box>
-                                        {/* Subtle Grid Effect for Light Mode instead of Scanlines */}
-                                        <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="linear-gradient(rgba(0,0,0,0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.01) 1px, transparent 1px)" backgroundSize="20px 20px" pointerEvents="none" />
-                                    </Box>
-                                </VStack>
-                            ))}
-                        </Grid>
+                                                        <Badge variant="outline" colorScheme="gray" fontSize="10px" fontFamily="monospace" borderRadius="sm" px={2} py={0.5}>
+                                                            {signal.id}
+                                                        </Badge>
+                                                    </HStack>
+                                                    {signal.loading && <Spinner size="sm" color="blue.500" />}
+                                                </HStack>
+
+                                                <Box
+                                                    bg="white"
+                                                    borderRadius="xl"
+                                                    height="350px" // Increased height proportionally
+                                                    width="100%"
+                                                    position="relative"
+                                                    overflow="hidden"
+                                                    border="1px solid"
+                                                    borderColor="gray.200"
+                                                    boxShadow="sm"
+                                                >
+                                                    <Box p={0} height="100%" overflow="auto" width="100%">
+                                                        {signal.error ? (
+                                                            <Flex align="center" justify="center" h="100%" p={4} width="100%">
+                                                                <Text color="red.500" fontSize="14px" fontWeight="bold" fontFamily="monospace" textAlign="center">
+                                                                    {`> ERROR: ${signal.error}`}
+                                                                </Text>
+                                                            </Flex>
+                                                        ) : signal.data && signal.data.length > 0 ? (
+                                                            <Box width="100%" overflow="auto">
+                                                                {renderDataAsTable(signal.data, signal.name, isOdometer)}
+                                                            </Box>
+                                                        ) : signal.loading ? (
+                                                            <Flex align="center" justify="center" h="100%" width="100%">
+                                                                <VStack spacing={2}>
+                                                                    <Spinner size="md" color="blue.400" thickness="3px" />
+                                                                    <Text color="gray.500" fontSize="14px" fontWeight="bold" fontFamily="monospace">
+                                                                        {`> ESTABLISHING LINK...`}
+                                                                    </Text>
+                                                                </VStack>
+                                                            </Flex>
+                                                        ) : (
+                                                            <Flex align="center" justify="center" h="100%" width="100%">
+                                                                <Text color="gray.400" fontSize="14px" fontWeight="bold" fontFamily="monospace">
+                                                                    {`> NO DATA PACKETS`}
+                                                                </Text>
+                                                            </Flex>
+                                                        )}
+                                                    </Box>
+                                                    <Box position="absolute" top={0} left={0} right={0} bottom={0}
+                                                        backgroundImage="linear-gradient(rgba(0,0,0,0.01) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.01) 1px, transparent 1px)"
+                                                        backgroundSize="20px 20px"
+                                                        pointerEvents="none" />
+                                                </Box>
+                                            </VStack>
+                                        );
+                                    })
+                                })()}
+                            </Grid>
+                        </Box>
                     )}
 
                     {/* Device Events Section (Commented out) */}

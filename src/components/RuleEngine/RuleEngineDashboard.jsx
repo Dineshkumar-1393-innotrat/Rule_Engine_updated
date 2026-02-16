@@ -46,7 +46,7 @@ import {
     Icon,
     Divider
 } from '@chakra-ui/react';
-import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle, LayoutDashboard } from 'lucide-react';
+import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle, LayoutDashboard, Compass } from 'lucide-react';
 import {
     RuleEngine,
     defaultRules, // Keep defaultRules as it's used in DEFAULT_RULE_ENGINE_STATE
@@ -154,6 +154,7 @@ const RuleEngineDashboard = () => {
     const [isRunning, setIsRunning] = useState(false);
     const [dataHistory, setDataHistory] = useState([]);
     const [events, setEvents] = useState([]);
+    const messageCounterRef = useRef(1); // Message counter for events
 
     // Device State Machine
     const [deviceState, setDeviceState] = useState(DeviceStates.TRIP_IDLE);
@@ -364,87 +365,9 @@ const RuleEngineDashboard = () => {
                 return;
             }
 
-            // 120min Trip Continuity Logic
-            const now = Date.now();
-            const lastOff = deviceVariables.current.lastIgnitionOffTime;
-            const diffMins = lastOff ? (now - lastOff) / (1000 * 60) : 999;
-
-            if (diffMins < 120 && deviceVariables.current.journeyId && deviceState !== DeviceStates.TRIP_IDLE) {
-                // Continue Previous Trip
-                setDeviceState(DeviceStates.TRIP_ACTIVE);
-                toast({ title: 'Trip Continued', description: `Ignition back ON within ${Math.round(diffMins)} mins.`, status: 'info' });
-                // Note: Section 16 metadata like startTime remains the same for continued trips
-            } else {
-                // Before starting a new trip, send Trip End for the previous one (if any)
-                if (deviceVariables.current.journeyId) {
-                    const endPayload = generateTripPayload('tripEnd', {
-                        ...deviceVariables.current,
-                        lifecycleRules
-                    });
-                    setLastTripPayload(endPayload);
-                    setEvents(prev => [...prev, {
-                        ruleId: 'trip-end-previous', ruleName: 'Trip End (Previous)', type: 'info',
-                        message: `Sent End Payload for previous trip: ${deviceVariables.current.journeyId}`, severity: 'info',
-                        timestamp: new Date().toISOString()
-                    }].slice(-100));
-                }
-
-                // Start New Trip - Begin in TRIP_PENDING
-                const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '');
-
-                // Get or initialize persistent counter
-                let currentCounter = persistedState.tripCounter || 1;
-                const counterDate = persistedState.tripCounterDate;
-
-                if (counterDate !== dateStr) {
-                    currentCounter = 1; // Reset on new day
-                }
-
-                // Format: DDMMYYYYNo (e.g., 3012202501)
-                const tripNum = currentCounter.toString().padStart(2, '0');
-                const newTripId = `${dateStr}${tripNum}`;
-
-                // Increment and save counter for next trip
-                updatePersistedState({
-                    tripCounter: currentCounter + 1,
-                    tripCounterDate: dateStr
-                });
-
-                deviceVariables.current = {
-                    ...deviceVariables.current,
-                    journeyId: newTripId,
-                    tripStartTime: new Date().toISOString(),
-                    tripStartTimeEpoch: Math.floor(Date.now() / 1000),
-                    tripStartOdo: deviceVariables.current.tripStartOdo + deviceVariables.current.currentTripDistance,
-                    currentTripDistance: 0,
-                    currentTripTime: 0,
-                    harshAccCnt: 0,
-                    hardBrakeCnt: 0,
-                    harshTurnCnt: 0,
-                    idlingCnt: 0,
-                    idleDuration: 0,
-                    topSpeed: 0,
-                    tripType: 'Idle',
-                    gnssInfoStart: { lat: 12.9716, long: 77.5946 },
-                    drivingScore: 100
-                };
-
-                setDeviceState(DeviceStates.TRIP_PENDING);
-
-                // Section 16.2: Trip Start Payload
-                const startPayload = generateTripPayload('tripStart', {
-                    ...deviceVariables.current,
-                    lifecycleRules
-                });
-                setLastTripPayload(startPayload);
-                toast({ title: 'New Trip Registered', description: `Trip ID: ${newTripId}`, status: 'success', duration: 2000 });
-
-                // Reset timers for new trip
-                ignOnTime.current = Date.now();
-                lastProgressTime.current = Date.now();
-                shutdownSamplesSent.current = 0;
-                tripStats.current = { runTime: 0, distance: 0, offTime: 0 };
-            }
+            // Ignition ON - Wait for Speed > 5 km/h to start Trip (moved to simulation loop)
+            toast({ title: 'Ignition ON', description: 'Waiting for Speed > 5 km/h to start trip.', status: 'info' });
+            ignOnTime.current = Date.now();
         } else {
             // Ignition ON → OFF
             // Don't immediately set TRIP_IDLE - let the simulation loop handle state transitions
@@ -700,6 +623,54 @@ const RuleEngineDashboard = () => {
         }, 1500);
     };
 
+    // Helper function to create events with API-compliant structure
+    const createEvent = ({ type, message, severity = 'info', dataSnapshot = {}, topic = '', eventType = 'deviceJoin' }) => {
+        const sourceId = deviceVariables.current.vehicleId || deviceVariables.current.imeiNo;
+        const eventId = crypto.randomUUID();
+        const messageId = String(messageCounterRef.current++);
+
+        // Create eventdetails as JSON string (matching Postman API format)
+        const eventdetails = JSON.stringify({
+            payload: {
+                tboxOperatingState: tboxOperatingState,
+                tboxSerialNum: deviceVariables.current.tboxSerialNum,
+                MCU_SW_Version: deviceVariables.current.vmcuVersion,
+                imeiNo: deviceVariables.current.imeiNo,
+                tboxeSimState: tboxeSimState,
+                protocolVersion: deviceVariables.current.protocolVersion,
+                vehicleId: deviceVariables.current.vehicleId,
+                tboxApplicationState: tboxApplicationState,
+                NAD_SW_Version: deviceVariables.current.ccpuVersion,
+                ...dataSnapshot
+            },
+            topic: topic || `/dongle/${sourceId}/MQTTPROTOBUF/${type}`,
+            status: message
+        });
+
+        return {
+            sourceid: sourceId,
+            eventid: eventId,
+            messageId: messageId,
+            eventdetails: eventdetails,
+            type: "",
+            userId: "",
+            version: "",
+            accountId: 65, // Default account ID
+            sourcetimestamp: new Date().toISOString().replace('T', ' ').substring(0, 23),
+            eventsubcategory: "jeep",
+            sourcetype: "DEVICE",
+            eventtype: eventType,
+            correlationId: "",
+            to: "",
+            // Keep legacy fields for backward compatibility with existing UI
+            message: message,
+            severity: severity,
+            timestamp: new Date().toISOString(),
+            ruleId: type,
+            ruleName: type
+        };
+    };
+
     const handleDongleInsertion = () => {
         const currentState = tboxApplicationStateRef.current;
         if (currentState !== DeviceStates.PRE_SALES) {
@@ -714,14 +685,12 @@ const RuleEngineDashboard = () => {
 
         setTboxApplicationState(DeviceStates.FACTORY);
 
-        setEvents(prev => [...prev, {
-            ruleId: 'dongle-inserted',
-            ruleName: 'Dongle Insertion',
-            type: 'state',
+        setEvents(prev => [...prev, createEvent({
+            type: 'dongle-inserted',
             message: 'Dongle physically inserted. Subsystems (CAN, GPS, GSM) initialized. State: FACTORY',
             severity: 'success',
-            timestamp: new Date().toISOString()
-        }].slice(-100));
+            topic: '/dongle/inserted'
+        })].slice(-100));
 
         toast({
             title: 'Dongle Inserted',
@@ -979,6 +948,11 @@ const RuleEngineDashboard = () => {
         }, 30000));
 
         // 8. Start Driving & Trips
+        // Demonstrating that Ignition ON alone (Step 7) didn't start the trip.
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Step 7: Engine ON, Trip IDLE', description: 'Speed is 0. Trip has NOT started yet (Requires Speed > 5).', status: 'info' });
+        }, 34000));
+
         demoTimeoutsRef.current.push(setTimeout(() => {
             setGasPedal(80); // High acceleration for demo
             // Set thresholds low for demo purposes so we hit states quickly
@@ -989,14 +963,14 @@ const RuleEngineDashboard = () => {
                 MAX_IGN_OFF_TIME: 15     // 15 seconds for TRIP_IDLE
             }));
             setRules([...rules, ...JeepM6DefaultRules]);
-            toast({ title: 'Step 7: Trip Started', description: 'Applying Gas Pedal (80%). thresholds lowered for demo.', status: 'info' });
-        }, 34000));
+            toast({ title: 'Step 8: Throttle Applied', description: 'Vehicle Speed increasing > 5 km/h. Trip Start condition met.', status: 'success' });
+        }, 37000));
 
         // 9. Trigger Overspeed
         demoTimeoutsRef.current.push(setTimeout(() => {
             setGasPedal(100); // Max acceleration
-            toast({ title: 'Step 8: Simulating Alert', description: 'Full Gas (100%) to trigger Overspeed Alert (> 100 km/h)...', status: 'warning' });
-        }, 40000));
+            toast({ title: 'Step 9: Simulating Alert', description: 'Full Gas (100%) to trigger Overspeed Alert (> 100 km/h)...', status: 'warning' });
+        }, 43000));
 
         // 10. End Driving
         demoTimeoutsRef.current.push(setTimeout(() => {
@@ -1004,18 +978,18 @@ const RuleEngineDashboard = () => {
             setSimSpeed(0);
             setIgnition(false);
             deviceVariables.current.lastIgnitionOffTime = Date.now();
-            toast({ title: 'Step 9: Ignition OFF', description: 'Monitoring for Pause/End thresholds... (Waiting 10s)', status: 'info' });
-        }, 48000));
+            toast({ title: 'Step 10: Ignition OFF', description: 'Trip continues! Waiting for 10s Idle Timer to Pause...', status: 'info' });
+        }, 51000));
 
         // 11. Observe TRIP_PAUSED (after MIN_IGN_OFF_TIME = 10s)
         demoTimeoutsRef.current.push(setTimeout(() => {
-            toast({ title: 'Step 10: State TRIP_PAUSED', description: 'Threshold met! Trip moved to Paused state.', status: 'warning' });
-        }, 60000));
+            toast({ title: 'Step 11: State TRIP_PAUSED', description: 'Idle Timer > 10s. Trip moved to Paused state.', status: 'warning' });
+        }, 63000));
 
         // 12. Observe TRIP_IDLE (after MAX_IGN_OFF_TIME = 15s)
         demoTimeoutsRef.current.push(setTimeout(() => {
-            toast({ title: 'Step 11: State TRIP_IDLE', description: 'Max Off Time met! Trip finalized and joined with IDLE records.', status: 'info' });
-        }, 66000));
+            toast({ title: 'Step 12: State TRIP_IDLE', description: 'Idle Timer > 15s. Trip Ended. Payload Sent.', status: 'info' });
+        }, 69000));
 
         // 13. Final Demo Completion
         demoTimeoutsRef.current.push(setTimeout(() => {
@@ -1033,8 +1007,95 @@ const RuleEngineDashboard = () => {
                 HARD_BRAKE_THR: 15
             });
             toast({ title: 'Demo Completed', description: 'Full lifecycle and trip scenario finished. Dashboard fully reset.', status: 'success', duration: 10000 });
-        }, 72000));
+        }, 75000));
     };
+
+    // Trip-Only Automated Simulation
+    const runTripSimulation = () => {
+        // Clear any existing demo
+        demoTimeoutsRef.current.forEach(timeoutId => clearTimeout(timeoutId));
+        demoTimeoutsRef.current = [];
+
+        // Reset to CUSTOMER state (Trip-ready state)
+        clearData();
+        setTboxApplicationState(DeviceStates.CUSTOMER);
+        setDeviceState(DeviceStates.TRIP_IDLE);
+        setIsRunning(false);
+        setIgnition(false);
+        setSimSpeed(0);
+
+        // Set Trip Parameters (shorter times for demo)
+        const tripParams = {
+            MIN_TRIP_DISTANCE: 2,
+            MIN_IGN_OFF_TIME: 10,
+            MAX_IGN_OFF_TIME: 15, // 15 seconds for demo (normally 300s/5mins)
+            MAX_IGN_ON_TIME: 3600,
+            OVERSPEED_THR: 100,
+            HARSH_ACCEL_THR: 10,
+            HARD_BRAKE_THR: 15
+        };
+        setParameters(tripParams);
+
+        toast({
+            title: 'Trip Simulation Started',
+            description: 'Step 1: Vehicle in TRIP_IDLE state',
+            status: 'info',
+            duration: 3000,
+            position: 'top'
+        });
+
+        // Step 1: Start Simulation (2s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setIsRunning(true);
+            toast({ title: 'Step 2: Simulation Active', description: 'Monitoring trip conditions...', status: 'info' });
+        }, 2000));
+
+        // Step 2: Turn Ignition ON (4s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toggleIgnition(); // This will set ignition to true
+            toast({ title: 'Step 3: Ignition ON', description: 'State: TRIP_PENDING (waiting for speed > 5)', status: 'success' });
+        }, 4000));
+
+        // Step 3: Increase Speed to 6 km/h → Trip Start (7s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(6);
+            toast({ title: 'Step 4: Speed > 5 km/h', description: 'Trip Started! State: TRIP_ACTIVE', status: 'success', duration: 3000 });
+        }, 7000));
+
+        // Step 4: Increase Speed to 40 km/h (10s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(40);
+            toast({ title: 'Step 5: Driving', description: 'Speed: 40 km/h, Trip Distance accumulating...', status: 'info' });
+        }, 10000));
+
+        // Step 5: Maintain Speed for a bit (15s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Trip Active', description: 'Continuing trip...', status: 'info' });
+        }, 15000));
+
+        // Step 6: Slow down to 0 (20s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            setSimSpeed(0);
+            toast({ title: 'Step 6: Vehicle Stopped', description: 'Speed: 0 km/h', status: 'info' });
+        }, 20000));
+
+        // Step 7: Turn Ignition OFF (22s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toggleIgnition(); // This will set ignition to false
+            toast({ title: 'Step 7: Ignition OFF', description: 'State: TRIP_PAUSED. Waiting for 15s idle timer...', status: 'warning', duration: 3000 });
+        }, 22000));
+
+        // Step 8: Wait for MAX_IGN_OFF_TIME (15s) → Trip End (37s = 22s + 15s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Step 8: Trip Ended', description: 'Ignition OFF > 15s. State: TRIP_IDLE. Simulation Stopped.', status: 'success', duration: 5000 });
+        }, 38000));
+
+        // Step 9: Final Message (40s)
+        demoTimeoutsRef.current.push(setTimeout(() => {
+            toast({ title: 'Trip Simulation Complete!', description: 'You can now interact manually or run again.', status: 'success', duration: 5000 });
+        }, 40000));
+    };
+
 
     const runCANDemo = () => {
         // Clear any existing demo
@@ -1191,6 +1252,85 @@ const RuleEngineDashboard = () => {
                 // (See handleDongleInsertion function)
 
                 if (ignition) {
+                    // Trip Logic: Start Trip if Speed > 5 km/h
+                    // [ 0x46C/BH2-CAN/CmdIgnSts == ( 0x4 RUN || 0x5 START ) ] && [0x3E2/BH2-CAN/VehicleSpeedVSOSig > 5 Kmph ]
+                    if (currentSpeed > 5 && deviceState === DeviceStates.TRIP_IDLE) {
+                        const now = Date.now();
+                        const lastOff = deviceVariables.current.lastIgnitionOffTime;
+                        const diffMins = lastOff ? (now - lastOff) / (1000 * 60) : 999;
+
+                        // Check Continuity (120 min rule) - Resume if applicable
+                        if (diffMins < 120 && deviceVariables.current.journeyId) {
+                            setDeviceState(DeviceStates.TRIP_ACTIVE);
+                            toast({ title: 'Trip Resumed', description: `Speed > 5 detected & < 120m idle. Resuming trip key.`, status: 'info' });
+                        } else {
+                            // Start NEW Trip
+                            // Before starting a new trip, send Trip End for the previous one (if any)
+                            if (deviceVariables.current.journeyId) {
+                                const endPayload = generateTripPayload('tripEnd', {
+                                    ...deviceVariables.current,
+                                    lifecycleRules
+                                });
+                                setLastTripPayload(endPayload);
+                                setEvents(prev => [...prev, {
+                                    ruleId: 'trip-end-previous', ruleName: 'Trip End (Previous)', type: 'info',
+                                    message: `Sent End Payload for previous trip: ${deviceVariables.current.journeyId}`, severity: 'info',
+                                    timestamp: new Date().toISOString()
+                                }].slice(-100));
+                            }
+
+                            const dateStr = new Date().toLocaleDateString('en-GB').replace(/\//g, '');
+                            let currentCounter = persistedState.tripCounter || 1;
+                            const counterDate = persistedState.tripCounterDate;
+
+                            if (counterDate !== dateStr) {
+                                currentCounter = 1;
+                            }
+
+                            const tripNum = currentCounter.toString().padStart(2, '0');
+                            const newTripId = `${dateStr}${tripNum}`;
+
+                            updatePersistedState({
+                                tripCounter: currentCounter + 1,
+                                tripCounterDate: dateStr
+                            });
+
+                            deviceVariables.current = {
+                                ...deviceVariables.current,
+                                journeyId: newTripId,
+                                tripStartTime: new Date().toISOString(),
+                                tripStartTimeEpoch: Math.floor(Date.now() / 1000),
+                                tripStartOdo: deviceVariables.current.tripStartOdo + deviceVariables.current.currentTripDistance,
+                                currentTripDistance: 0,
+                                currentTripTime: 0,
+                                harshAccCnt: 0,
+                                hardBrakeCnt: 0,
+                                harshTurnCnt: 0,
+                                idlingCnt: 0,
+                                idleDuration: 0,
+                                topSpeed: 0,
+                                tripType: 'Idle',
+                                gnssInfoStart: { lat: 12.9716, long: 77.5946 },
+                                drivingScore: 100
+                            };
+
+                            setDeviceState(DeviceStates.TRIP_PENDING);
+
+                            const startPayload = generateTripPayload('tripStart', {
+                                ...deviceVariables.current,
+                                lifecycleRules
+                            });
+                            setLastTripPayload(startPayload);
+                            toast({ title: 'New Trip Started', description: `Speed > 5 detected. Trip ID: ${newTripId}`, status: 'success', duration: 2000 });
+
+                            // Reset timers
+                            ignOnTime.current = Date.now();
+                            lastProgressTime.current = Date.now();
+                            shutdownSamplesSent.current = 0;
+                            tripStats.current = { runTime: 0, distance: 0, offTime: 0 };
+                        }
+                    }
+
                     // Engine is ON
                     tripStats.current.runTime += 1;
                     // Only reset offTime if we're starting a new trip or resuming from pause
@@ -1351,98 +1491,86 @@ const RuleEngineDashboard = () => {
                         setCanBusData(prev => [...newCanFrames, ...prev].slice(0, 50)); // Keep last 50 frames
                     }
                     // --------------------------
+                    // TRIP LOGIC REFINEMENT
+                    // --------------------------
 
-                    // State Machine: TRIP_PENDING → TRIP_ACTIVE transition
-                    const minTripDist = Number(parameters.MIN_TRIP_DISTANCE) || 2;
-                    if (deviceState === DeviceStates.TRIP_PENDING &&
-                        deviceVariables.current.currentTripDistance >= minTripDist) {
-                        setDeviceState(DeviceStates.TRIP_ACTIVE);
-                        toast({
-                            title: 'State: TRIP_ACTIVE',
-                            description: `Trip confirmed! Distance: ${deviceVariables.current.currentTripDistance.toFixed(2)} km (threshold: ${minTripDist} km)`,
-                            status: 'success',
-                            duration: 2000
-                        });
-                        // Log State Change
-                        setEvents(prev => [...prev, {
-                            ruleId: 'state-change', ruleName: 'State Change', type: 'state',
-                            message: `State changed to TRIP_ACTIVE (Distance ${deviceVariables.current.currentTripDistance.toFixed(2)}km >= ${minTripDist}km)`,
-                            severity: 'success',
-                            timestamp: new Date().toISOString(),
-                            dataSnapshot: { ...deviceVariables.current, deviceState: DeviceStates.TRIP_ACTIVE }
-                        }].slice(-100));
+                    // 1. Trip Start Condition:
+                    // [ 0x46C/BH2-CAN/CmdIgnSts == ( 0x4 RUN || 0x5 START ) ] && [0x3E2/BH2-CAN/VehicleSpeedVSOSig > 5 Kmph ]
+                    if (deviceState === DeviceStates.TRIP_IDLE || deviceState === DeviceStates.TRIP_PENDING) {
+                        if (ignition && currentSpeed > 5) {
+                            setDeviceState(DeviceStates.TRIP_ACTIVE);
+                            // Reset IDLE timer on start
+                            tripStats.current.offTime = 0;
+                            deviceVariables.current.elapsedIgnitionOffTime = 0;
+
+                            toast({
+                                title: 'State: TRIP_ACTIVE',
+                                description: `Trip Started! Ignition ON & Speed (${currentSpeed.toFixed(0)} km/h) > 5 km/h`,
+                                status: 'success',
+                                duration: 2000
+                            });
+
+                            // Log State Change
+                            setEvents(prev => [...prev, {
+                                ruleId: 'state-change', ruleName: 'State Change', type: 'state',
+                                message: `Trip Started (Ign ON, Speed ${currentSpeed.toFixed(0)} > 5)`,
+                                severity: 'success',
+                                timestamp: new Date().toISOString(),
+                                dataSnapshot: { ...deviceVariables.current, deviceState: DeviceStates.TRIP_ACTIVE }
+                            }].slice(-100));
+                        } else if (ignition && deviceState === DeviceStates.TRIP_IDLE) {
+                            // If Ign ON but speed <= 5, we can be in PENDING (Warming up)
+                            setDeviceState(DeviceStates.TRIP_PENDING);
+                        }
                     }
 
-                } else {
-                    // Engine is OFF
-                    currentSpeed = 0;
-                    currentRpm = 0;
-                    tripStats.current.offTime += 1;
-                    deviceVariables.current.elapsedIgnitionOffTime = tripStats.current.offTime;
+                    // 2. Trip End Condition:
+                    // [ 0x46C/BH2-CAN/CmdIgnSts != ( 0x4 RUN || 0x5 START ) ] && [ IGNITION Off counter > 300s (5 mins) ]
+                    if (!ignition) {
+                        // Engine is OFF
+                        currentSpeed = 0;
+                        currentRpm = 0;
+                        tripStats.current.offTime += 1; // Increment every second
+                        deviceVariables.current.elapsedIgnitionOffTime = tripStats.current.offTime;
 
-                    // State Machine: TRIP_PENDING/ACTIVE → TRIP_PAUSED → TRIP_IDLE
-                    // Ensure parameters are numbers with sensible defaults (prevents aggressive cutoffs)
-                    const minIgnOff = Number(parameters.MIN_IGN_OFF_TIME) || 120; // Default 2 mins
-                    const maxIgnOff = Number(parameters.MAX_IGN_OFF_TIME) || 300; // Default 5 mins
+                        // Check if we need to end the trip
+                        const maxIgnOff = 300; // 5 Minutes Fixed as per requirement
 
-                    // First check: TRIP_PAUSED or any state → TRIP_IDLE when MAX_IGN_OFF_TIME is reached
-                    if ((deviceState === DeviceStates.TRIP_PAUSED || deviceState === DeviceStates.TRIP_ACTIVE || deviceState === DeviceStates.TRIP_PENDING) &&
-                        deviceVariables.current.elapsedIgnitionOffTime >= maxIgnOff) {
-                        setDeviceState(DeviceStates.TRIP_IDLE);
-                        setIsRunning(false); // STOP SIMULATION
+                        if ((deviceState === DeviceStates.TRIP_ACTIVE || deviceState === DeviceStates.TRIP_PAUSED || deviceState === DeviceStates.TRIP_PENDING) &&
+                            deviceVariables.current.elapsedIgnitionOffTime >= maxIgnOff) {
 
-                        // Generate tripEnd payload
-                        const endPayload = generateTripPayload('tripEnd', {
-                            ...deviceVariables.current,
-                            lifecycleRules
-                        });
-                        setLastTripPayload(endPayload);
-
-                        toast({
-                            title: 'State: TRIP_IDLE',
-                            description: `Trip ended. Ignition off for ${maxIgnOff}s. Simulation Stopped.`,
-                            status: 'info',
-                            duration: 2000
-                        });
-                        // Log State Change
-                        setEvents(prev => [...prev, {
-                            ruleId: 'state-change', ruleName: 'State Change', type: 'state',
-                            message: 'State changed to TRIP_IDLE (Trip Ended)', severity: 'info',
-                            timestamp: new Date().toISOString(), dataSnapshot: { ...deviceVariables.current, deviceState: DeviceStates.TRIP_IDLE }
-                        }].slice(-100));
-                    }
-                    // Second check: TRIP_PENDING/ACTIVE → TRIP_PAUSED when MIN_IGN_OFF_TIME is reached (but before MAX)
-                    else if ((deviceState === DeviceStates.TRIP_PENDING || deviceState === DeviceStates.TRIP_ACTIVE) &&
-                        deviceVariables.current.elapsedIgnitionOffTime >= minIgnOff) {
-                        // ... existing pause logic ...
-
-                        // If we are PENDING and hit minIgnOff, it's a False Trip -> Go straight to IDLE and STOP
-                        if (deviceState === DeviceStates.TRIP_PENDING) {
                             setDeviceState(DeviceStates.TRIP_IDLE);
                             setIsRunning(false); // STOP SIMULATION
-                            toast({ title: 'False Trip Ended', description: 'Distance too short. Simulation Stopped.', status: 'info', duration: 2000 });
-                        } else {
-                            // TRIP_ACTIVE -> TRIP_PAUSED
+
+                            // Generate tripEnd payload
+                            const endPayload = generateTripPayload('tripEnd', {
+                                ...deviceVariables.current,
+                                lifecycleRules
+                            });
+                            setLastTripPayload(endPayload);
+
+                            toast({
+                                title: 'State: TRIP_IDLE',
+                                description: `Trip Ended. Ignition OFF > 5 mins.`,
+                                status: 'info',
+                                duration: 3000
+                            });
+                            // Log State Change
+                            setEvents(prev => [...prev, {
+                                ruleId: 'state-change', ruleName: 'State Change', type: 'state',
+                                message: 'State changed to TRIP_IDLE (Ignition OFF > 5 mins)', severity: 'info',
+                                timestamp: new Date().toISOString(), dataSnapshot: { ...deviceVariables.current, deviceState: DeviceStates.TRIP_IDLE }
+                            }].slice(-100));
+                        } else if (deviceState === DeviceStates.TRIP_ACTIVE) {
+                            // Immediate transition to PAUSED if Ign OFF but timer not expired yet
                             setDeviceState(DeviceStates.TRIP_PAUSED);
-                            toast({ title: 'State: TRIP_PAUSED', description: `Trip Paused (Ign Off >= ${minIgnOff}s)`, status: 'warning', duration: 2000 });
                         }
-
-                        // Log State Change
-                        setEvents(prev => [...prev, {
-                            ruleId: 'state-change', ruleName: 'State Change', type: 'state',
-                            message: deviceState === DeviceStates.TRIP_PENDING ? 'State changed to TRIP_IDLE (False Trip)' : 'State changed to TRIP_PAUSED',
-                            severity: 'warning',
-                            timestamp: new Date().toISOString(),
-                            dataSnapshot: { ...deviceVariables.current, deviceState: deviceState === DeviceStates.TRIP_PENDING ? DeviceStates.TRIP_IDLE : DeviceStates.TRIP_PAUSED }
-                        }].slice(-100));
-                    }
-                }
-
-                // Self-Healing: If Ignition is ON but we are in TRIP_IDLE, force transition to TRIP_PENDING
-                // This handles cases where manual overrides or state glitches left us in IDLE while driving
-                if (ignition && deviceState === DeviceStates.TRIP_IDLE) {
-                    setDeviceState(DeviceStates.TRIP_PENDING);
-                    // We don't reset distance here to allow "catching up", but normally toggleIgnition handles resets.
+                    } else {
+                        // Ignition is ON
+                        // Reset Off Timer if Ignition comes back ON
+                        tripStats.current.offTime = 0;
+                        deviceVariables.current.elapsedIgnitionOffTime = 0;
+                    }    // We don't reset distance here to allow "catching up", but normally toggleIgnition handles resets.
                     setEvents(prev => [...prev, {
                         ruleId: 'state-correction', ruleName: 'State Correction', type: 'state',
                         message: 'Auto-corrected state: TRIP_IDLE → TRIP_PENDING (Ignition is ON)',
@@ -1595,6 +1723,10 @@ const RuleEngineDashboard = () => {
                     // TE-01 CAN Aliases
                     DRV_CLUSTER_DSPEED: currentSpeed,
                     VITV: currentSpeed,
+                    // Specific User Requested CAN Signals
+                    CmdIgnSts: ignition ? 0x04 : 0x01, // 0x4: RUN, 0x1: LOCK/OFF (User Requirement)
+                    VehicleSpeedVSOSig: currentSpeed,   // (User Requirement)
+
                     EFCMNT_PDLE_ACCEL: gasPedal,
                     CONTACT_FREIN1: brakeActive ? 1 : 0,
                     KEY_POS: ignition ? 1 : 0,
@@ -1833,6 +1965,8 @@ const RuleEngineDashboard = () => {
         return [...defaultTemplates, ...(persistedState.customRuleTemplates || [])];
     }, [persistedState.customRuleTemplates]);
 
+    const [showTripOnly, setShowTripOnly] = useState(false);
+
     return (
         <Flex direction="column" minH="100vh" bg="gray.50" p={5}>
             <VStack spacing={5} align="stretch" w="full">
@@ -1846,6 +1980,26 @@ const RuleEngineDashboard = () => {
                 >
                     <Heading size="lg">Rule Engine Dashboard</Heading>
                     <HStack>
+                        <Tooltip label={showTripOnly ? "Show All Controls" : "Run Trip Simulation"}>
+                            <Button
+                                size="sm"
+                                colorScheme={showTripOnly ? "purple" : "gray"}
+                                variant={showTripOnly ? "solid" : "outline"}
+                                onClick={() => {
+                                    if (!showTripOnly) {
+                                        // Activate Trip View and run simulation
+                                        setShowTripOnly(true);
+                                        runTripSimulation();
+                                    } else {
+                                        // Deactivate Trip View
+                                        setShowTripOnly(false);
+                                    }
+                                }}
+                                leftIcon={<Compass size={18} />}
+                            >
+                                {showTripOnly ? "Trip View Active" : "Trip View"}
+                            </Button>
+                        </Tooltip>
                         <Tooltip label={isRunning ? "Stop Simulation" : "Start Simulation"}>
                             <IconButton
                                 icon={isRunning ? <Square size={18} /> : <Play size={18} />}
@@ -1873,6 +2027,7 @@ const RuleEngineDashboard = () => {
                                 size="sm"
                             />
                         </Tooltip>
+                        {/* Hidden in Trip View for simplicity if desired, but user said 'don't remove remaining logics', so keeping accessible */}
                         <Tooltip label="Run CAN Demo">
                             <IconButton
                                 icon={<Activity size={18} />}
@@ -1907,7 +2062,13 @@ const RuleEngineDashboard = () => {
                                     <Flex flexWrap="wrap" gap={2}>
                                         {Object.values(DeviceStates).filter(state => {
                                             const isTripState = state.startsWith('TRIP_');
-                                            if (isTripState && tboxApplicationState !== DeviceStates.CUSTOMER) return false;
+                                            // Trip View: Show ONLY Trip States (excluding TRIP_PAUSED)
+                                            if (showTripOnly) {
+                                                if (!isTripState || state === 'TRIP_PAUSED') return false;
+                                            } else {
+                                                // Normal View: Consistent filtering (hide non-customer trip states logic if needed, but here we just follow user request for Trip View)
+                                                if (isTripState && tboxApplicationState !== DeviceStates.CUSTOMER) return false;
+                                            }
                                             return true;
                                         }).map((state) => {
                                             const isTripState = state.startsWith('TRIP_');
@@ -1963,20 +2124,23 @@ const RuleEngineDashboard = () => {
                                             onChange={(e) => setDeviceState(e.target.value)}
                                             borderRadius="md"
                                         >
-                                            {tboxApplicationState === DeviceStates.CUSTOMER && (
+                                            {/* Always allow Trip States if in Trip View OR Customer Mode */}
+                                            {(showTripOnly || tboxApplicationState === DeviceStates.CUSTOMER) && (
                                                 <optgroup label="Trip States">
                                                     <option value={DeviceStates.TRIP_IDLE}>TRIP_IDLE</option>
                                                     <option value={DeviceStates.TRIP_PENDING}>TRIP_PENDING</option>
                                                     <option value={DeviceStates.TRIP_ACTIVE}>TRIP_ACTIVE</option>
-                                                    <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>
+                                                    {!showTripOnly && <option value={DeviceStates.TRIP_PAUSED}>TRIP_PAUSED</option>}
                                                 </optgroup>
                                             )}
-                                            <optgroup label="Lifecycle States">
-                                                <option value={DeviceStates.FACTORY}>FACTORY</option>
-                                                <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
-                                                <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
-                                                <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
-                                            </optgroup>
+                                            {!showTripOnly && (
+                                                <optgroup label="Lifecycle States">
+                                                    <option value={DeviceStates.FACTORY}>FACTORY</option>
+                                                    <option value={DeviceStates.PROVISIONED}>PROVISIONED</option>
+                                                    <option value={DeviceStates.AUTHORIZED}>AUTHORIZED</option>
+                                                    <option value={DeviceStates.CUSTOMER}>CUSTOMER</option>
+                                                </optgroup>
+                                            )}
                                         </Select>
                                     </FormControl>
                                 </HStack>
@@ -2177,79 +2341,81 @@ const RuleEngineDashboard = () => {
                                 </CardBody>
                             </Card>
 
-                            {/* 2. Cloud & Environment Simulation */}
-                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
-                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
-                                    <HStack>
-                                        <Icon as={Shield} color="purple.500" />
-                                        <Heading size="xs" textTransform="uppercase">Cloud Simulation</Heading>
-                                    </HStack>
-                                </CardHeader>
-                                <CardBody>
-                                    <VStack spacing={4} align="stretch">
-                                        <SimpleGrid columns={2} spacing={4}>
-                                            <FormControl>
-                                                <FormLabel fontSize="xs" fontWeight="bold">Battery Voltage</FormLabel>
-                                                <HStack spacing={2}>
-                                                    <Slider
-                                                        value={batteryVoltage}
-                                                        onChange={setBatteryVoltage}
-                                                        min={9}
-                                                        max={15}
-                                                        step={0.1}
-                                                        flex={1}
-                                                    >
-                                                        <SliderTrack><SliderFilledTrack bg={batteryVoltage < 11.5 ? "red.500" : "green.500"} /></SliderTrack>
-                                                        <SliderThumb boxSize={3} />
-                                                    </Slider>
-                                                    <Text fontSize="xs" fontWeight="bold" w="40px">{batteryVoltage}V</Text>
-                                                </HStack>
-                                            </FormControl>
-                                            <FormControl>
-                                                <FormLabel fontSize="xs" fontWeight="bold">Road Surface</FormLabel>
-                                                <Select size="sm" value={simRoadCondition} onChange={(e) => setSimRoadCondition(e.target.value)}>
-                                                    <option value="good">Good / Dry</option>
-                                                    <option value="bad">Damaged Path</option>
-                                                    <option value="wet">Wet Surface</option>
-                                                    <option value="icy">Icy / Slippery</option>
-                                                </Select>
-                                            </FormControl>
-                                        </SimpleGrid>
-
-                                        <SimpleGrid columns={2} spacing={3}>
-                                            <FormControl>
-                                                <FormLabel fontSize="xs" fontWeight="bold">eSIM Connectivity</FormLabel>
-                                                <Select size="xs" value={tboxeSimState} onChange={(e) => setTboxeSimState(e.target.value)}>
-                                                    <option value="NORMAL_SIM">NORMAL_SIM</option>
-                                                    <option value="NO_SIM">NO_SIM</option>
-                                                    <option value="SIM_ERROR">SIM_ERROR</option>
-                                                </Select>
-                                            </FormControl>
-                                            <FormControl>
-                                                <FormLabel fontSize="xs" fontWeight="bold">Operation State</FormLabel>
-                                                <Select size="xs" value={tboxOperatingState} onChange={(e) => setTboxOperatingState(e.target.value)}>
-                                                    <option value="NORMAL">NORMAL</option>
-                                                    <option value="DISCONNECTED">DISCONNECTED</option>
-                                                    <option value="FAIL">FAIL</option>
-                                                </Select>
-                                            </FormControl>
-                                        </SimpleGrid>
-
-                                        <Divider />
-
-                                        <HStack spacing={2} wrap="wrap">
-                                            <Button size="xs" colorScheme="red" variant="outline" onClick={handleTriggerCrashLog}>Crash Log</Button>
-                                            <Button size="xs" colorScheme="orange" variant="outline" onClick={handleTriggerTowLog}>Tow Log</Button>
-                                            <Button size="xs" colorScheme="purple" variant="outline" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}>
-                                                {isDeviceRemoved ? "Device Inserted" : "Device Removed"}
-                                            </Button>
-                                            <Button size="sm" colorScheme="teal" variant="solid" onClick={handleDismantleCheck} w="full">
-                                                Dismantle Check
-                                            </Button>
+                            {/* 2. Cloud & Environment Simulation (HIDDEN in Trip View) */}
+                            {!showTripOnly && (
+                                <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
+                                    <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                        <HStack>
+                                            <Icon as={Shield} color="purple.500" />
+                                            <Heading size="xs" textTransform="uppercase">Cloud Simulation</Heading>
                                         </HStack>
-                                    </VStack>
-                                </CardBody>
-                            </Card>
+                                    </CardHeader>
+                                    <CardBody>
+                                        <VStack spacing={4} align="stretch">
+                                            <SimpleGrid columns={2} spacing={4}>
+                                                <FormControl>
+                                                    <FormLabel fontSize="xs" fontWeight="bold">Battery Voltage</FormLabel>
+                                                    <HStack spacing={2}>
+                                                        <Slider
+                                                            value={batteryVoltage}
+                                                            onChange={setBatteryVoltage}
+                                                            min={9}
+                                                            max={15}
+                                                            step={0.1}
+                                                            flex={1}
+                                                        >
+                                                            <SliderTrack><SliderFilledTrack bg={batteryVoltage < 11.5 ? "red.500" : "green.500"} /></SliderTrack>
+                                                            <SliderThumb boxSize={3} />
+                                                        </Slider>
+                                                        <Text fontSize="xs" fontWeight="bold" w="40px">{batteryVoltage}V</Text>
+                                                    </HStack>
+                                                </FormControl>
+                                                <FormControl>
+                                                    <FormLabel fontSize="xs" fontWeight="bold">Road Surface</FormLabel>
+                                                    <Select size="sm" value={simRoadCondition} onChange={(e) => setSimRoadCondition(e.target.value)}>
+                                                        <option value="good">Good / Dry</option>
+                                                        <option value="bad">Damaged Path</option>
+                                                        <option value="wet">Wet Surface</option>
+                                                        <option value="icy">Icy / Slippery</option>
+                                                    </Select>
+                                                </FormControl>
+                                            </SimpleGrid>
+
+                                            <SimpleGrid columns={2} spacing={3}>
+                                                <FormControl>
+                                                    <FormLabel fontSize="xs" fontWeight="bold">eSIM Connectivity</FormLabel>
+                                                    <Select size="xs" value={tboxeSimState} onChange={(e) => setTboxeSimState(e.target.value)}>
+                                                        <option value="NORMAL_SIM">NORMAL_SIM</option>
+                                                        <option value="NO_SIM">NO_SIM</option>
+                                                        <option value="SIM_ERROR">SIM_ERROR</option>
+                                                    </Select>
+                                                </FormControl>
+                                                <FormControl>
+                                                    <FormLabel fontSize="xs" fontWeight="bold">Operation State</FormLabel>
+                                                    <Select size="xs" value={tboxOperatingState} onChange={(e) => setTboxOperatingState(e.target.value)}>
+                                                        <option value="NORMAL">NORMAL</option>
+                                                        <option value="DISCONNECTED">DISCONNECTED</option>
+                                                        <option value="FAIL">FAIL</option>
+                                                    </Select>
+                                                </FormControl>
+                                            </SimpleGrid>
+
+                                            <Divider />
+
+                                            <HStack spacing={2} wrap="wrap">
+                                                <Button size="xs" colorScheme="red" variant="outline" onClick={handleTriggerCrashLog}>Crash Log</Button>
+                                                <Button size="xs" colorScheme="orange" variant="outline" onClick={handleTriggerTowLog}>Tow Log</Button>
+                                                <Button size="xs" colorScheme="purple" variant="outline" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}>
+                                                    {isDeviceRemoved ? "Device Inserted" : "Device Removed"}
+                                                </Button>
+                                                <Button size="sm" colorScheme="teal" variant="solid" onClick={handleDismantleCheck} w="full">
+                                                    Dismantle Check
+                                                </Button>
+                                            </HStack>
+                                        </VStack>
+                                    </CardBody>
+                                </Card>
+                            )}
 
                             {/* 3. Device Lifecycle & Remote Ops - HIDDEN BY USER REQUEST */}
                             {/* <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
@@ -2287,34 +2453,36 @@ const RuleEngineDashboard = () => {
                                 </CardBody>
                             </Card> */}
 
-                            {/* 4. FOTA Update Center */}
-                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="blue.100" bg="blue.50">
-                                <CardBody p={4}>
-                                    <VStack align="stretch" spacing={3}>
-                                        <HStack justify="space-between">
-                                            <HStack>
-                                                <Icon as={Activity} color="blue.600" />
-                                                <Text fontWeight="bold" fontSize="sm" color="blue.800">FOTA Status</Text>
+                            {/* 4. FOTA Update Center (HIDDEN in Trip View) */}
+                            {!showTripOnly && (
+                                <Card variant="outline" shadow="md" borderRadius="xl" borderColor="blue.100" bg="blue.50">
+                                    <CardBody p={4}>
+                                        <VStack align="stretch" spacing={3}>
+                                            <HStack justify="space-between">
+                                                <HStack>
+                                                    <Icon as={Activity} color="blue.600" />
+                                                    <Text fontWeight="bold" fontSize="sm" color="blue.800">FOTA Status</Text>
+                                                </HStack>
+                                                <Badge colorScheme={fotaStatus === 'SUCCESS' ? 'green' : 'blue'}>{fotaStatus}</Badge>
                                             </HStack>
-                                            <Badge colorScheme={fotaStatus === 'SUCCESS' ? 'green' : 'blue'}>{fotaStatus}</Badge>
-                                        </HStack>
 
-                                        {fotaStatus === 'DOWNLOADING' && (
-                                            <VStack align="stretch" spacing={1}>
-                                                <Progress value={fotaProgress} size="xs" borderRadius="full" colorScheme="blue" />
-                                                <Text fontSize="10px" textAlign="right">{fotaProgress}%</Text>
-                                            </VStack>
-                                        )}
+                                            {fotaStatus === 'DOWNLOADING' && (
+                                                <VStack align="stretch" spacing={1}>
+                                                    <Progress value={fotaProgress} size="xs" borderRadius="full" colorScheme="blue" />
+                                                    <Text fontSize="10px" textAlign="right">{fotaProgress}%</Text>
+                                                </VStack>
+                                            )}
 
-                                        <Flex gap={2}>
-                                            <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'} flex={1}>Check Updates</Button>
-                                            <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'} flex={1}>Install</Button>
-                                        </Flex>
-                                    </VStack>
-                                </CardBody>
-                            </Card>
+                                            <Flex gap={2}>
+                                                <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'} flex={1}>Check Updates</Button>
+                                                <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'} flex={1}>Install</Button>
+                                            </Flex>
+                                        </VStack>
+                                    </CardBody>
+                                </Card>
+                            )}
 
-                            {lastPayload && (
+                            {!showTripOnly && lastPayload && (
                                 <Box p={3} bg="gray.800" borderRadius="lg" shadow="inner">
                                     <HStack justify="space-between" mb={2}>
                                         <Text color="gray.400" fontSize="2xs" fontWeight="bold">LAST SOUTHBOUND PAYLOAD</Text>
@@ -2366,12 +2534,12 @@ const RuleEngineDashboard = () => {
                                 >
                                     Dashboard
                                 </Tab>
-                                <Tab flexShrink={0}>Alert Rules</Tab>
-                                <Tab flexShrink={0}>Rule Templates</Tab>
+                                {!showTripOnly && <Tab flexShrink={0}>Alert Rules</Tab>}
+                                {!showTripOnly && <Tab flexShrink={0}>Rule Templates</Tab>}
                                 <Tab flexShrink={0}>Trip Configuration</Tab>
-                                <Tab flexShrink={0}>CAN Configuration</Tab>
-                                <Tab flexShrink={0}>Lifecycle Configuration</Tab>
-                                <Tab flexShrink={0}>SouthBound Payloads</Tab>
+                                {!showTripOnly && <Tab flexShrink={0}>CAN Configuration</Tab>}
+                                {!showTripOnly && <Tab flexShrink={0}>Lifecycle Configuration</Tab>}
+                                {!showTripOnly && <Tab flexShrink={0}>SouthBound Payloads</Tab>}
                             </TabList>
 
                             <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden">
@@ -2384,90 +2552,100 @@ const RuleEngineDashboard = () => {
                                             </Button>
                                         </VStack>
                                     </TabPanel>
-                                    <TabPanel>
-                                        <Box mb={6}>
-                                            <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
-                                            <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} mb={6}>
-                                                {rules.map(rule => (
-                                                    <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
-                                                        <HStack justify="space-between">
-                                                            <Text fontWeight="bold" fontSize="sm">{rule.name}</Text>
-                                                            <Badge colorScheme={rule.event.severity === 'critical' ? 'red' : rule.event.severity === 'warning' ? 'orange' : 'blue'}>
-                                                                {rule.event.severity}
-                                                            </Badge>
-                                                        </HStack>
-                                                    </Box>
-                                                ))}
-                                            </SimpleGrid>
-                                            {rules.length === 0 && <Text color="gray.500" mb={4}>No active rules.</Text>}
-                                            <DataVisualizer dataHistory={dataHistory} events={events} />
-                                        </Box>
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <Box mb={6}>
+                                                <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
+                                                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} mb={6}>
+                                                    {rules.map(rule => (
+                                                        <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
+                                                            <HStack justify="space-between">
+                                                                <Text fontWeight="bold" fontSize="sm">{rule.name}</Text>
+                                                                <Badge colorScheme={rule.event.severity === 'critical' ? 'red' : rule.event.severity === 'warning' ? 'orange' : 'blue'}>
+                                                                    {rule.event.severity}
+                                                                </Badge>
+                                                            </HStack>
+                                                        </Box>
+                                                    ))}
+                                                </SimpleGrid>
+                                                {rules.length === 0 && <Text color="gray.500" mb={4}>No active rules.</Text>}
+                                                <DataVisualizer dataHistory={dataHistory} events={events} />
+                                            </Box>
 
-                                        <RuleBuilder
-                                            rules={rules}
-                                            savedRules={savedRules}
-                                            onAddRule={handleAddRule}
-                                            onDeleteRule={handleDeleteRule}
-                                            onSaveToLibrary={handleSaveToLibrary}
-                                            prefillRule={prefillRule}
-                                        />
-                                    </TabPanel>
-                                    <TabPanel h="full" p={0}>
-                                        {templateView === 'library' ? (
-                                            <RuleTemplateLibrary
-                                                templates={libraryTemplates}
-                                                onCreateNew={() => setTemplateView('create')}
-                                                onUseTemplate={handleUseTemplate}
+                                            <RuleBuilder
+                                                rules={rules}
+                                                savedRules={savedRules}
+                                                onAddRule={handleAddRule}
+                                                onDeleteRule={handleDeleteRule}
+                                                onSaveToLibrary={handleSaveToLibrary}
+                                                prefillRule={prefillRule}
                                             />
-                                        ) : (
-                                            <CreateRuleTemplate
-                                                onSave={handleSaveTemplate}
-                                                onCancel={() => setTemplateView('library')}
-                                            />
-                                        )}
-                                    </TabPanel>
+                                        </TabPanel>
+                                    )}
+                                    {!showTripOnly && (
+                                        <TabPanel h="full" p={0}>
+                                            {templateView === 'library' ? (
+                                                <RuleTemplateLibrary
+                                                    templates={libraryTemplates}
+                                                    onCreateNew={() => setTemplateView('create')}
+                                                    onUseTemplate={handleUseTemplate}
+                                                />
+                                            ) : (
+                                                <CreateRuleTemplate
+                                                    onSave={handleSaveTemplate}
+                                                    onCancel={() => setTemplateView('library')}
+                                                />
+                                            )}
+                                        </TabPanel>
+                                    )}
                                     <TabPanel>
                                         <TripConfiguration parameters={parameters} setParameters={setParameters} />
                                     </TabPanel>
-                                    <TabPanel>
-                                        <CANSignalBuilder
-                                            signals={canSignalRules}
-                                            onUpdateSignals={setCanSignalRules}
-                                            busData={canBusData}
-                                        />
-                                    </TabPanel>
-                                    <TabPanel>
-                                        <LifecycleConfig
-                                            rules={lifecycleRules}
-                                            onUpdateRule={(state, updatedRule) => {
-                                                setLifecycleRules({ ...lifecycleRules, [state]: updatedRule });
-                                            }}
-                                        />
-                                    </TabPanel>
-                                    <TabPanel>
-                                        <VStack align="stretch" spacing={4}>
-                                            <Heading size="sm">SouthBound Payload Explorer</Heading>
-                                            <Text fontSize="sm" color="gray.500">View generated payloads based on current state and rules.</Text>
-                                            <Box overflowX="auto">
-                                                {lastPayload && (
-                                                    <Box mt={4} p={4} bg="gray.900" borderRadius="md">
-                                                        <Text color="gray.400" fontSize="xs" mb={1}>Last Generated {lastPayload.type} Payload:</Text>
-                                                        <Text color="green.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
-                                                            {JSON.stringify(lastPayload.content, null, 2)}
-                                                        </Text>
-                                                    </Box>
-                                                )}
-                                                {lastTripPayload && (
-                                                    <Box mt={4} p={4} bg="gray.900" borderRadius="md">
-                                                        <Text color="gray.400" fontSize="xs" mb={1}>Last Trip Payload:</Text>
-                                                        <Text color="blue.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
-                                                            {JSON.stringify(lastTripPayload, null, 2)}
-                                                        </Text>
-                                                    </Box>
-                                                )}
-                                            </Box>
-                                        </VStack>
-                                    </TabPanel>
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <CANSignalBuilder
+                                                signals={canSignalRules}
+                                                onUpdateSignals={setCanSignalRules}
+                                                busData={canBusData}
+                                            />
+                                        </TabPanel>
+                                    )}
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <LifecycleConfig
+                                                rules={lifecycleRules}
+                                                onUpdateRule={(state, updatedRule) => {
+                                                    setLifecycleRules({ ...lifecycleRules, [state]: updatedRule });
+                                                }}
+                                            />
+                                        </TabPanel>
+                                    )}
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <VStack align="stretch" spacing={4}>
+                                                <Heading size="sm">SouthBound Payload Explorer</Heading>
+                                                <Text fontSize="sm" color="gray.500">View generated payloads based on current state and rules.</Text>
+                                                <Box overflowX="auto">
+                                                    {lastPayload && (
+                                                        <Box mt={4} p={4} bg="gray.900" borderRadius="md">
+                                                            <Text color="gray.400" fontSize="xs" mb={1}>Last Generated {lastPayload.type} Payload:</Text>
+                                                            <Text color="green.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
+                                                                {JSON.stringify(lastPayload.content, null, 2)}
+                                                            </Text>
+                                                        </Box>
+                                                    )}
+                                                    {lastTripPayload && (
+                                                        <Box mt={4} p={4} bg="gray.900" borderRadius="md">
+                                                            <Text color="gray.400" fontSize="xs" mb={1}>Last Trip Payload:</Text>
+                                                            <Text color="blue.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
+                                                                {JSON.stringify(lastTripPayload, null, 2)}
+                                                            </Text>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            </VStack>
+                                        </TabPanel>
+                                    )}
                                 </TabPanels>
                             </Card>
                         </Tabs>
