@@ -688,6 +688,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
             // If stopped or modal closed, don't schedule next
             if (!isLive || !isOpen) return;
 
+            // If no VIN, stop polling (useEffect will restart when VIN changes)
+            if (!vin) return;
+
             try {
                 // Ensure we use the latest VIN from the parent scope's state
                 // Note: fetch routines below already use the 'vin' state variable
@@ -824,6 +827,11 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
 
     const fetchOtherData = async () => {
+        if (!vin) {
+            console.warn("Skipping fetchOtherData: No VIN available");
+            return;
+        }
+
         try {
             const stateData = await TraxoApi.getDeviceState(vin);
             if (stateData) setDeviceState(stateData);
@@ -1083,6 +1091,10 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
 
     const fetchCheckedSignals = async () => {
+        if (!vin) {
+            console.warn("Skipping fetchCheckedSignals: No VIN available");
+            return;
+        }
         const checkedSignals = signals.filter(s => s.isChecked);
         console.log('🔍 fetchCheckedSignals called. Checked signals:', checkedSignals.map(s => s.name));
 
@@ -1383,6 +1395,16 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
     // };
 
     const handleRefresh = async () => {
+        if (!vin) {
+            toast({
+                title: "Cannot Refresh",
+                description: "No Valid VIN selected",
+                status: "warning",
+                duration: 3000
+            });
+            return;
+        }
+
         try {
             await Promise.all([
                 fetchCheckedSignals(),
