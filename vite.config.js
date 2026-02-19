@@ -36,6 +36,12 @@ export default defineConfig({
           proxy.on('error', (err, req, res) => {
             console.error('[Vite Proxy Error - JEEP]:', err);
           });
+          proxy.on('proxyReq', (proxyReq, req, res) => {
+            console.log('[Vite Proxy Request - JEEP]:', req.method, req.url, '->', options.target + proxyReq.path);
+          });
+          proxy.on('proxyRes', (proxyRes, req, res) => {
+            console.log('[Vite Proxy Response - JEEP]:', proxyRes.statusCode, req.url);
+          });
         }
       }
     }

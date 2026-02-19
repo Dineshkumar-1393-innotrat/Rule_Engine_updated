@@ -34,6 +34,7 @@ import {
     Tooltip,
     useToast
 } from '@chakra-ui/react';
+import Vehicle360Viewer from './Vehicle360Viewer';
 import { RotateCcw, LayoutDashboard, Wifi, WifiOff, ArrowLeft, Search, Monitor, Eye, Thermometer, Zap, Fuel, Activity, Car, Map, Calendar, Bell } from 'lucide-react';
 import { TraxoApi } from '../../utils/TraxoApi';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -398,7 +399,7 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                     <StatusToggle
                         label="Ignition Status"
                         description="Real-time engine status"
-                        isOn={String(ignition).toUpperCase() === 'ON' || String(ignition).toUpperCase() === 'TRUE' || ignition === 1}
+                        isOn={String(ignition).toUpperCase() === 'ON' || String(ignition).toUpperCase() === 'TRUE' || String(ignition).toUpperCase() === 'CONNECTED' || ignition === 1}
                         icon={Zap}
                         isError={isSigError("Ignition Status")}
                     />
@@ -499,10 +500,10 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                     </VStack>
 
                     {/* Right: Car Visualization */}
-                    <Box bg="white" borderRadius="2xl" border="1px solid" borderColor="rgba(0,0,0,0.06)" boxShadow="sm" overflow="hidden">
-                        <iframe
-                            src="https://stimg.cardekho.com/images/feelthecar360view/Exterior/Jeep/Jeep-Compass/Exterior.html"
-                            width="100%" height="100%" style={{ border: 'none' }} title="Jeep Compass 360 View"
+                    <Box bg="white" borderRadius="2xl" border="1px solid" borderColor="rgba(0,0,0,0.06)" boxShadow="sm" overflow="hidden" position="relative">
+                        <Vehicle360Viewer
+                            baseUrl="https://imgd.aeplcdn.com/1280x720/cw/360/jeep/1048/5364/closed-door/c2c7cb/"
+                            imageCount={60}
                         />
                     </Box>
                 </Grid>
@@ -617,6 +618,8 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         { name: "Alerts", apiName: "Alerts", id: "alerts", isChecked: true, data: [], loading: false, error: null, fetchType: 'alerts' },
         { name: "Device Events", apiName: "DeviceEvents", id: "events", isChecked: true, data: [], loading: false, error: null, fetchType: 'events' },
         { name: "Remote Commands", apiName: "CommandLog", id: "action", isChecked: true, data: [], loading: false, error: null, fetchType: 'manual' },
+        { name: "Trip History", apiName: "TripSummary", id: "trips", isChecked: true, data: [], loading: false, error: null, fetchType: 'trips' },
+        { name: "Device Logs", apiName: "DeviceLogs", id: "logs", isChecked: true, data: [], loading: false, error: null, fetchType: 'logs' },
     ]);
     const [viewMode, setViewMode] = useState('visual');
     const [isLive, setIsLive] = useState(true);
@@ -635,6 +638,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
     const [tripSummary, setTripSummary] = useState(null);
     const [commandLoading, setCommandLoading] = useState(null);
     const [speedAlert, setSpeedAlert] = useState("");
+    const [fotaVersion, setFotaVersion] = useState("2314.0");
+    const [availableVersions, setAvailableVersions] = useState([]);
+    const [isFotaUpdating, setIsFotaUpdating] = useState(false);
     const toast = useToast();
     const pollingTimeout = useRef(null);
 
@@ -695,12 +701,12 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
             // Schedule next poll ONLY after current one finishes
             if (isLive && isOpen) {
-                pollingTimeout.current = setTimeout(poll, 5000);
+                pollingTimeout.current = setTimeout(poll, 10000); // Changed from 5000 to 10000 (10 seconds)
             }
         };
 
         // Start the cycle
-        pollingTimeout.current = setTimeout(poll, 5000);
+        pollingTimeout.current = setTimeout(poll, 10000); // Match the interval
     };
 
     const stopPolling = () => {
@@ -1077,6 +1083,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
 
     const fetchCheckedSignals = async () => {
+        const checkedSignals = signals.filter(s => s.isChecked);
+        console.log('🔍 fetchCheckedSignals called. Checked signals:', checkedSignals.map(s => s.name));
+
         const today = new Date().toISOString().split('T')[0];
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -1086,6 +1095,14 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         // Fetch all in parallel
         const fetchPromises = signals.map(async (signal) => {
             if (!signal.isChecked) return null;
+
+            // Log when Trip or Logs are about to be fetched
+            if (signal.fetchType === 'trips') {
+                console.log('🎯 Trip History is CHECKED - Starting fetch...', signal.name);
+            }
+            if (signal.apiName === 'DeviceLogs') {
+                console.log('🎯 Device Logs is CHECKED - Starting fetch...', signal.name);
+            }
 
             try {
                 let newData;
@@ -1099,13 +1116,85 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                     newData = await TraxoApi.getLocationTelemetryArray(vin);
                 } else if (signal.fetchType === 'alerts') {
                     newData = await TraxoApi.getAlerts(vin);
+                } else if (signal.fetchType === 'trips') {
+                    // Fetch last 30 days of trip history
+                    console.log('⏳ About to call getTripSummary API...');
+                    const endDate = new Date();
+                    const startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 30);
+                    const formatDateTime = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+                    console.log('⏳ Date range:', formatDateTime(startDate), 'to', formatDateTime(endDate));
+                    newData = await TraxoApi.getTripSummary(vin, formatDateTime(startDate), formatDateTime(endDate));
+                    console.log('✅ getTripSummary returned:', newData);
+                } else if (signal.fetchType === 'logs') {
+                    // Trigger device log fetch command
+                    console.log('📋 Fetching Device Logs...');
+                    newData = await TraxoApi.fetchDeviceLogs(vin);
                 } else {
                     newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
                 }
 
-                const returnData = (newData && newData.events) ? newData.events : newData;
+                const returnData = (() => {
+                    if (!newData) return null;
+
+                    // Special handling for trips - API might return { trips: [...] } or direct array
+                    if (signal.fetchType === 'trips') {
+                        console.log('🔍 Processing Trip Data - Raw Response:', newData);
+                        console.log('🔍 Response Type:', typeof newData);
+                        console.log('🔍 Is Array?:', Array.isArray(newData));
+                        console.log('🔍 Response Keys:', newData ? Object.keys(newData) : 'null');
+
+                        // Try various possible structures
+                        if (Array.isArray(newData)) {
+                            console.log('✅ Trip data is direct array, length:', newData.length);
+                            return newData;
+                        }
+                        if (newData && newData.trips && Array.isArray(newData.trips)) {
+                            console.log('✅ Trip data found at .trips, length:', newData.trips.length);
+                            return newData.trips;
+                        }
+                        if (newData && newData.data && Array.isArray(newData.data)) {
+                            console.log('✅ Trip data found at .data, length:', newData.data.length);
+                            return newData.data;
+                        }
+                        if (newData && newData.tripSummary && Array.isArray(newData.tripSummary)) {
+                            console.log('✅ Trip data found at .tripSummary, length:', newData.tripSummary.length);
+                            return newData.tripSummary;
+                        }
+                        // If it's an object but not an array, wrap it
+                        if (typeof newData === 'object' && newData !== null) {
+                            console.log('⚠️ Trip data is object, wrapping as single-item array');
+                            return [newData];
+                        }
+                        console.warn('❌ Could not extract trip data from response');
+                        return null;
+                    }
+
+                    // Special handling for logs - API returns command response
+                    if (signal.fetchType === 'logs') {
+                        console.log('🔍 Processing Logs Data:', newData);
+                        // fetchDeviceLogs returns a command response, wrap it as a single event
+                        if (typeof newData === 'object' && !Array.isArray(newData)) {
+                            return [{ ...newData, timestamp: new Date().toISOString(), action: 'Fetch Logs Command' }];
+                        }
+                        if (Array.isArray(newData)) return newData;
+                        return null;
+                    }
+
+                    // For other types, keep existing logic
+                    return (newData && newData.events) ? newData.events : newData;
+                })();
+
                 return { name: signal.name, newData: returnData };
             } catch (error) {
+                // Log detailed error info especially for Trip History
+                if (signal.fetchType === 'trips') {
+                    console.error(`❌❌❌ TRIP HISTORY FETCH FAILED ❌❌❌`);
+                    console.error('Error details:', error);
+                    console.error('Error message:', error.message);
+                    console.error('Error response:', error.response?.data);
+                    console.error('Error status:', error.response?.status);
+                }
                 console.error(`Failed to fetch ${signal.name}`, error);
                 return { name: signal.name, error: error.message || "Fetch failed" };
             }
@@ -1122,9 +1211,39 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 if (error) return { ...signal, error, loading: false, hasFetched: true };
 
                 if (newData !== null && newData !== undefined) {
+                    const existingData = signal.data || [];
+                    const isArray = Array.isArray(newData);
+                    const hasData = isArray ? newData.length > 0 : !!newData;
+
+                    let updatedData = existingData;
+                    if (hasData) {
+                        if (isArray) {
+                            // For trips and events, handle differently
+                            if (signal.fetchType === 'trips') {
+                                // For trips, replace entirely on each fetch (don't merge)
+                                updatedData = newData.slice(0, 100);
+                            } else {
+                                // For ignition/events, merge and deduplicate
+                                const existingStrings = new Set(existingData.map(d => JSON.stringify(d)));
+                                const newUniqueItems = newData.filter(d => !existingStrings.has(JSON.stringify(d)));
+
+                                if (newUniqueItems.length > 0) {
+                                    updatedData = [...newUniqueItems, ...existingData].slice(0, 500);
+                                }
+                            }
+                        } else {
+                            if (JSON.stringify(newData) !== JSON.stringify(existingData[0])) {
+                                updatedData = [newData, ...existingData].slice(0, 100);
+                            }
+                        }
+                    } else if (isArray && (signal.fetchType === 'ignition' || signal.fetchType === 'trips')) {
+                        // If ignition or trips got [] back, DO NOT CLEAR existing data.
+                        // Just keep what we have to prevent "coming and going" issue
+                    }
+
                     return {
                         ...signal,
-                        data: Array.isArray(newData) ? newData : [newData],
+                        data: updatedData,
                         loading: false,
                         lastUpdated: new Date().toLocaleTimeString(),
                         hasFetched: true,
@@ -1483,6 +1602,121 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
     // };
 
 
+
+    const handleFotaUpdate = async () => {
+        if (!fotaVersion) {
+            toast({ title: "Error", description: "Please enter a firmware version", status: "error" });
+            return;
+        }
+
+        setIsFotaUpdating(true);
+        try {
+            toast({
+                title: "Initiating FOTA Update",
+                description: `Version: ${fotaVersion}`,
+                status: "info",
+                duration: 3000,
+                isClosable: true,
+            });
+
+            // Optimistic UI update
+            const signalIndex = signals.findIndex(s => s.name === "Remote Commands");
+            if (signalIndex !== -1) {
+                const newCommand = {
+                    command: "FOTA Update",
+                    status: "PENDING",
+                    time: new Date().toLocaleTimeString(),
+                    apiResponse: { actionType: "FOTA_DOWNLOAD", version: fotaVersion, status: "PENDING" }
+                };
+
+                setSignals(prev => {
+                    const newSignals = [...prev];
+                    const currentData = newSignals[signalIndex].data || [];
+                    newSignals[signalIndex].data = [newCommand, ...currentData];
+                    return newSignals;
+                });
+            }
+
+            const response = await TraxoApi.triggerFotaUpdate(vin, fotaVersion);
+            console.log("FOTA Response:", response);
+
+            // Update with success
+            setSignals(prev => {
+                const newSignals = [...prev];
+                const signalIdx = newSignals.findIndex(s => s.name === "Remote Commands");
+                if (signalIdx !== -1) {
+                    const currentData = [...newSignals[signalIdx].data];
+                    if (currentData.length > 0) {
+                        currentData[0] = {
+                            ...currentData[0],
+                            status: "SUCCESS",
+                            apiResponse: response,
+                            time: new Date().toLocaleTimeString()
+                        };
+                        newSignals[signalIdx].data = currentData;
+                    }
+                }
+                return newSignals;
+            });
+
+            toast({ title: "FOTA Update Triggered", status: "success", duration: 3000 });
+
+        } catch (error) {
+            console.error("FOTA Failed:", error);
+            setSignals(prev => {
+                const newSignals = [...prev];
+                const signalIdx = newSignals.findIndex(s => s.name === "Remote Commands");
+                if (signalIdx !== -1) {
+                    const currentData = [...newSignals[signalIdx].data];
+                    if (currentData.length > 0) {
+                        currentData[0] = {
+                            ...currentData[0],
+                            status: "FAILED",
+                            apiResponse: { error: error.message || "Request failed" }
+                        };
+                        newSignals[signalIdx].data = currentData;
+                    }
+                }
+                return newSignals;
+            });
+            toast({ title: "FOTA Update Failed", description: error.message, status: "error", duration: 5000 });
+        } finally {
+            setIsFotaUpdating(false);
+        }
+    };
+
+    const handleFotaReset = async () => {
+        if (!confirm("Are you sure you want to reset the FOTA state for this vehicle? This is usually done to fix 'Request is invalid' errors.")) return;
+
+        try {
+            toast({ title: "Resetting FOTA State...", status: "info", duration: 2000 });
+            const response = await TraxoApi.resetFotaState(vin);
+            console.log("FOTA Reset Response:", response);
+            toast({ title: "FOTA State Reset Successful", status: "success", duration: 3000 });
+
+            // Log in table
+            const signalIndex = signals.findIndex(s => s.name === "Remote Commands");
+            if (signalIndex !== -1) {
+                const newCommand = {
+                    command: "FOTA Reset",
+                    status: "SUCCESS",
+                    time: new Date().toLocaleTimeString(),
+                    apiResponse: response
+                };
+                setSignals(prev => {
+                    const newSignals = [...prev];
+                    const currentData = newSignals[signalIndex].data || [];
+                    newSignals[signalIndex].data = [newCommand, ...currentData];
+                    return newSignals;
+                });
+            }
+
+        } catch (error) {
+            console.error("FOTA Reset Failed:", error);
+            toast({ title: "FOTA Reset Failed", description: error.message, status: "error", duration: 5000 });
+        }
+    };
+
     const renderDataAsTable = (data, name, isOdometer = false) => {
         if (!data || data.length === 0) return null;
         const term = searchTerm.toLowerCase();
@@ -1490,41 +1724,78 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
         // Special handling for Remote Commands
         if (name === "Remote Commands") {
-            return (
-                <VStack align="stretch" spacing={3} w="full">
-                    {data.map((cmd, idx) => (
-                        <Box key={idx} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
-                            <HStack justify="space-between" mb={2}>
-                                <HStack>
-                                    <Badge colorScheme={cmd.status === 'SUCCESS' ? 'green' : cmd.status === 'PENDING' ? 'yellow' : 'red'}>
-                                        {cmd.status}
-                                    </Badge>
-                                    <Text fontWeight="bold" fontSize="sm">{cmd.command}</Text>
-                                </HStack>
-                                <Text fontSize="xs" color="gray.500">{cmd.time}</Text>
-                            </HStack>
+            if (!data || data.length === 0) {
+                return (
+                    <Flex align="center" justify="center" h="100%" p={4}>
+                        <Text fontSize="14px" color="gray.500" textAlign="center">No remote commands found</Text>
+                    </Flex>
+                );
+            }
 
-                            {/* API Response Display */}
-                            <Box bg="gray.900" p={2} borderRadius="md" mt={2} overflowX="auto">
-                                <Text color="green.400" fontSize="xs" fontFamily="monospace" mb={1}>
-                                    // API Response
-                                </Text>
-                                <pre style={{ color: '#e2e8f0', fontSize: '10px' }}>
-                                    {JSON.stringify(cmd.apiResponse, null, 2)}
-                                </pre>
-                            </Box>
-                        </Box>
-                    ))}
-                </VStack>
+            const headerKeys = ['Command ID', 'Version', 'Action', 'Status', 'Time', 'Comments'];
+
+            return (
+                <Box width="100%" overflowX="auto">
+                    <Table size="sm" variant="simple" width="100%">
+                        <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+                            <Tr>
+                                {headerKeys.map(key => (
+                                    <Th
+                                        key={key}
+                                        fontSize="14px"
+                                        color="gray.700"
+                                        textTransform="uppercase"
+                                        px={4}
+                                        py={3}
+                                        borderBottom="2px solid"
+                                        borderColor="gray.300"
+                                        letterSpacing="0.5px"
+                                        whiteSpace="nowrap"
+                                        fontWeight="800"
+                                    >
+                                        {key}
+                                    </Th>
+                                ))}
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {data.map((cmd, idx) => {
+                                const response = cmd.apiResponse || {};
+                                const commandId = response.commandId || cmd.commandId || '-';
+                                const actionType = response.actionType || cmd.command || '-';
+                                const status = response.commandStatus || cmd.status || '-';
+                                const createdTime = response.createdTime
+                                    ? new Date(response.createdTime * 1000).toLocaleString()
+                                    : (cmd.time || '-');
+                                const comments = response.comments || '-';
+                                const version = response.version || '1.0'; // Assuming default if not present, or extract if available
+
+                                return (
+                                    <Tr key={idx} _hover={{ bg: "gray.50" }}>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" color="gray.800" fontFamily="monospace" fontWeight="bold">{commandId}</Td>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" color="gray.800" fontFamily="monospace" fontWeight="500">{version}</Td>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" color="gray.800" fontFamily="monospace" fontWeight="bold">{actionType}</Td>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" fontFamily="monospace" fontWeight="700">
+                                            <Badge colorScheme={status === 'success' || status === 'accepted' ? 'green' : status === 'pending' || status === 'in progress' ? 'yellow' : 'red'}>
+                                                {status.toUpperCase()}
+                                            </Badge>
+                                        </Td>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" color="gray.600" fontFamily="monospace">{createdTime}</Td>
+                                        <Td fontSize="12px" py={3} px={4} borderBottom="1px solid" borderColor="gray.100" color="gray.600" maxW="300px" isTruncated title={comments}>
+                                            {comments}
+                                        </Td>
+                                    </Tr>
+                                );
+                            })}
+                        </Tbody>
+                    </Table>
+                </Box>
             );
         }
 
-        // Special handling for Ignition Status
         if (name === "Ignition Status") {
-            // Filter to show only IGNITIONSTATUS events
-            const ignitionEvents = data.filter(item =>
-                item.eventtype === "IGNITIONSTATUS"
-            );
+            // Display whatever data was fetched by TraxoApi.getIgnitionEvents (which is already filtered)
+            const ignitionEvents = data || [];
 
             console.log("🔥 Ignition Events to display:", ignitionEvents);
 
@@ -1807,13 +2078,6 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                     bg="gray.50"
                     overflowX="hidden"
                     overflowY="auto"
-                    sx={{
-                        '&::-webkit-scrollbar': {
-                            display: 'none',
-                        },
-                        msOverflowStyle: 'none',
-                        scrollbarWidth: 'none',
-                    }}
                 > {/* Removed padding here, handled in inner Box */}
 
                     {/* Header Strip */}
@@ -2033,6 +2297,32 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                                     Honk
                                 </Button>
                             </Grid>
+
+                            {/* FOTA Section */}
+                            <Box mt={4} pt={4} borderTop="1px dashed" borderColor="gray.200">
+                                <Heading size="xs" mb={3} color="gray.600" textTransform="uppercase" letterSpacing="0.5px">Firmware Over-The-Air (FOTA)</Heading>
+                                <HStack spacing={3}>
+                                    <Input
+                                        placeholder="Version (e.g. 2314.0)"
+                                        value={fotaVersion}
+                                        onChange={(e) => setFotaVersion(e.target.value)}
+                                        size="sm"
+                                        width="180px"
+                                        bg="gray.50"
+                                        borderRadius="md"
+                                        color="black"
+                                    />
+                                    <Button
+                                        size="sm" colorScheme="purple"
+                                        isLoading={isFotaUpdating}
+                                        loadingText="Updating..."
+                                        onClick={handleFotaUpdate}
+                                        leftIcon={<RotateCcw size={14} />}
+                                    >
+                                        Trigger FOTA Update
+                                    </Button>
+                                </HStack>
+                            </Box>
                         </Box>
                     </Box>
 

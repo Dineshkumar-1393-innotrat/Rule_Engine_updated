@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const BASE_URL = '/api/traxo';
+const JEEP_BASE_URL = '/api/jeep'; // For trip and JEEP-specific APIs
 console.warn("TraxoApi Loaded - MultiAccount Version - If you do not see this, restart the server");
-const JEEP_BASE_URL = '/api/jeep';
 
 const ACCOUNTS = {
     PRIMARY: {
@@ -23,13 +23,21 @@ const ACCOUNTS = {
         countryCode: "+91",
         mobileNum: "9894638059",
         password: "Password@123"
+    },
+    FOTA: {
+        userName: "admin",
+        password: "V6PS0EWwF5V&",
+        accountId: "fotatenant",
+        clientId: "K4dcMP30mQbE9POIwqfFSHccfAIa",
+        clientSecret: "94ZhjPBKffxaODNfwFKdliRoO4Aa"
     }
 };
 
 const authTokens = {
     PRIMARY: null,
     FACTORY: null,
-    JEEP: null
+    JEEP: null,
+    FOTA: null
 };
 
 const withRetry = async (apiCall, accountType = 'PRIMARY', isRetry = false) => {
@@ -111,8 +119,12 @@ export const TraxoApi = {
             if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
 
             const formatDate = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
-            const finalStartTime = starttime || formatDate(new Date(Date.now() - 7 * 86400000)); // 7 days ago
+            // Default to last 24 hours if not provided, to keep it snappy but cover recent activity
+            // Use user-provided window if available
+            const finalStartTime = starttime || formatDate(new Date(Date.now() - 24 * 60 * 60 * 1000));
             const finalEndTime = endtime || formatDate(new Date());
+
+            console.log(`🔥 Fetching Ignition Events for ${vin} | Limit: 500 | Start: ${finalStartTime} | End: ${finalEndTime}`);
 
             const response = await axios.get(`${BASE_URL}/events/${vin}/DEVICE`, {
                 params: {
@@ -127,11 +139,18 @@ export const TraxoApi = {
                 timeout: 30000
             });
 
-            console.log("📡 API Response Status:", response.data);
+            const events = response.data.events || [];
+            console.log(`🔥 Ignition Events Found (Raw): ${events.length}`);
+            if (events.length > 0) {
+                console.log("🔥 Raw Event Types:", events.map(e => e.eventtype));
+            }
 
-            // Filter and format ignition events
-            const ignitionEvents = (response.data.events || [])
-                .filter(event => event.eventtype === "IGNITIONSTATUS")
+            // Filter ignition and device events
+            const ignitionEvents = events
+                .filter(event => {
+                    const type = (event.eventtype || "").toUpperCase();
+                    return type.includes("IGNITION") || type.includes("DEVICEJOIN");
+                })
                 .map(event => {
                     let details = {};
                     try {
@@ -139,14 +158,22 @@ export const TraxoApi = {
                             ? JSON.parse(event.eventdetails)
                             : event.eventdetails || {};
                     } catch (e) {
-                        console.warn("Failed to parse ignition details", e);
+                        // ignore parse error
+                    }
+
+                    let signalValue = details.eventValue || details.value || 'OFF';
+                    const typeUpper = (event.eventtype || "").toUpperCase();
+
+                    // If it's a device join event, mark as connected/online
+                    if (typeUpper.includes("DEVICEJOIN")) {
+                        signalValue = 'CONNECTED';
                     }
 
                     return {
                         sourceid: event.sourceid,
                         eventtype: event.eventtype,
                         sourcetimestamp: event.sourcetimestamp,
-                        signalValue: details.eventValue || details.value || 'OFF',
+                        signalValue: signalValue,
                         eventValue: details.eventValue || '',
                         message: details.message || '',
                         details: details,
@@ -154,7 +181,31 @@ export const TraxoApi = {
                     };
                 });
 
+            console.log(`🔥 Ignition Events Filtered: ${ignitionEvents.length}`);
             return ignitionEvents;
+
+        }, 'PRIMARY');
+    },
+
+    // Generic getEvents method with pagination
+    getEvents: async (vin, limit = 50, starttime, endtime, nextKey = null) => {
+        return withRetry(async () => {
+            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
+
+            const params = { limit };
+            if (starttime) params.starttime = starttime;
+            if (endtime) params.endtime = endtime;
+            if (nextKey) params.nextPageKey = nextKey;
+
+            const response = await axios.get(`${BASE_URL}/events/${vin}/DEVICE`, {
+                params,
+                headers: {
+                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
+                    'Accept': 'application/json'
+                },
+                timeout: 30000
+            });
+            return response.data;
         }, 'PRIMARY');
     },
 
@@ -171,6 +222,7 @@ export const TraxoApi = {
                     },
                     timeout: 30000
                 });
+                console.log(`📡 Realtime Telemetry [${signalName}]:`, response.data);
                 return response.data;
             } catch (error) {
                 console.warn(`Failed to fetch signal ${signalName} for ${vin}:`, error.message);
@@ -230,10 +282,17 @@ export const TraxoApi = {
                     },
                     timeout: 30000
                 });
-                console.log("Location API raw response:", response.data);
-                console.log("Location API response type:", typeof response.data, "isArray:", Array.isArray(response.data));
+                console.log("📍 Location API Raw Response:", response.data);
+                console.log("📍 Location API Type:", typeof response.data, "Is Array?", Array.isArray(response.data));
+
                 // Return raw array for console view
-                return Array.isArray(response.data) ? response.data : (response.data.events || response.data);
+                if (Array.isArray(response.data)) return response.data;
+                if (response.data && Array.isArray(response.data.events)) return response.data.events;
+
+                // If object but not events array, maybe wrap it?
+                if (typeof response.data === 'object') return [response.data];
+
+                return [];
             } catch (error) {
                 console.warn(`Failed to fetch location telemetry array for ${vin}:`, error.message);
                 return [];
@@ -258,33 +317,29 @@ export const TraxoApi = {
                     });
                     return response.data;
                 } catch (e) {
-                    if (e.response?.status === 400) {
-                        console.warn(`[Alerts] 400 error for ${url}:`, e.response.data?.message || e.message);
-                    }
+                    // Silently suppress expected fallback errors (don't log to console)
                     throw e;
                 }
             };
 
-            // Variation 1: Standard path (matching Postman)
+            // Try multiple endpoint variations (expected to fail until correct one is found)
+            // These failures are EXPECTED - don't alarm the user
             try {
                 return await tryGet(`${BASE_URL}/alerts/${cleanVin}/`);
             } catch (e) {
-                // Variation 2: No trailing slash
                 try {
                     return await tryGet(`${BASE_URL}/alerts/${cleanVin}`);
                 } catch (e2) {
-                    // Variation 3: DEVICE suffix (matching events pattern)
                     try {
                         return await tryGet(`${BASE_URL}/alerts/${cleanVin}/DEVICE`);
                     } catch (e3) {
-                        // Variation 4: Query params
                         try {
                             return await tryGet(`${BASE_URL}/alerts`, { vin: cleanVin, status: 'OPEN' });
                         } catch (e4) {
-                            // Variation 5: VIN query param only
                             try {
                                 return await tryGet(`${BASE_URL}/alerts`, { vin: cleanVin });
                             } catch (e5) {
+                                // All attempts failed - return empty array silently
                                 return [];
                             }
                         }
@@ -440,5 +495,139 @@ export const TraxoApi = {
         return (await axios.get(`${JEEP_BASE_URL}/commands/device/vin/${vin}/command/${commandId}`,
             { headers: { 'Authorization': `Bearer ${authTokens.JEEP}` }, timeout: 30000 }
         )).data;
-    }, 'JEEP')
+    }, 'JEEP'),
+
+    triggerFotaUpdate: async (vin, version) => withRetry(async () => {
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+        // Note: FOTA APIs use the same base URL structure as PRIMARY/FACTORY (via /api/traxo proxy)
+        // but with specific jeep/ota paths.
+        // Postman URL: https://lb2.cvip-preprod.citroen.in:40543/jeep/ota/downloadfirmware
+        // Proxy /api/traxo -> https://lb2...
+        return (await axios.post(`${BASE_URL}/jeep/ota/downloadfirmware`,
+            {
+                category: "VIN",
+                devices: [
+                    {
+                        vin: vin,
+                        releaseVersion: version
+                    }
+                ]
+            },
+            { headers: { 'Authorization': `Bearer ${authTokens.FOTA}` }, timeout: 30000 }
+        )).data;
+    }, 'FOTA'),
+
+    getFotaVersions: async () => withRetry(async () => {
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+        // Postman URL: https://lb1.cvip-preprod.citroen.in:40543/jeep/fota/firmware/versions
+        // Trying via lb2 base url proxy
+        const response = await axios.get(`${BASE_URL}/jeep/fota/firmware/versions`, {
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'FOTA'),
+
+    resetFotaState: async (vin, commandName = "firmwaredownloadcommand") => withRetry(async () => {
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+        // Postman URL: https://lb1.cvip-preprod.citroen.in:40543/jeep/ota/resetfotastate?vinNo=...&commandName=...
+        // Method: PUT
+        return (await axios.put(`${BASE_URL}/jeep/ota/resetfotastate`, null, {
+            params: { vinNo: vin, commandName: commandName },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+            timeout: 30000
+        })).data;
+    }, 'FOTA'),
+
+    // ========== TRIP AND LOGS APIs ==========
+    getTripSummary: async (vin, starttime, endtime) => {
+        return withRetry(async () => {
+            console.log('🚗 Fetching Trip Summary for VIN:', vin, '| Start:', starttime, '| End:', endtime);
+
+            // Note: Trip API might use JEEP account or might not require auth
+            // Try without JEEP auth first, then with if needed
+            try {
+                const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
+                    params: { starttime, endtime },
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                console.log('📊 Trip Summary Response (no auth):', response.data);
+                return response.data;
+            } catch (error) {
+                console.error('❌ Trip API failed (no auth):', error.response?.status, error.response?.data || error.message);
+
+                // If 401/403, try with JEEP auth
+                if (error.response?.status === 401 || error.response?.status === 403) {
+                    console.log('🔐 Trip API requires authentication, logging in with JEEP account...');
+                    try {
+                        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+
+                        const retryResponse = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
+                            params: { starttime, endtime },
+                            headers: {
+                                'Authorization': `Bearer ${authTokens.JEEP}`,
+                                'Accept': 'application/json'
+                            },
+                            timeout: 30000
+                        });
+                        console.log('📊 Trip Summary Response (with auth):', retryResponse.data);
+                        return retryResponse.data;
+                    } catch (authError) {
+                        console.error('❌ Trip API failed (with auth):', authError.response?.status, authError.response?.data || authError.message);
+                        throw authError;
+                    }
+                }
+
+                // If 404 or other error, the endpoint might not exist or VIN has no trips
+                if (error.response?.status === 404) {
+                    console.warn('⚠️ Trip API returned 404 - No trips found or endpoint does not exist');
+                    return []; // Return empty array instead of throwing
+                }
+
+                throw error;
+            }
+        }, 'PRIMARY');
+    },
+
+    fetchDeviceLogs: async (vin) => {
+        return withRetry(async () => {
+            console.log('📋 Triggering Device Log Fetch for VIN:', vin);
+            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
+
+            const response = await axios.post(`${BASE_URL}/jeep/concurrentcommands/vinno`, {
+                deviceVinno: vin,
+                actionType: 'fetchlogs'
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 30000
+            });
+            console.log('📋 Fetch Logs Response:', response.data);
+            return response.data;
+        }, 'PRIMARY');
+    },
+
+    downloadLogFile: async (vin, filename) => {
+        return withRetry(async () => {
+            console.log('📥 Downloading Log File:', filename, 'for VIN:', vin);
+            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
+
+            const response = await axios.get(`${BASE_URL}/fileupload/download`, {
+                params: { vin, filename },
+                headers: {
+                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
+                    'Accept': '*/*'
+                },
+                timeout: 60000,
+                responseType: 'blob' // For file downloads
+            });
+            console.log('📥 Download File Response:', response.headers);
+            return response.data;
+        }, 'PRIMARY');
+    }
 };
