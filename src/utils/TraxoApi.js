@@ -30,6 +30,13 @@ const ACCOUNTS = {
         accountId: "fotatenant",
         clientId: "K4dcMP30mQbE9POIwqfFSHccfAIa",
         clientSecret: "94ZhjPBKffxaODNfwFKdliRoO4Aa"
+    },
+    FOTA_UPLOAD: {
+        userName: "admin",
+        password: "V6PS0EWwF5V&",
+        accountId: "fotatenant",
+        clientId: "HLzVgxYxPbzLOD3rzoWh6Gsv7Twa",
+        clientSecret: "8OoOUy5Ny7spvefvSfXssvddeLEa"
     }
 };
 
@@ -37,7 +44,8 @@ const authTokens = {
     PRIMARY: null,
     FACTORY: null,
     JEEP: null,
-    FOTA: null
+    FOTA: null,
+    FOTA_UPLOAD: null
 };
 
 const withRetry = async (apiCall, accountType = 'PRIMARY', isRetry = false) => {
@@ -518,15 +526,15 @@ export const TraxoApi = {
     }, 'FOTA'),
 
     getFotaVersions: async () => withRetry(async () => {
-        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+        if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
         // Postman URL: https://lb1.cvip-preprod.citroen.in:40543/jeep/fota/firmware/versions
         // Trying via lb2 base url proxy
         const response = await axios.get(`${BASE_URL}/jeep/fota/firmware/versions`, {
-            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
             timeout: 30000
         });
         return response.data;
-    }, 'FOTA'),
+    }, 'FOTA_UPLOAD'),
 
     resetFotaState: async (vin, commandName = "firmwaredownloadcommand") => withRetry(async () => {
         if (!authTokens.FOTA) await TraxoApi.login('FOTA');
@@ -542,51 +550,38 @@ export const TraxoApi = {
     // ========== TRIP AND LOGS APIs ==========
     getTripSummary: async (vin, starttime, endtime) => {
         return withRetry(async () => {
-            console.log('🚗 Fetching Trip Summary for VIN:', vin, '| Start:', starttime, '| End:', endtime);
+            // Ensure PRIMARY token is available
+            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
 
-            // Note: Trip API might use JEEP account or might not require auth
-            // Try without JEEP auth first, then with if needed
             try {
+                // Try with PRIMARY token first
                 const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
                     params: { starttime, endtime },
                     headers: {
+                        'Authorization': `Bearer ${authTokens.PRIMARY}`,
                         'Accept': 'application/json'
                     },
                     timeout: 30000
                 });
-                console.log('📊 Trip Summary Response (no auth):', response.data);
+                console.log('📊 Trip Summary Response (PRIMARY):', response.data);
                 return response.data;
             } catch (error) {
-                console.error('❌ Trip API failed (no auth):', error.response?.status, error.response?.data || error.message);
-
-                // If 401/403, try with JEEP auth
+                // Fallback to JEEP token if PRIMARY fails with 403/401
                 if (error.response?.status === 401 || error.response?.status === 403) {
-                    console.log('🔐 Trip API requires authentication, logging in with JEEP account...');
-                    try {
-                        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+                    console.log('⚠️ Trip API failed with PRIMARY token, trying JEEP token...');
+                    if (!authTokens.JEEP) await TraxoApi.login('JEEP');
 
-                        const retryResponse = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
-                            params: { starttime, endtime },
-                            headers: {
-                                'Authorization': `Bearer ${authTokens.JEEP}`,
-                                'Accept': 'application/json'
-                            },
-                            timeout: 30000
-                        });
-                        console.log('📊 Trip Summary Response (with auth):', retryResponse.data);
-                        return retryResponse.data;
-                    } catch (authError) {
-                        console.error('❌ Trip API failed (with auth):', authError.response?.status, authError.response?.data || authError.message);
-                        throw authError;
-                    }
+                    const retryResponse = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
+                        params: { starttime, endtime },
+                        headers: {
+                            'Authorization': `Bearer ${authTokens.JEEP}`,
+                            'Accept': 'application/json'
+                        },
+                        timeout: 30000
+                    });
+                    console.log('📊 Trip Summary Response (JEEP):', retryResponse.data);
+                    return retryResponse.data;
                 }
-
-                // If 404 or other error, the endpoint might not exist or VIN has no trips
-                if (error.response?.status === 404) {
-                    console.warn('⚠️ Trip API returned 404 - No trips found or endpoint does not exist');
-                    return []; // Return empty array instead of throwing
-                }
-
                 throw error;
             }
         }, 'PRIMARY');
@@ -598,19 +593,18 @@ export const TraxoApi = {
             if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
 
             const response = await axios.post(`${BASE_URL}/jeep/concurrentcommands/vinno`, {
-                deviceVinno: vin,
-                actionType: 'fetchlogs'
+                vin: vin,
+                commandName: "DEVICE_LOGS",
+                commandType: "Get"
             }, {
-                headers: {
-                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
-                    'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${authTokens.PRIMARY}` },
                 timeout: 30000
             });
-            console.log('📋 Fetch Logs Response:', response.data);
+            console.log('📋 Device Logs Command Response:', response.data);
             return response.data;
         }, 'PRIMARY');
     },
+
 
     downloadLogFile: async (vin, filename) => {
         return withRetry(async () => {
