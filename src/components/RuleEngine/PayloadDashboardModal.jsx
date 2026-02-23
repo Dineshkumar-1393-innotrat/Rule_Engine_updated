@@ -35,12 +35,12 @@ import {
     useToast
 } from '@chakra-ui/react';
 import Vehicle360Viewer from './Vehicle360Viewer';
-import { RotateCcw, LayoutDashboard, Wifi, WifiOff, ArrowLeft, Search, Monitor, Eye, Thermometer, Zap, Fuel, Activity, Car, Map, Calendar, Bell } from 'lucide-react';
+import { RotateCcw, LayoutDashboard, Wifi, WifiOff, ArrowLeft, Search, Monitor, Eye, Thermometer, Zap, Fuel, Activity, Car, Map, Calendar, Bell, AlertTriangle } from 'lucide-react';
 import { TraxoApi } from '../../utils/TraxoApi';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Visual Components for Dashboard
-const CircularGauge = ({ value, label, unit, color = "#00E5FF", size = 110, icon: Icon }) => {
+const CircularGauge = ({ value, label, unit, color = "#00E5FF", size = 110, icon: Icon, isError = false }) => {
     const strokeWidth = 6;
     const radius = (size - strokeWidth) / 2;
     const circumference = 2 * Math.PI * radius;
@@ -54,7 +54,7 @@ const CircularGauge = ({ value, label, unit, color = "#00E5FF", size = 110, icon
                     position="absolute"
                     top="-4px" left="-4px" right="-4px" bottom="-4px"
                     border="1px solid"
-                    borderColor="rgba(0, 0, 0, 0.05)"
+                    borderColor={isError ? "red.100" : "rgba(0, 0, 0, 0.05)"}
                     borderRadius="full"
                 />
                 <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
@@ -70,21 +70,21 @@ const CircularGauge = ({ value, label, unit, color = "#00E5FF", size = 110, icon
                     <circle
                         cx={size / 2} cy={size / 2} r={radius}
                         fill="transparent"
-                        stroke="rgba(0, 0, 0, 0.03)"
+                        stroke={isError ? "red.50" : "rgba(0, 0, 0, 0.03)"}
                         strokeWidth={strokeWidth}
                     />
                     <motion.circle
                         cx={size / 2} cy={size / 2} r={radius}
                         fill="transparent"
-                        stroke={color}
+                        stroke={isError ? "#E53E3E" : color}
                         strokeWidth={strokeWidth}
                         strokeDasharray={circumference}
                         initial={{ strokeDashoffset: circumference }}
-                        animate={{ strokeDashoffset: circumference - (progress * circumference) }}
+                        animate={{ strokeDashoffset: isError ? 0 : circumference - (progress * circumference) }}
                         transition={{ duration: 1.5, ease: "easeOut" }}
                         strokeLinecap="round"
                         transform={`rotate(-90 ${size / 2} ${size / 2})`}
-                        filter={`url(#glow-${label.replace(/\s+/g, '-')})`}
+                        filter={!isError ? `url(#glow-${label.replace(/\s+/g, '-')})` : "none"}
                     />
                 </svg>
                 <VStack
@@ -93,20 +93,29 @@ const CircularGauge = ({ value, label, unit, color = "#00E5FF", size = 110, icon
                     transform="translate(-50%, -50%)"
                     spacing={0}
                 >
-                    <Text fontSize="lg" fontWeight="900" color="gray.800" letterSpacing="-1px">
-                        {value}{unit}
-                    </Text>
-                    {Icon && <Icon size={14} color={color} opacity={0.8} />}
+                    {isError ? (
+                        <VStack spacing={0}>
+                            <AlertTriangle size={24} color="#E53E3E" />
+                            <Text fontSize="10px" fontWeight="black" color="red.500">ERR</Text>
+                        </VStack>
+                    ) : (
+                        <>
+                            <Text fontSize="lg" fontWeight="900" color="gray.800" letterSpacing="-1px">
+                                {value}{unit}
+                            </Text>
+                            {Icon && <Icon size={14} color={color} opacity={0.8} />}
+                        </>
+                    )}
                 </VStack>
             </Box>
-            <Text fontSize="10px" fontWeight="black" color="gray.400" letterSpacing="1px" textTransform="uppercase">
+            <Text fontSize="10px" fontWeight="black" color={isError ? "red.400" : "gray.400"} letterSpacing="1px" textTransform="uppercase">
                 {label}
             </Text>
         </VStack>
     );
 };
 
-const SpeedometerGauge = ({ value, label, secondaryValue }) => {
+const SpeedometerGauge = ({ value, label, secondaryValue, isError = false }) => {
     const size = 260;
     const strokeWidth = 12;
     const radius = 90;
@@ -117,7 +126,7 @@ const SpeedometerGauge = ({ value, label, secondaryValue }) => {
     const progress = Math.min(speed / maxVal, 1);
     const totalAngle = 270;
     const startAngle = -135;
-    const currentAngle = startAngle + progress * totalAngle;
+    const currentAngle = startAngle + (isError ? 0 : progress * totalAngle);
 
     const polarToCartesian = (centerX, centerY, radius, angleInDegrees) => {
         const angleInRadians = (angleInDegrees - 90) * Math.PI / 180.0;
@@ -150,15 +159,15 @@ const SpeedometerGauge = ({ value, label, secondaryValue }) => {
                             </feMerge>
                         </filter>
                         <linearGradient id="speed-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
-                            <stop offset="0%" stopColor="#00B8D4" />
-                            <stop offset="100%" stopColor="#00E5FF" />
+                            <stop offset="0%" stopColor={isError ? "#FEB2B2" : "#00B8D4"} />
+                            <stop offset="100%" stopColor={isError ? "#E53E3E" : "#00E5FF"} />
                         </linearGradient>
                     </defs>
 
                     <path
                         d={drawArc(startAngle, startAngle + totalAngle)}
                         fill="none"
-                        stroke="rgba(0, 0, 0, 0.03)"
+                        stroke={isError ? "rgba(255, 0, 0, 0.05)" : "rgba(0, 0, 0, 0.03)"}
                         strokeWidth={strokeWidth}
                         strokeLinecap="round"
                     />
@@ -169,7 +178,7 @@ const SpeedometerGauge = ({ value, label, secondaryValue }) => {
                         stroke="url(#speed-gradient)"
                         strokeWidth={strokeWidth}
                         strokeLinecap="round"
-                        filter="url(#speed-glow)"
+                        filter={!isError ? "url(#speed-glow)" : "none"}
                         initial={{ pathLength: 0 }}
                         animate={{ pathLength: 1 }}
                         transition={{ duration: 1, ease: "easeOut" }}
@@ -180,25 +189,34 @@ const SpeedometerGauge = ({ value, label, secondaryValue }) => {
                         const p1 = polarToCartesian(center, center, radius + 8, angle);
                         const p2 = polarToCartesian(center, center, radius + 18, angle);
                         const tickVal = i * (maxVal / 8);
-                        const isActive = speed >= tickVal;
+                        const isActive = isError ? false : speed >= tickVal;
                         return (
-                            <line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={isActive ? "#00B8D4" : "rgba(0,0,0,0.1)"} strokeWidth="2" />
+                            <line key={i} x1={p1.x} y1={p1.y} x2={p2.x} y2={p2.y} stroke={isActive ? "#00B8D4" : isError ? "rgba(255,0,0,0.1)" : "rgba(0,0,0,0.1)"} strokeWidth="2" />
                         );
                     })}
                 </svg>
 
                 <VStack position="absolute" top="55%" left="50%" transform="translate(-50%, -50%)" spacing={-1}>
-                    <Text fontSize="6xl" fontWeight="900" color="gray.800" lineHeight="1">
-                        {Math.floor(speed)}
-                    </Text>
-                    <Text fontSize="xs" fontWeight="black" color="blue.500" letterSpacing="2px">KM/H</Text>
+                    {isError ? (
+                        <VStack spacing={1}>
+                            <AlertTriangle size={48} color="#E53E3E" />
+                            <Text fontSize="xs" fontWeight="black" color="red.500" letterSpacing="1px">SIG ERROR</Text>
+                        </VStack>
+                    ) : (
+                        <>
+                            <Text fontSize="6xl" fontWeight="900" color="gray.800" lineHeight="1">
+                                {Math.floor(speed)}
+                            </Text>
+                            <Text fontSize="xs" fontWeight="black" color="blue.500" letterSpacing="2px">KM/H</Text>
 
-                    <Box mt={4} textAlign="center">
-                        <Text fontSize="10px" fontWeight="black" color="gray.400" letterSpacing="1px">ODO</Text>
-                        <Text fontSize="md" fontWeight="bold" color="gray.700">
-                            {odo.toLocaleString()} <Text as="span" fontSize="10px" color="gray.500">KM</Text>
-                        </Text>
-                    </Box>
+                            <Box mt={4} textAlign="center">
+                                <Text fontSize="10px" fontWeight="black" color="gray.400" letterSpacing="1px">ODO</Text>
+                                <Text fontSize="md" fontWeight="bold" color="gray.700">
+                                    {odo.toLocaleString()} <Text as="span" fontSize="10px" color="gray.500">KM</Text>
+                                </Text>
+                            </Box>
+                        </>
+                    )}
                 </VStack>
             </Box>
         </VStack>
@@ -379,6 +397,9 @@ const VisualDashboardView = ({ signals, deviceState }) => {
         ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
         : '--:--';
 
+    const hasAnyError = signals.some(s => s.error);
+    const errorSignals = signals.filter(s => s.error).map(s => s.name);
+
     return (
         <Box w="full" bg="#f8faff" p={8} borderRadius="none" minH="100vh" position="relative" overflow="hidden">
             {/* HUD Grid Background */}
@@ -394,6 +415,22 @@ const VisualDashboardView = ({ signals, deviceState }) => {
             <DeviceEventsList events={deviceEvents} />
 
             <Box position="relative" zIndex={1}>
+                {hasAnyError && (
+                    <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                        <Box bg="red.50" border="1px solid" borderColor="red.200" p={3} borderRadius="xl" mb={6} boxShadow="sm">
+                            <Flex align="center" gap={3}>
+                                <AlertTriangle color="#E53E3E" size={18} />
+                                <VStack align="flex-start" spacing={0}>
+                                    <Text color="red.700" fontWeight="bold" fontSize="xs">DATA SYNC ALERT</Text>
+                                    <Text color="red.600" fontSize="10px">
+                                        The following signals are currently reporting errors: {errorSignals.join(", ")}
+                                    </Text>
+                                </VStack>
+                            </Flex>
+                        </Box>
+                    </motion.div>
+                )}
+
                 {/* Top Row: Status Toggles */}
                 <Grid templateColumns="repeat(2, 1fr)" gap={6} mb={8}>
                     <StatusToggle
@@ -434,7 +471,7 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                                     <Activity size={18} color="#3182CE" />
                                 </motion.div>
                                 <VStack align="flex-start" spacing={0}>
-                                    <Text fontSize="md" fontWeight="900" color="gray.800" letterSpacing="-0.5px">{coords}</Text>
+                                    <Text fontSize="md" fontWeight="900" color="gray.800" letterSpacing="-1px">{coords}</Text>
                                     <Text fontSize="9px" color="gray.500" fontWeight="black" letterSpacing="1px">LIVE COORDINATES</Text>
                                 </VStack>
                             </Flex>
@@ -482,7 +519,7 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                     {/* Center Column: Temp & Time */}
                     <VStack spacing={6} h="full">
                         <Box flex={1.2} w="full">
-                            <TempCard temp={engineTemp} label="Engine Temp" interiorTemp={extTemp} />
+                            <TempCard temp={engineTemp} label="Engine Temp" interiorTemp={extTemp} isError={isSigError("Engine Water Temp") || isSigError("External Temperature (C)")} />
                         </Box>
                         <Box flex={1} w="full" bg="white" p={5} borderRadius="2xl" border="1px solid" borderColor="rgba(0,0,0,0.06)" boxShadow="sm" display="flex" flexDirection="column" justifyContent="space-between">
                             <Flex justify="space-between" align="center">
@@ -515,21 +552,24 @@ const VisualDashboardView = ({ signals, deviceState }) => {
                     border="1px solid" borderColor="rgba(0,0,0,0.04)"
                     position="relative" overflow="hidden"
                 >
-                    <CircularGauge value={fuel} label="Fuel Level" unit="%" color="#00B8D4" icon={Fuel} />
+                    <CircularGauge value={fuel} label="Fuel Level" unit="%" color="#00B8D4" icon={Fuel} isError={isSigError("Fuel Level")} />
 
                     <CircularGauge
                         value={Math.min(Math.round((engineSpeed / 8000) * 100), 100)}
                         label={`RPM (${engineSpeed})`} unit="" color="#FF9100" icon={Activity}
+                        isError={isSigError("Engine Speed")}
                     />
 
                     <SpeedometerGauge
                         value={vehicleSpeed}
                         secondaryValue={odometer}
+                        isError={isSigError("Vehicle Speed") || isSigError("Total Odometer")}
                     />
 
                     <CircularGauge
                         value={batteryPercent}
                         label={`Battery (${batteryRaw}V)`} unit="%" color="#00C853" icon={Zap}
+                        isError={isSigError("Battery Voltage Level")}
                     />
                 </Flex>
 
@@ -568,36 +608,51 @@ const VisualDashboardView = ({ signals, deviceState }) => {
 
 
 
-const TempCard = ({ temp, label, interiorTemp = "45" }) => (
-    <Box bg="white" p={5} borderRadius="2xl" border="1px solid" borderColor="rgba(0,0,0,0.06)" boxShadow="sm" height="full" position="relative" overflow="hidden">
+const TempCard = ({ temp, label, interiorTemp = "45", isError = false }) => (
+    <Box bg="white" p={5} borderRadius="2xl" border="1px solid" borderColor={isError ? "red.200" : "rgba(0,0,0,0.06)"} boxShadow="sm" height="full" position="relative" overflow="hidden">
         <Flex justify="space-between" align="start" mb={4}>
             <VStack align="flex-start" spacing={0}>
                 <HStack spacing={2}>
-                    <Text fontWeight="800" color="blue.500" fontSize="xs" letterSpacing="0.5px" textTransform="uppercase">{label}</Text>
-                    <Thermometer size={14} color="#3182CE" />
+                    <Text fontWeight="800" color={isError ? "red.500" : "blue.500"} fontSize="xs" letterSpacing="0.5px" textTransform="uppercase">{label}</Text>
+                    <Thermometer size={14} color={isError ? "#E53E3E" : "#3182CE"} />
                 </HStack>
                 <Text color="gray.400" fontSize="10px" fontWeight="bold">Interior: {interiorTemp}°C</Text>
             </VStack>
-            <Box w={2} h={2} borderRadius="full" bg="blue.500" />
+            <Box w={2} h={2} borderRadius="full" bg={isError ? "red.500" : "blue.500"} />
         </Flex>
 
         <Flex align="center" justify="center" py={2} mb={4}>
-            <Text fontSize="6xl" fontWeight="900" color="gray.800" lineHeight="1">{temp}°</Text>
+            {isError ? (
+                <VStack spacing={1}>
+                    <AlertTriangle size={32} color="#E53E3E" />
+                    <Text fontSize="xs" fontWeight="black" color="red.500">DATA ERROR</Text>
+                </VStack>
+            ) : (
+                <Text fontSize="6xl" fontWeight="900" color="gray.800" lineHeight="1">{temp}°</Text>
+            )}
         </Flex>
 
-        <VStack width="full" align="flex-start" spacing={3}>
-            <Flex justify="space-between" width="full">
-                <Text fontSize="9px" fontWeight="black" color="blue.600" letterSpacing="0.5px">COOLING SYSTEM</Text>
-                <Badge variant="subtle" colorScheme="blue" fontSize="8px" px={2} borderRadius="full">NORMAL</Badge>
-            </Flex>
-            <Box width="full" h="4px" bg="gray.50" borderRadius="full" position="relative" border="1px solid" borderColor="gray.100">
-                <Box
-                    position="absolute" left={`${Math.min((temp / 100) * 100, 100)}%`} top="-5px"
-                    w="14px" h="14px" bg="white" border="3px solid" borderColor="blue.500"
-                    borderRadius="full" boxShadow="md" transform="translateX(-50%)"
-                />
-            </Box>
-        </VStack>
+        {!isError && (
+            <VStack width="full" align="flex-start" spacing={3}>
+                <Flex justify="space-between" width="full">
+                    <Text fontSize="9px" fontWeight="black" color="blue.600" letterSpacing="0.5px">COOLING SYSTEM</Text>
+                    <Badge variant="subtle" colorScheme="blue" fontSize="8px" px={2} borderRadius="full">NORMAL</Badge>
+                </Flex>
+                <Box width="full" h="4px" bg="gray.50" borderRadius="full" position="relative" border="1px solid" borderColor="gray.100">
+                    <Box
+                        position="absolute" left={`${Math.min((temp / 100) * 100, 100)}%`} top="-5px"
+                        w="14px" h="14px" bg="white" border="3px solid" borderColor="blue.500"
+                        borderRadius="full" boxShadow="md" transform="translateX(-50%)"
+                    />
+                </Box>
+            </VStack>
+        )}
+        {isError && (
+            <VStack width="full" align="flex-start" spacing={1}>
+                <Text fontSize="9px" fontWeight="black" color="red.600" letterSpacing="0.5px">SYSTEM FAULT</Text>
+                <Badge variant="solid" colorScheme="red" fontSize="8px" px={2} borderRadius="full">OFFLINE</Badge>
+            </VStack>
+        )}
     </Box>
 );
 
@@ -1151,64 +1206,47 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
                     // Special handling for trips - API might return { trips: [...] } or direct array
                     if (signal.fetchType === 'trips') {
-                        console.log('🔍 Processing Trip Data - Raw Response:', newData);
-                        console.log('🔍 Response Type:', typeof newData);
-                        console.log('🔍 Is Array?:', Array.isArray(newData));
-                        console.log('🔍 Response Keys:', newData ? Object.keys(newData) : 'null');
-
-                        // Try various possible structures
-                        if (Array.isArray(newData)) {
-                            console.log('✅ Trip data is direct array, length:', newData.length);
-                            return newData;
-                        }
-                        if (newData && newData.trips && Array.isArray(newData.trips)) {
-                            console.log('✅ Trip data found at .trips, length:', newData.trips.length);
-                            return newData.trips;
-                        }
-                        if (newData && newData.data && Array.isArray(newData.data)) {
-                            console.log('✅ Trip data found at .data, length:', newData.data.length);
-                            return newData.data;
-                        }
-                        if (newData && newData.tripSummary && Array.isArray(newData.tripSummary)) {
-                            console.log('✅ Trip data found at .tripSummary, length:', newData.tripSummary.length);
-                            return newData.tripSummary;
-                        }
-                        // If it's an object but not an array, wrap it
-                        if (typeof newData === 'object' && newData !== null) {
-                            console.log('⚠️ Trip data is object, wrapping as single-item array');
-                            return [newData];
-                        }
-                        console.warn('❌ Could not extract trip data from response');
+                        // ... same logic for trips ...
+                        if (Array.isArray(newData)) return newData;
+                        if (newData && newData.trips && Array.isArray(newData.trips)) return newData.trips;
+                        if (newData && newData.data && Array.isArray(newData.data)) return newData.data;
+                        if (newData && newData.tripSummary && Array.isArray(newData.tripSummary)) return newData.tripSummary;
+                        if (typeof newData === 'object' && newData !== null) return [newData];
                         return null;
                     }
 
-                    // Special handling for logs - API returns command response
+                    // Special handling for logs
                     if (signal.fetchType === 'logs') {
-                        console.log('🔍 Processing Logs Data:', newData);
-                        // fetchDeviceLogs returns a command response, wrap it as a single event
                         if (typeof newData === 'object' && !Array.isArray(newData)) {
                             return [{ ...newData, timestamp: new Date().toISOString(), action: 'Fetch Logs Command' }];
                         }
-                        if (Array.isArray(newData)) return newData;
-                        return null;
+                        return Array.isArray(newData) ? newData : null;
                     }
 
                     // For other types, keep existing logic
-                    return (newData && newData.events) ? newData.events : newData;
+                    let processed = (newData && newData.events) ? newData.events : newData;
+
+                    // Validate telemetry signals - if it's an object but missing signalValue/Value, check if it's "improper"
+                    if (signal.fetchType === 'literal' && processed) {
+                        const checkBody = Array.isArray(processed) ? processed[0] : processed;
+                        if (checkBody && typeof checkBody === 'object' && !checkBody.signalValue && !checkBody.Value && !checkBody.signalUnit) {
+                            console.warn(`⚠️ Improper data structure for ${signal.name}:`, checkBody);
+                            // We don't throw error here to allow renderDataAsTable to show "IMPROPER FORMAT"
+                        }
+                    }
+
+                    return processed;
                 })();
+
+                if (returnData === null) {
+                    return { name: signal.name, error: "Empty response from server" };
+                }
 
                 return { name: signal.name, newData: returnData };
             } catch (error) {
-                // Log detailed error info especially for Trip History
-                if (signal.fetchType === 'trips') {
-                    console.error(`❌❌❌ TRIP HISTORY FETCH FAILED ❌❌❌`);
-                    console.error('Error details:', error);
-                    console.error('Error message:', error.message);
-                    console.error('Error response:', error.response?.data);
-                    console.error('Error status:', error.response?.status);
-                }
+                // ... log ...
                 console.error(`Failed to fetch ${signal.name}`, error);
-                return { name: signal.name, error: error.message || "Fetch failed" };
+                return { name: signal.name, error: error.message || "Network or API Error" };
             }
         });
 
@@ -1740,20 +1778,26 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
     };
 
     const renderDataAsTable = (data, name, isOdometer = false) => {
-        if (!data || data.length === 0) return null;
+        // Validation check for data structure
+        if (!data) return (
+            <Flex align="center" justify="center" h="100%" p={4}>
+                <Text fontSize="12px" color="orange.500" fontWeight="bold">NO DATA RECEIVED</Text>
+            </Flex>
+        );
+
+        const dataArray = Array.isArray(data) ? data : [data];
+
+        if (dataArray.length === 0) return (
+            <Flex align="center" justify="center" h="100%" p={4}>
+                <Text fontSize="12px" color="gray.500">NO RECORDS FOUND</Text>
+            </Flex>
+        );
+
         const term = searchTerm.toLowerCase();
         const signalMatchesName = name.toLowerCase().includes(term);
 
         // Special handling for Remote Commands
         if (name === "Remote Commands") {
-            if (!data || data.length === 0) {
-                return (
-                    <Flex align="center" justify="center" h="100%" p={4}>
-                        <Text fontSize="14px" color="gray.500" textAlign="center">No remote commands found</Text>
-                    </Flex>
-                );
-            }
-
             const headerKeys = ['Command ID', 'Version', 'Action', 'Status', 'Time', 'Comments'];
 
             return (
@@ -1781,7 +1825,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                             </Tr>
                         </Thead>
                         <Tbody>
-                            {data.map((cmd, idx) => {
+                            {dataArray.map((cmd, idx) => {
                                 const response = cmd.apiResponse || {};
                                 const commandId = response.commandId || cmd.commandId || '-';
                                 const actionType = response.actionType || cmd.command || '-';
@@ -1790,7 +1834,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                                     ? new Date(response.createdTime * 1000).toLocaleString()
                                     : (cmd.time || '-');
                                 const comments = response.comments || '-';
-                                const version = response.version || '1.0'; // Assuming default if not present, or extract if available
+                                const version = response.version || '1.0';
 
                                 return (
                                     <Tr key={idx} _hover={{ bg: "gray.50" }}>
@@ -1816,8 +1860,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }
 
         if (name === "Ignition Status") {
-            // Display whatever data was fetched by TraxoApi.getIgnitionEvents (which is already filtered)
-            const ignitionEvents = data || [];
+            const ignitionEvents = dataArray || [];
 
             console.log("🔥 Ignition Events to display:", ignitionEvents);
 
@@ -1983,7 +2026,17 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
 
         // For other signals, show all data
         // Get all unique keys from all items
-        const allKeys = Array.from(new Set(data.flatMap(item => Object.keys(item))));
+        const allKeys = Array.from(new Set(dataArray.flatMap(item => typeof item === 'object' && item !== null ? Object.keys(item) : [])));
+
+        if (allKeys.length === 0 && dataArray.length > 0) {
+            return (
+                <Flex align="center" justify="center" h="100%" p={4} direction="column">
+                    <AlertTriangle size={24} color="#DD6B20" />
+                    <Text fontSize="12px" color="orange.600" fontWeight="bold" mt={2}>IMPROPER DATA FORMAT</Text>
+                    <Text fontSize="10px" color="gray.500" textAlign="center">Raw: {JSON.stringify(dataArray[0]).substring(0, 50)}...</Text>
+                </Flex>
+            )
+        }
 
         // Priority keys based on signal type
         let priorityKeys = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
@@ -2002,8 +2055,8 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }).slice(0, 8); // Show up to 8 columns
 
         const filteredRows = signalMatchesName
-            ? data.slice(0, 25)
-            : data.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 25);
+            ? dataArray.slice(0, 25)
+            : dataArray.filter(item => keys.some(key => String(item[key] ?? '').toLowerCase().includes(term))).slice(0, 25);
 
         if (filteredRows.length === 0) {
             return (
@@ -2205,15 +2258,31 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                                                     position="relative"
                                                     overflow="hidden"
                                                     border="1px solid"
-                                                    borderColor="gray.200"
+                                                    borderColor={signal.error ? "red.200" : "gray.200"}
                                                     boxShadow="sm"
                                                 >
                                                     <Box p={0} height="100%" overflow="auto" width="100%">
                                                         {signal.error ? (
-                                                            <Flex align="center" justify="center" h="100%" p={4} width="100%">
-                                                                <Text color="red.500" fontSize="14px" fontWeight="bold" fontFamily="monospace" textAlign="center">
-                                                                    {`> ERROR: ${signal.error}`}
-                                                                </Text>
+                                                            <Flex align="center" justify="center" h="100%" p={8} width="100%" direction="column" bg="red.50">
+                                                                <AlertTriangle size={40} color="#E53E3E" />
+                                                                <VStack spacing={2} mt={4}>
+                                                                    <Text color="red.700" fontSize="14px" fontWeight="900" fontFamily="monospace" textAlign="center">
+                                                                        {`> SIGNAL ERROR DETECTED`}
+                                                                    </Text>
+                                                                    <Text color="red.600" fontSize="11px" fontWeight="bold" fontFamily="monospace" textAlign="center" maxW="80%">
+                                                                        {signal.error}
+                                                                    </Text>
+                                                                    <Button
+                                                                        size="xs"
+                                                                        mt={2}
+                                                                        colorScheme="red"
+                                                                        variant="outline"
+                                                                        leftIcon={<RotateCcw size={12} />}
+                                                                        onClick={handleRefresh}
+                                                                    >
+                                                                        RETRY SYNC
+                                                                    </Button>
+                                                                </VStack>
                                                             </Flex>
                                                         ) : signal.data && signal.data.length > 0 ? (
                                                             <Box width="100%" overflow="auto">
@@ -2229,10 +2298,14 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                                                                 </VStack>
                                                             </Flex>
                                                         ) : (
-                                                            <Flex align="center" justify="center" h="100%" width="100%">
+                                                            <Flex align="center" justify="center" h="100%" width="100%" direction="column" bg="gray.50">
+                                                                <Box opacity={0.3} mb={3}>
+                                                                    <Activity size={32} />
+                                                                </Box>
                                                                 <Text color="gray.400" fontSize="14px" fontWeight="bold" fontFamily="monospace">
                                                                     {`> NO DATA PACKETS`}
                                                                 </Text>
+                                                                <Text color="gray.400" fontSize="10px" mt={1}>Waiting for next telemetry update...</Text>
                                                             </Flex>
                                                         )}
                                                     </Box>
