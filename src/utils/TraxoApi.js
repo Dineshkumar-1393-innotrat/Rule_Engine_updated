@@ -363,25 +363,7 @@ export const TraxoApi = {
         }, 'PRIMARY');
     },
 
-    getEvents: async (vin, limit = 50, starttime = null, endtime = null) => {
-        return withRetry(async () => {
-            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
 
-            const formatDate = (date) => date.toISOString().slice(0, 19).replace('T', ' ');
-            const finalStartTime = starttime || formatDate(new Date(Date.now() - 86400000));
-            const finalEndTime = endtime || formatDate(new Date());
-
-            const response = await axios.get(`${BASE_URL}/events/${vin}/DEVICE`, {
-                params: { limit, starttime: finalStartTime, endtime: finalEndTime },
-                headers: {
-                    'Authorization': `Bearer ${authTokens.PRIMARY}`,
-                    'Accept': 'application/json'
-                },
-                timeout: 30000
-            });
-            return response.data;
-        }, 'PRIMARY');
-    },
 
     getDevices: async () => {
         return withRetry(async () => {
@@ -541,6 +523,17 @@ export const TraxoApi = {
         });
         return response.data;
     }, 'FOTA_UPLOAD'),
+
+    getFotaCommandStatus: async (commandId) => withRetry(async () => {
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+        // Postman URL: https://lb1.cvip-preprod.citroen.in:40543/jeep/ota/commandvalidity?commandid=...&username=admin
+        const response = await axios.get(`${BASE_URL}/jeep/ota/commandvalidity`, {
+            params: { commandid: commandId, username: "admin" },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'FOTA'),
 
     resetFotaState: async (vin, commandName = "firmwaredownloadcommand") => withRetry(async () => {
         if (!authTokens.FOTA) await TraxoApi.login('FOTA');

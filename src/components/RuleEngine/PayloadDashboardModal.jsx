@@ -903,7 +903,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         }
     };
 
-    const pollCommandStatus = async (commandName, commandId) => {
+    const pollCommandStatus = async (commandName, commandId, isFota = false) => {
         const maxRetries = 20; // 20 * 3s = 60s max polling
         let attempts = 0;
 
@@ -915,8 +915,17 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
             }
 
             try {
-                const statusData = await TraxoApi.getCommandStatus(vin, commandId);
-                const status = statusData.commandStatus || "Unknown";
+                let statusData;
+                let status;
+
+                if (isFota) {
+                    statusData = await TraxoApi.getFotaCommandStatus(commandId);
+                    // FOTA status logic based on API response structure
+                    status = statusData.commandstatus || statusData.status || "Unknown";
+                } else {
+                    statusData = await TraxoApi.getCommandStatus(vin, commandId);
+                    status = statusData.commandStatus || "Unknown";
+                }
 
                 // Update specific command in log
                 setSignals(prev => prev.map(s => {
@@ -930,9 +939,13 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 }));
 
                 // Stop polling if terminal state
-                if (["Success", "Timed Out", "Failed", "Cancelled"].includes(status)) {
+                const terminalStates = isFota
+                    ? ["Success", "Timed Out", "Failed", "Cancelled", "Completed", "Error"]
+                    : ["Success", "Timed Out", "Failed", "Cancelled"];
+
+                if (terminalStates.includes(status)) {
                     clearInterval(interval);
-                    if (status === "Success") {
+                    if (status === "Success" || status === "Completed") {
                         toast({ title: `${commandName} Success`, status: "success", duration: 3000 });
                     } else if (status === "Timed Out") {
                         toast({ title: `${commandName} Timed Out`, status: "warning", duration: 3000 });
@@ -1712,7 +1725,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
             const response = await TraxoApi.triggerFotaUpdate(vin, fotaVersion);
             console.log("FOTA Response:", response);
 
-            // Update with success
+            const commandId = response.commandId || response.fotaId || (response.data && (response.data.commandId || response.data.fotaId));
+
+            // Update with success/pending and start polling
             setSignals(prev => {
                 const newSignals = [...prev];
                 const signalIdx = newSignals.findIndex(s => s.name === "Remote Commands");
@@ -1721,7 +1736,8 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                     if (currentData.length > 0) {
                         currentData[0] = {
                             ...currentData[0],
-                            status: "SUCCESS",
+                            status: commandId ? "PENDING" : "SUCCESS",
+                            commandId: commandId,
                             apiResponse: response,
                             time: new Date().toLocaleTimeString()
                         };
@@ -1731,7 +1747,11 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                 return newSignals;
             });
 
-            toast({ title: "FOTA Update Triggered", status: "success", duration: 3000 });
+            if (commandId) {
+                pollCommandStatus("FOTA Update", commandId, true);
+            }
+
+            toast({ title: commandId ? "FOTA Update Initiated" : "FOTA Update Triggered", status: "success", duration: 3000 });
 
         } catch (error) {
             console.error("FOTA Failed:", error);
