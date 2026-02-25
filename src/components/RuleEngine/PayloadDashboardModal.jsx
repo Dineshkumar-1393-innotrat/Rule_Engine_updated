@@ -675,6 +675,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
         { name: "Remote Commands", apiName: "CommandLog", id: "action", isChecked: true, data: [], loading: false, error: null, fetchType: 'manual' },
         { name: "Trip History", apiName: "TripSummary", id: "trips", isChecked: true, data: [], loading: false, error: null, fetchType: 'trips' },
         { name: "Device Logs", apiName: "DeviceLogs", id: "logs", isChecked: true, data: [], loading: false, error: null, fetchType: 'logs' },
+        { name: "Jeep Vehicle Status", apiName: "VehicleStatus", id: "vehicleStatus", isChecked: true, data: [], loading: false, error: null, fetchType: 'vehicleStatus' },
     ]);
     const [viewMode, setViewMode] = useState('visual');
     const [isLive, setIsLive] = useState(true);
@@ -1197,12 +1198,23 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = "T434ZTZT155550104"
                     // Trigger device log fetch command
                     console.log('📋 Fetching Device Logs...');
                     newData = await TraxoApi.fetchDeviceLogs(vin);
+                } else if (signal.fetchType === 'vehicleStatus') {
+                    console.log('🚗 Fetching Jeep Vehicle Status...');
+                    newData = await TraxoApi.getVehicleStatus(vin);
                 } else {
                     newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
                 }
 
                 const returnData = (() => {
                     if (!newData) return null;
+
+                    // Special handling for vehicleStatus
+                    if (signal.fetchType === 'vehicleStatus') {
+                        if (typeof newData === 'object' && !Array.isArray(newData)) {
+                            return [newData];
+                        }
+                        return Array.isArray(newData) ? newData : null;
+                    }
 
                     // Special handling for trips - API might return { trips: [...] } or direct array
                     if (signal.fetchType === 'trips') {

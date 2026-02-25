@@ -332,23 +332,29 @@ export const TraxoApi = {
 
             // Try multiple endpoint variations (expected to fail until correct one is found)
             // These failures are EXPECTED - don't alarm the user
+            let lastError = null;
             try {
                 return await tryGet(`${BASE_URL}/alerts/${cleanVin}/`);
             } catch (e) {
+                lastError = e;
                 try {
                     return await tryGet(`${BASE_URL}/alerts/${cleanVin}`);
                 } catch (e2) {
+                    lastError = e2;
                     try {
                         return await tryGet(`${BASE_URL}/alerts/${cleanVin}/DEVICE`);
                     } catch (e3) {
+                        lastError = e3;
                         try {
                             return await tryGet(`${BASE_URL}/alerts`, { vin: cleanVin, status: 'OPEN' });
                         } catch (e4) {
+                            lastError = e4;
                             try {
                                 return await tryGet(`${BASE_URL}/alerts`, { vin: cleanVin });
                             } catch (e5) {
-                                // All attempts failed - return empty array silently
-                                return [];
+                                lastError = e5;
+                                // All attempts failed - throw the last error to trigger UI error state
+                                throw lastError;
                             }
                         }
                     }
@@ -623,5 +629,19 @@ export const TraxoApi = {
             console.log('📥 Download File Response:', response.headers);
             return response.data;
         }, 'PRIMARY');
+    },
+
+    getVehicleStatus: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/vehicleStatus/${vin}`, {
+                headers: {
+                    'Authorization': `Bearer ${authTokens.JEEP}`,
+                    'Accept': 'application/json'
+                },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
     }
 };
