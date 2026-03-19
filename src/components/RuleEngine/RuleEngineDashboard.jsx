@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Box,
     Container,
@@ -67,6 +68,7 @@ import TripConfiguration from './TripConfiguration';
 import CANSignalBuilder from './CANSignalBuilder'; // Added
 import DongleAlertPopup from './DongleAlertPopup'; // Added
 import PayloadDashboardModal from './PayloadDashboardModal'; // Added
+import DriverProfileBuilder from './DriverProfileBuilder'; // Added
 
 import { useAutoPersist } from '../../hooks/useAutoPersist';
 import {
@@ -84,6 +86,21 @@ import {
     generateTowLogPayload,
     generateDismantleCheckPayload
 } from '../../utils/SouthBoundPayloads';
+
+import {
+    generateUserRegistrationPayload,
+    generateUserLoginPayload,
+    generateLocationStreamPayload,
+    generateTripDetailsPayload,
+    generateRemoteCommandPayload,
+    generateGeoFencePayload,
+    generateNotificationSettingsPayload,
+    generateCustomerOnboardingPayload,
+    generateEmergencyAlertPayload
+} from '../../utils/NorthBoundPayloads';
+
+import { DOMAINS } from '../../utils/DomainConfig';
+import { TraxoApi } from '../../utils/TraxoApi';
 
 // Default initial state for the Rule Engine screen
 const DEFAULT_RULE_ENGINE_STATE = {
@@ -108,6 +125,7 @@ const DEFAULT_RULE_ENGINE_STATE = {
 };
 
 const RuleEngineDashboard = () => {
+    const navigate = useNavigate();
     const toast = useToast();
     const intervalRef = useRef(null);
     const demoTimeoutsRef = useRef([]); // Track demo timeouts to clear them on stop
@@ -209,6 +227,7 @@ const RuleEngineDashboard = () => {
     const [tboxeSimState, setTboxeSimState] = useState('NORMAL_SIM');
     const [lastPayload, setLastPayload] = useState(null);
     const [lastTripPayload, setLastTripPayload] = useState(null);
+    const [lastNbPayload, setLastNbPayload] = useState(null);
 
     // Simulation Loop Helpers
     const prevSpeedRef = useRef(0);
@@ -231,12 +250,25 @@ const RuleEngineDashboard = () => {
     const [fotaStatus, setFotaStatus] = useState('IDLE');
     const [fotaProgress, setFotaProgress] = useState(0);
 
+    // Driver Profiles State
+    const defaultProfiles = [
+        { id: 'profile-default-1', name: 'Grandma Driver', aggressiveness: 10, baseSpeed: 40 },
+        { id: 'profile-default-2', name: 'Highway Cruiser', aggressiveness: 25, baseSpeed: 90 },
+        { id: 'profile-default-3', name: 'Aggressive Racer', aggressiveness: 85, baseSpeed: 120 }
+    ];
+    const savedDriverProfiles = (persistedState.savedDriverProfiles && persistedState.savedDriverProfiles.length > 0)
+        ? persistedState.savedDriverProfiles
+        : defaultProfiles;
+    const [activeDriverProfile, setActiveDriverProfile] = useState(null);
+
     // Jeep M6 Simulation State
     const [batteryVoltage, setBatteryVoltage] = useState(12.6);
     const [crashDetected, setCrashDetected] = useState(false);
     const [geoFenceStatus, setGeoFenceStatus] = useState('INSIDE'); // INSIDE, OUTSIDE
     const [lastCommand, setLastCommand] = useState('NONE');
     const [isDeviceRemoved, setIsDeviceRemoved] = useState(false);
+    const [deviceStatusLoading, setDeviceStatusLoading] = useState(false);
+    const [deviceStatusInfo, setDeviceStatusInfo] = useState(null); // { connectionStatus, tamperStatus }
 
     // M6 Pedal State
     const [gasPedal, setGasPedal] = useState(0);
@@ -435,6 +467,7 @@ const RuleEngineDashboard = () => {
         setTboxOperatingState('NORMAL');
         setTboxeSimState('NORMAL_SIM');
         prevIgnitionRef.current = false;
+        setLastNbPayload(null);
 
         // Reset pedal and alert states
         setGasPedal(0);
@@ -814,29 +847,85 @@ const RuleEngineDashboard = () => {
         toast({ title: 'Tow Log Published', status: 'info', duration: 2000 });
     };
 
-    const handleDismantleCheck = () => {
+    const checkDeviceJoinStatus = async () => {
+        const vin = deviceVariables.current.vehicleId;
+        if (!vin) {
+            toast({ title: 'No VIN configured', status: 'warning', duration: 2000 });
+            return;
+        }
+        setDeviceStatusLoading(true);
+        try {
+            const result = await TraxoApi.getDeviceJoinStatus(vin);
+            setIsDeviceRemoved(result.isDeviceRemoved);
+            deviceVariables.current.isDeviceRemoved = result.isDeviceRemoved;
+            deviceVariables.current.dismantleStatus = result.isDeviceRemoved ? 'TAMPERED' : 'SECURE';
+            setDeviceStatusInfo({
+                connectionStatus: result.connectionStatus,
+                tamperStatus: result.tamperStatus
+            });
+            toast({
+                title: '📡 Device Status Refreshed',
+                description: `Connection: ${result.connectionStatus || 'N/A'} | Tamper: ${result.tamperStatus || 'N/A'} | Removed: ${result.isDeviceRemoved}`,
+                status: result.isDeviceRemoved ? 'error' : 'success',
+                duration: 4000
+            });
+        } catch (err) {
+            console.error('[DeviceJoinStatus] API Error:', err);
+            toast({
+                title: '⚠️ Device Status Check Failed',
+                description: err?.response?.data?.message || err.message || 'Could not reach the device status API.',
+                status: 'error',
+                duration: 4000
+            });
+        } finally {
+            setDeviceStatusLoading(false);
+        }
+    };
+
+    const handleDismantleCheck = async () => {
+        // First — try to get real-time status from the API
+        const vin = deviceVariables.current.vehicleId;
+        if (vin) {
+            setDeviceStatusLoading(true);
+            try {
+                const result = await TraxoApi.getDeviceJoinStatus(vin);
+                setIsDeviceRemoved(result.isDeviceRemoved);
+                deviceVariables.current.isDeviceRemoved = result.isDeviceRemoved;
+                setDeviceStatusInfo({
+                    connectionStatus: result.connectionStatus,
+                    tamperStatus: result.tamperStatus
+                });
+            } catch (err) {
+                console.warn('[DismantleCheck] Could not fetch live status, using last known state:', err.message);
+            } finally {
+                setDeviceStatusLoading(false);
+            }
+        }
+
+        // Generate payload using updated isDeviceRemoved value
+        const latestRemoved = deviceVariables.current.isDeviceRemoved;
         const cmdId = 'man-' + Math.random().toString(36).substring(7);
-        const dStatus = isDeviceRemoved ? 'Failure' : 'Success';
+        const dStatus = latestRemoved ? 'Failure' : 'Success';
         const payload = generateDismantleCheckPayload(cmdId, dStatus, {
             ...deviceVariables.current,
             tboxApplicationState
         });
         setLastPayload({ type: 'commandResponse', content: payload });
-        deviceVariables.current.dismantleStatus = isDeviceRemoved ? 'TAMPERED' : 'SECURE';
+        deviceVariables.current.dismantleStatus = latestRemoved ? 'TAMPERED' : 'SECURE';
 
         setEvents(prev => [...prev, {
             ruleId: 'dismantle-check',
             ruleName: 'Dismantle Check',
             type: 'diagnostic',
-            message: `Dismantle status: ${isDeviceRemoved ? 'TAMPERED' : 'SECURE'}`,
-            severity: isDeviceRemoved ? 'critical' : 'success',
+            message: `Dismantle status: ${latestRemoved ? 'TAMPERED' : 'SECURE'}`,
+            severity: latestRemoved ? 'critical' : 'success',
             timestamp: new Date().toISOString()
         }].slice(-100));
 
         toast({
             title: 'Dismantle Check Complete',
-            description: `Status: ${isDeviceRemoved ? 'TAMPERED' : 'SECURE'}`,
-            status: isDeviceRemoved ? 'error' : 'success'
+            description: `Status: ${latestRemoved ? 'TAMPERED' : 'SECURE'}`,
+            status: latestRemoved ? 'error' : 'success'
         });
     };
 
@@ -1363,9 +1452,23 @@ const RuleEngineDashboard = () => {
                         nextSpeed = Math.max(targetSpeed, nextSpeed - braking);
                     }
 
-                    // Add small fluctuation for realism
-                    const fluctuation = (Math.random() * 0.4) - 0.2;
-                    currentSpeed = Math.max(0, Math.min(200, nextSpeed + fluctuation));
+                    // Add small fluctuation for realism, influenced by driver profile aggressiveness
+                    const baseFluctuation = (Math.random() * 0.4) - 0.2;
+                    let aggressivenessMultiplier = 1;
+                    let erraticSpeedSpike = 0;
+
+                    if (activeDriverProfile && activeDriverProfile.aggressiveness) {
+                        // aggressiveness is 0-100. At 100, fluctuation is up to 5x higher and erratic spikes happen.
+                        aggressivenessMultiplier = 1 + (activeDriverProfile.aggressiveness / 25);
+
+                        // 10% chance per tick of erratic speed spike if aggressiveness is high
+                        if (Math.random() < (activeDriverProfile.aggressiveness / 1000)) {
+                            erraticSpeedSpike = (Math.random() * 10) - 2; // Can jump up to +8km/h suddenly
+                        }
+                    }
+
+                    const totalFluctuation = (baseFluctuation * aggressivenessMultiplier) + erraticSpeedSpike;
+                    currentSpeed = Math.max(0, Math.min(200, nextSpeed + totalFluctuation));
 
                     // Update the state so the slider and UI reflect the simulated speed
                     setSimSpeed(currentSpeed);
@@ -1954,7 +2057,8 @@ const RuleEngineDashboard = () => {
         // Map default rules to template format
         const defaultTemplates = [
             ...defaultRules,
-            ...JeepM6DefaultRules
+            ...JeepM6DefaultRules,
+            ...(DOMAINS.jeep_proto_5?.defaultRules || [])
         ].map(rule => ({
             title: rule.name,
             description: rule.description || rule.event.message,
@@ -2046,6 +2150,22 @@ const RuleEngineDashboard = () => {
                                 size="sm"
                             />
                         </Tooltip>
+                        <Button
+                            size="sm"
+                            colorScheme="purple"
+                            leftIcon={<LayoutDashboard size={18} />}
+                            onClick={() => navigate('/iot-rule-engine')}
+                        >
+                            IoT Rule Engine
+                        </Button>
+                        <Button
+                            size="sm"
+                            colorScheme="blue"
+                            leftIcon={<Car size={18} />}
+                            onClick={() => navigate('/iot-rule-engine')}
+                        >
+                            Jeep Proto 5.0
+                        </Button>
                     </HStack>
                 </Box>
 
@@ -2237,312 +2357,120 @@ const RuleEngineDashboard = () => {
 
 
                 {/* Main Layout */}
-                <Grid
-                    templateColumns={{ base: "1fr", lg: "400px 1fr", xl: "450px 1fr" }}
-                    gap={{ base: 4, md: 6, lg: 8 }}
-                    alignItems="start"
+                <Tabs
+                    variant="soft-rounded"
+                    colorScheme="blue"
+                    index={activeTabIndex}
+                    onChange={setActiveTabIndex}
+                    isLazy
+                    orientation="vertical"
                 >
-                    {/* Sidebar - Control Panel */}
-                    <GridItem>
-                        <VStack spacing={{ base: 4, md: 5, lg: 6 }} align="stretch" position={{ lg: "sticky" }} top="20px" width={{ base: "85vw", md: "93vw", lg: "auto" }}>
-
-                            {/* 1. Vehicle Simulation Control */}
-                            <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
-                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
-                                    <HStack>
-                                        <Icon as={Car} color="blue.500" />
-                                        <Heading size="xs" textTransform="uppercase">Vehicle Controls</Heading>
-                                    </HStack>
-                                </CardHeader>
-                                <CardBody p={{ base: 3, md: 4 }}>
-                                    <VStack spacing={{ base: 4, md: 5 }} align="stretch">
-                                        <FormControl>
-                                            <Flex justify="space-between" align="center" mb={2}>
-                                                <FormLabel mb={0} fontWeight="bold">Ignition System</FormLabel>
-                                                <Button
-                                                    size={{ base: "sm", md: "md" }}
-                                                    colorScheme={ignition ? "green" : "gray"}
-                                                    onClick={toggleIgnition}
-                                                    boxShadow="sm"
-                                                    width={{ base: "100px", md: "120px" }}
-                                                    minH="44px"
-                                                    leftIcon={<Zap size={16} />}
-                                                >
-                                                    {ignition ? "IGN ON" : "IGN OFF"}
-                                                </Button>
-                                            </Flex>
-                                            <Text fontSize="xs" color="gray.500" mb={4}>Controls the primary engine state and enables speed manipulation.</Text>
-                                        </FormControl>
-
-                                        <FormControl>
-                                            <HStack justify="space-between" mb={2}>
-                                                <FormLabel mb={0} fontWeight="bold">Vehicle Speed</FormLabel>
-                                                <Badge colorScheme="blue" fontSize="md" px={2} py={0.5} borderRadius="md">
-                                                    {Math.round(simSpeed)} km/h
-                                                </Badge>
-                                            </HStack>
-                                            <Slider
-                                                value={simSpeed}
-                                                onChange={setSimSpeed}
-                                                min={0}
-                                                max={200}
-                                                isDisabled={!ignition}
-                                                focusThumbOnChange={false}
-                                            >
-                                                <SliderTrack h={{ base: 3, md: 2 }} borderRadius="full">
-                                                    <SliderFilledTrack bg="blue.500" />
-                                                </SliderTrack>
-                                                <SliderThumb boxSize={6} border="2px solid white" shadow="md" />
-                                            </Slider>
-                                            {!ignition && <Text fontSize="2xs" color="red.500" mt={1}>Required: Ignition ON to adjust speed</Text>}
-                                        </FormControl>
-
-                                        <SimpleGrid columns={2} spacing={4}>
-                                            <Button
-                                                size={{ base: "sm", md: "md" }}
-                                                colorScheme={brakeActive ? "orange" : "gray"}
-                                                variant={brakeActive ? "solid" : "outline"}
-                                                onClick={() => setBrakeActive(!brakeActive)}
-                                                leftIcon={<Circle size={12} />}
-                                                minH="44px"
-                                            >
-                                                Brake {brakeActive ? "ON" : "OFF"}
-                                            </Button>
-                                            <Button
-                                                size={{ base: "sm", md: "md" }}
-                                                colorScheme={milActive ? "red" : "gray"}
-                                                variant={milActive ? "solid" : "outline"}
-                                                onClick={() => setMilActive(!milActive)}
-                                                leftIcon={<AlertTriangle size={16} />}
-                                                minH="44px"
-                                            >
-                                                MIL {milActive ? "ACTIVE" : "OFF"}
-                                            </Button>
-                                        </SimpleGrid>
-
-                                        <FormControl>
-                                            <HStack justify="space-between" mb={2}>
-                                                <FormLabel mb={0} fontSize="sm">Gas Pedal Position: {gasPedal}%</FormLabel>
-                                            </HStack>
-                                            <Slider
-                                                value={gasPedal}
-                                                onChange={setGasPedal}
-                                                min={0}
-                                                max={100}
-                                                isDisabled={!ignition}
-                                            >
-                                                <SliderTrack h={1.5}>
-                                                    <SliderFilledTrack bg="orange.500" />
-                                                </SliderTrack>
-                                                <SliderThumb boxSize={4} />
-                                            </Slider>
-                                        </FormControl>
-                                    </VStack>
-                                </CardBody>
-                            </Card>
-
-                            {/* 2. Cloud & Environment Simulation (HIDDEN in Trip View) */}
-                            {!showTripOnly && (
-                                <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
-                                    <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
-                                        <HStack>
-                                            <Icon as={Shield} color="purple.500" />
-                                            <Heading size="xs" textTransform="uppercase">Cloud Simulation</Heading>
+                    <Grid
+                        templateColumns={{ base: "1fr", lg: "280px 1fr", xl: "320px 1fr" }}
+                        gap={{ base: 4, md: 6 }}
+                        alignItems="start"
+                        w="full"
+                    >
+                        {/* Sidebar - Control Panel */}
+                        <GridItem w="full">
+                            <VStack spacing={{ base: 4, md: 5, lg: 6 }} align="stretch" position={{ lg: "sticky" }} top="20px" width={{ base: "85vw", md: "93vw", lg: "auto" }}>
+                                {/* Navigation Tabs */}
+                                <Card
+                                    variant="elevated"
+                                    shadow="xl"
+                                    borderRadius="2xl"
+                                    border="1px solid"
+                                    borderColor="gray.200"
+                                    bg="white"
+                                    overflow="hidden"
+                                >
+                                    <CardHeader
+                                        bgGradient="linear(to-r, blue.800, purple.800)"
+                                        py={4}
+                                        px={5}
+                                    >
+                                        <HStack justify="space-between" align="center">
+                                            <Heading size="sm" color="white" letterSpacing="widest" textTransform="uppercase" fontWeight="extrabold">Control Panel</Heading>
+                                            <Icon as={LayoutDashboard} color="whiteAlpha.800" boxSize={5} />
                                         </HStack>
                                     </CardHeader>
-                                    <CardBody>
-                                        <VStack spacing={4} align="stretch">
-                                            <SimpleGrid columns={2} spacing={4}>
-                                                <FormControl>
-                                                    <FormLabel fontSize="xs" fontWeight="bold">Battery Voltage</FormLabel>
-                                                    <HStack spacing={2}>
-                                                        <Slider
-                                                            value={batteryVoltage}
-                                                            onChange={setBatteryVoltage}
-                                                            min={9}
-                                                            max={15}
-                                                            step={0.1}
-                                                            flex={1}
-                                                        >
-                                                            <SliderTrack><SliderFilledTrack bg={batteryVoltage < 11.5 ? "red.500" : "green.500"} /></SliderTrack>
-                                                            <SliderThumb boxSize={3} />
-                                                        </Slider>
-                                                        <Text fontSize="xs" fontWeight="bold" w="40px">{batteryVoltage}V</Text>
-                                                    </HStack>
-                                                </FormControl>
-                                                <FormControl>
-                                                    <FormLabel fontSize="xs" fontWeight="bold">Road Surface</FormLabel>
-                                                    <Select size="sm" value={simRoadCondition} onChange={(e) => setSimRoadCondition(e.target.value)}>
-                                                        <option value="good">Good / Dry</option>
-                                                        <option value="bad">Damaged Path</option>
-                                                        <option value="wet">Wet Surface</option>
-                                                        <option value="icy">Icy / Slippery</option>
-                                                    </Select>
-                                                </FormControl>
-                                            </SimpleGrid>
-
-                                            <SimpleGrid columns={2} spacing={3}>
-                                                <FormControl>
-                                                    <FormLabel fontSize="xs" fontWeight="bold">eSIM Connectivity</FormLabel>
-                                                    <Select size="xs" value={tboxeSimState} onChange={(e) => setTboxeSimState(e.target.value)}>
-                                                        <option value="NORMAL_SIM">NORMAL_SIM</option>
-                                                        <option value="NO_SIM">NO_SIM</option>
-                                                        <option value="SIM_ERROR">SIM_ERROR</option>
-                                                    </Select>
-                                                </FormControl>
-                                                <FormControl>
-                                                    <FormLabel fontSize="xs" fontWeight="bold">Operation State</FormLabel>
-                                                    <Select size="xs" value={tboxOperatingState} onChange={(e) => setTboxOperatingState(e.target.value)}>
-                                                        <option value="NORMAL">NORMAL</option>
-                                                        <option value="DISCONNECTED">DISCONNECTED</option>
-                                                        <option value="FAIL">FAIL</option>
-                                                    </Select>
-                                                </FormControl>
-                                            </SimpleGrid>
-
-                                            <Divider />
-
-                                            <HStack spacing={2} wrap="wrap">
-                                                <Button size="xs" colorScheme="red" variant="outline" onClick={handleTriggerCrashLog}>Crash Log</Button>
-                                                <Button size="xs" colorScheme="orange" variant="outline" onClick={handleTriggerTowLog}>Tow Log</Button>
-                                                <Button size="xs" colorScheme="purple" variant="outline" onClick={() => setIsDeviceRemoved(!isDeviceRemoved)}>
-                                                    {isDeviceRemoved ? "Device Inserted" : "Device Removed"}
-                                                </Button>
-                                                <Button size="sm" colorScheme="teal" variant="solid" onClick={handleDismantleCheck} w="full">
-                                                    Dismantle Check
-                                                </Button>
-                                            </HStack>
-                                        </VStack>
-                                    </CardBody>
-                                </Card>
-                            )}
-
-                            {/* 3. Device Lifecycle & Remote Ops - HIDDEN BY USER REQUEST */}
-                            {/* <Card variant="outline" shadow="md" borderRadius="xl" borderColor="gray.200">
-                                <CardHeader borderBottomWidth="1px" py={3} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
-                                    <HStack>
-                                        <Icon as={Cpu} color="orange.500" />
-                                        <Heading size="xs" textTransform="uppercase">Device Lifecycle</Heading>
-                                    </HStack>
-                                </CardHeader>
-                                <CardBody>
-                                    <VStack spacing={4} align="stretch">
-                                        <Box p={3} bg="blue.50" borderRadius="md" borderLeft="4px solid" borderColor="blue.400">
-                                            <Text fontSize="2xs" color="blue.700" fontWeight="bold" mb={1}>CURRENT LIFECYCLE STATE</Text>
-                                            <Text fontWeight="bold" color="blue.800">{tboxApplicationState}</Text>
-                                        </Box>
-
-                                        <SimpleGrid columns={2} spacing={2}>
-                                            <Button size="sm" colorScheme="green" onClick={handleDongleInsertion} isDisabled={tboxApplicationState !== 'PRE-SALES'}>Insert Dongle</Button>
-                                            <Button size="sm" colorScheme="blue" onClick={() => handleLifecycleCommand('PROVISION')} isDisabled={tboxApplicationState !== 'FACTORY'}>Provision</Button>
-                                            <Button size="sm" colorScheme="purple" onClick={() => handleLifecycleCommand('AUTHORIZE')} isDisabled={tboxApplicationState !== 'PROVISIONED'}>Authorize</Button>
-                                            <Button size="sm" colorScheme="orange" onClick={() => handleLifecycleCommand('HANDOVER')} isDisabled={tboxApplicationState !== 'AUTHORIZED'}>Handover</Button>
-                                        </SimpleGrid>
-                                        <Button size="xs" variant="ghost" onClick={() => setTboxApplicationState('PRE-SALES')}>Reset to PRE-SALES</Button>
-
-                                        <Divider />
-
-                                        <Text fontWeight="bold" fontSize="xs" color="gray.600">REMOTE COMMANDS</Text>
-                                        <SimpleGrid columns={2} spacing={2}>
-                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Zap} size={10} />} onClick={() => handleRemoteCommand('Blinker')}>Blinker</Button>
-                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Shield} size={10} />} onClick={() => handleRemoteCommand('DoorLock')}>Lock</Button>
-                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Shield} size={10} />} onClick={() => handleRemoteCommand('DoorUnlock')}>Unlock</Button>
-                                            <Button size="xs" variant="outline" leftIcon={<Icon as={Activity} size={10} />} onClick={() => handleRemoteCommand('Honk')}>Honk</Button>
-                                        </SimpleGrid>
-                                    </VStack>
-                                </CardBody>
-                            </Card> */}
-
-                            {/* 4. FOTA Update Center (HIDDEN in Trip View) */}
-                            {!showTripOnly && (
-                                <Card variant="outline" shadow="md" borderRadius="xl" borderColor="blue.100" bg="blue.50">
-                                    <CardBody p={4}>
-                                        <VStack align="stretch" spacing={3}>
-                                            <HStack justify="space-between">
-                                                <HStack>
-                                                    <Icon as={Activity} color="blue.600" />
-                                                    <Text fontWeight="bold" fontSize="sm" color="blue.800">FOTA Status</Text>
+                                    <CardBody p={3} bg="gray.50">
+                                        <TabList
+                                            flexDirection="column"
+                                            border="none"
+                                            w="full"
+                                            gap={2}
+                                        >
+                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }} onClick={() => setIsDashboardModalOpen(true)}>Dashboard</Tab>
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Alert Rules</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Rule Templates</Tab>}
+                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Trip Configuration</Tab>
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>CAN Configuration</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Lifecycle Configuration</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>SouthBound Payloads</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "purple.600" }} _selected={{ bgGradient: "linear(to-r, purple.500, purple.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>NorthBound Payloads</Tab>}
+                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Vehicle Controls</Tab>
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Cloud Simulation</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>FOTA Status</Tab>}
+                                            {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Driver Profile</Tab>}
+                                            <Tab 
+                                                justifyContent="flex-start" 
+                                                py={3} 
+                                                px={4} 
+                                                borderRadius="xl" 
+                                                fontWeight="bold" 
+                                                fontSize="sm" 
+                                                color="gray.600" 
+                                                transition="all 0.3s ease" 
+                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} 
+                                                _selected={{ bgGradient: "linear(to-r, teal.500, teal.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}
+                                                onClick={() => navigate('/iot-rule-engine')}
+                                            >
+                                                Multi-Domain
+                                            </Tab>
+                                            <Tab 
+                                                justifyContent="flex-start" 
+                                                py={3} 
+                                                px={4} 
+                                                borderRadius="xl" 
+                                                fontWeight="bold" 
+                                                fontSize="sm" 
+                                                color="blue.600" 
+                                                bg="blue.50"
+                                                transition="all 0.3s ease" 
+                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.800" }} 
+                                                _selected={{ bgGradient: "linear(to-r, blue.600, blue.700)", color: "white", shadow: "md", transform: "scale(1.02)" }}
+                                                onClick={() => navigate('/iot-rule-engine')}
+                                            >
+                                                <HStack spacing={2}>
+                                                    <Icon as={Car} size={14} />
+                                                    <Text>Jeep Proto 5.0</Text>
                                                 </HStack>
-                                                <Badge colorScheme={fotaStatus === 'SUCCESS' ? 'green' : 'blue'}>{fotaStatus}</Badge>
-                                            </HStack>
-
-                                            {fotaStatus === 'DOWNLOADING' && (
-                                                <VStack align="stretch" spacing={1}>
-                                                    <Progress value={fotaProgress} size="xs" borderRadius="full" colorScheme="blue" />
-                                                    <Text fontSize="10px" textAlign="right">{fotaProgress}%</Text>
-                                                </VStack>
-                                            )}
-
-                                            <Flex gap={2}>
-                                                <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'} flex={1}>Check Updates</Button>
-                                                <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'} flex={1}>Install</Button>
-                                            </Flex>
-                                        </VStack>
+                                            </Tab>
+                                        </TabList>
                                     </CardBody>
                                 </Card>
-                            )}
 
-                            {!showTripOnly && lastPayload && (
-                                <Box p={3} bg="gray.800" borderRadius="lg" shadow="inner">
-                                    <HStack justify="space-between" mb={2}>
-                                        <Text color="gray.400" fontSize="2xs" fontWeight="bold">LAST SOUTHBOUND PAYLOAD</Text>
-                                        <Badge variant="outline" colorScheme="green" fontSize="10px">{lastPayload.type}</Badge>
-                                    </HStack>
-                                    <Box maxH="150px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#4A5568', borderRadius: '4px' } }}>
-                                        <Text color="green.300" fontFamily="monospace" fontSize="xs" whiteSpace="pre-wrap">
-                                            {JSON.stringify(lastPayload.content, null, 2)}
-                                        </Text>
+                                {!showTripOnly && lastPayload && (
+                                    <Box p={3} bg="gray.800" borderRadius="lg" shadow="inner">
+                                        <HStack justify="space-between" mb={2}>
+                                            <Text color="gray.400" fontSize="2xs" fontWeight="bold">LAST SOUTHBOUND PAYLOAD</Text>
+                                            <Badge variant="outline" colorScheme="green" fontSize="10px">{lastPayload.type}</Badge>
+                                        </HStack>
+                                        <Box maxH="150px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#4A5568', borderRadius: '4px' } }}>
+                                            <Text color="green.300" fontFamily="monospace" fontSize="xs" whiteSpace="pre-wrap">
+                                                {JSON.stringify(lastPayload.content, null, 2)}
+                                            </Text>
+                                        </Box>
                                     </Box>
-                                </Box>
-                            )}
-                        </VStack>
-                    </GridItem>
+                                )}
+                            </VStack>
+                        </GridItem>
 
 
-                    {/* Main Content Area */}
-                    <GridItem>
-                        <Tabs
-                            variant="line"
-                            colorScheme="blue"
-                            index={activeTabIndex}
-                            onChange={setActiveTabIndex}
-                            isLazy
-                            width={{ base: "93vw", md: "93vw", lg: "60vw" }}
-                            sx={{
-                                '.chakra-tabs__tab[aria-selected=true]': {
-                                    borderBottomWidth: '4px',
-                                    fontWeight: 'bold'
-                                }
-                            }}
-                        >
-                            <TabList
-                                mb="1em"
-                                overflowX="auto"
-                                overflowY="hidden"
-                                whiteSpace="nowrap"
-                                pb={2}
-                                maxWidth="100%"
-                                sx={{
-                                    '&::-webkit-scrollbar': { height: '10px', display: 'block' },
-                                    '&::-webkit-scrollbar-thumb': { background: '#A0AEC0', borderRadius: '10px' },
-                                    '&::-webkit-scrollbar-track': { background: '#EDF2F7', borderRadius: '10px' }
-                                }}
-                            >
-                                <Tab
-                                    flexShrink={0}
-                                    onClick={() => setIsDashboardModalOpen(true)}
-                                >
-                                    Dashboard
-                                </Tab>
-                                {!showTripOnly && <Tab flexShrink={0}>Alert Rules</Tab>}
-                                {!showTripOnly && <Tab flexShrink={0}>Rule Templates</Tab>}
-                                <Tab flexShrink={0}>Trip Configuration</Tab>
-                                {!showTripOnly && <Tab flexShrink={0}>CAN Configuration</Tab>}
-                                {!showTripOnly && <Tab flexShrink={0}>Lifecycle Configuration</Tab>}
-                                {!showTripOnly && <Tab flexShrink={0}>SouthBound Payloads</Tab>}
-                            </TabList>
-
-                            <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden">
+                        {/* Main Content Area */}
+                        <GridItem w="full">
+                            <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" overflow="hidden" w="full">
                                 <TabPanels bg="white">
                                     <TabPanel>
                                         <VStack align="center" justify="center" h="200px" spacing={4}>
@@ -2558,7 +2486,7 @@ const RuleEngineDashboard = () => {
                                                 <Heading size="sm" mb={4}>Active Rules ({rules.length})</Heading>
                                                 <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3} mb={6}>
                                                     {rules.map(rule => (
-                                                        <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg={useColorModeValue('gray.50', 'gray.700')}>
+                                                        <Box key={rule.id} p={3} borderWidth="1px" borderRadius="md" bg="gray.50">
                                                             <HStack justify="space-between">
                                                                 <Text fontWeight="bold" fontSize="sm">{rule.name}</Text>
                                                                 <Badge colorScheme={rule.event.severity === 'critical' ? 'red' : rule.event.severity === 'warning' ? 'orange' : 'blue'}>
@@ -2646,70 +2574,388 @@ const RuleEngineDashboard = () => {
                                             </VStack>
                                         </TabPanel>
                                     )}
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <VStack align="stretch" spacing={4}>
+                                                <Heading size="sm">NorthBound Payload Interactor</Heading>
+                                                <Text fontSize="sm" color="gray.500">Test generating Northbound Requests to the connected vehicle platform.</Text>
+                                                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={3}>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateUserRegistrationPayload({ mobileNum: "9385698874" });
+                                                        setLastNbPayload({ type: 'NB-REGISTRATION_LOGIN-001 /register', content: p });
+                                                        toast({ title: 'NB Request Sent', description: '/register payload generated', status: 'info', duration: 2000 });
+                                                    }}>User Register</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateUserLoginPayload({ mobileNum: "9385698874" });
+                                                        setLastNbPayload({ type: 'NB-REGISTRATION_LOGIN-002 /login', content: p });
+                                                        toast({ title: 'NB Request Sent', description: '/login payload generated', status: 'info', duration: 2000 });
+                                                    }}>User Login</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateLocationStreamPayload(deviceVariables.current);
+                                                        setLastNbPayload({ type: 'NB-VEH-TRACKING-001 /location', content: p });
+                                                        toast({ title: 'NB Request Sent', description: '/location payload generated', status: 'info', duration: 2000 });
+                                                    }}>Get Location Stream</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateTripDetailsPayload(deviceVariables.current, deviceVariables.current.journeyId);
+                                                        setLastNbPayload({ type: 'NB-DRV-BEHAVIOUR-001 /tripDetails', content: p });
+                                                        toast({ title: 'NB Request Sent', description: '/tripDetails payload generated', status: 'info', duration: 2000 });
+                                                    }}>Get Trip Details</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateRemoteCommandPayload(deviceVariables.current, 'HONK', { duration: 5 });
+                                                        setLastNbPayload({ type: 'NB-REMOTE-CMDS-001 /honk', content: p });
+                                                        handleRemoteCommand('Honk', p); // Trigger SB simulation
+                                                    }}>Remote CMD: Honk</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateRemoteCommandPayload(deviceVariables.current, 'DOOR_LOCK');
+                                                        setLastNbPayload({ type: 'NB-REMOTE-CMDS-001 /lock', content: p });
+                                                        handleRemoteCommand('DoorLock', p); // Trigger SB simulation
+                                                    }}>Remote CMD: Lock</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateRemoteCommandPayload(deviceVariables.current, 'DOOR_UNLOCK');
+                                                        setLastNbPayload({ type: 'NB-REMOTE-CMDS-001 /unlock', content: p });
+                                                        handleRemoteCommand('DoorUnlock', p); // Trigger SB simulation
+                                                    }}>Remote CMD: Unlock</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateRemoteCommandPayload(deviceVariables.current, 'BLINKERS');
+                                                        setLastNbPayload({ type: 'NB-REMOTE-CMDS-001 /blinkers', content: p });
+                                                        handleRemoteCommand('Blinker', p); // Trigger SB simulation
+                                                    }}>Remote CMD: Blinkers</Button>
+                                                    <Button size="sm" colorScheme="purple" variant="outline" onClick={() => {
+                                                        const p = generateGeoFencePayload(deviceVariables.current, { name: "Office", lat: 12.97, lng: 77.59, radius: 1000 });
+                                                        setLastNbPayload({ type: 'NB-ALERTS-001 /geofence', content: p });
+                                                        toast({ title: 'NB Request Sent', description: 'Geofence created', status: 'info', duration: 2000 });
+                                                    }}>Create GeoFence</Button>
+                                                </SimpleGrid>
+                                                <Box overflowX="auto" mt={2}>
+                                                    {lastNbPayload && (
+                                                        <Box mt={4} p={4} bg="gray.900" borderRadius="md">
+                                                            <HStack justify="space-between" mb={2}>
+                                                                <Text color="gray.400" fontSize="xs">Last Generated NB Request:</Text>
+                                                                <Badge colorScheme="purple" fontSize="10px">{lastNbPayload.type}</Badge>
+                                                            </HStack>
+                                                            <Text color="purple.300" fontFamily="monospace" fontSize="sm" whiteSpace="pre-wrap">
+                                                                {JSON.stringify(lastNbPayload.content, null, 2)}
+                                                            </Text>
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            </VStack>
+                                        </TabPanel>
+                                    )}
+                                    <TabPanel>
+                                        <VStack spacing={{ base: 4, md: 5 }} align="stretch">
+                                            <HStack mb={4}><Icon as={Car} color="blue.500" /><Heading size="md">Vehicle Controls</Heading></HStack>
+                                            <FormControl>
+                                                <Flex justify="space-between" align="center" mb={2}>
+                                                    <FormLabel mb={0} fontWeight="bold">Ignition System</FormLabel>
+                                                    <Button
+                                                        size={{ base: "sm", md: "md" }}
+                                                        colorScheme={ignition ? "green" : "gray"}
+                                                        onClick={toggleIgnition}
+                                                        boxShadow="sm"
+                                                        width={{ base: "100px", md: "120px" }}
+                                                        minH="44px"
+                                                        leftIcon={<Zap size={16} />}
+                                                    >
+                                                        {ignition ? "IGN ON" : "IGN OFF"}
+                                                    </Button>
+                                                </Flex>
+                                                <Text fontSize="xs" color="gray.500" mb={4}>Controls the primary engine state and enables speed manipulation.</Text>
+                                            </FormControl>
+
+                                            <FormControl>
+                                                <HStack justify="space-between" mb={2}>
+                                                    <FormLabel mb={0} fontWeight="bold">Vehicle Speed</FormLabel>
+                                                    <Badge colorScheme="blue" fontSize="md" px={2} py={0.5} borderRadius="md">
+                                                        {Math.round(simSpeed)} km/h
+                                                    </Badge>
+                                                </HStack>
+                                                <Slider
+                                                    value={simSpeed}
+                                                    onChange={setSimSpeed}
+                                                    min={0}
+                                                    max={200}
+                                                    isDisabled={!ignition}
+                                                    focusThumbOnChange={false}
+                                                >
+                                                    <SliderTrack h={{ base: 3, md: 2 }} borderRadius="full">
+                                                        <SliderFilledTrack bg="blue.500" />
+                                                    </SliderTrack>
+                                                    <SliderThumb boxSize={6} border="2px solid white" shadow="md" />
+                                                </Slider>
+                                                {!ignition && <Text fontSize="2xs" color="red.500" mt={1}>Required: Ignition ON to adjust speed</Text>}
+                                            </FormControl>
+
+                                            <SimpleGrid columns={2} spacing={4}>
+                                                <Button
+                                                    size={{ base: "sm", md: "md" }}
+                                                    colorScheme={brakeActive ? "orange" : "gray"}
+                                                    variant={brakeActive ? "solid" : "outline"}
+                                                    onClick={() => setBrakeActive(!brakeActive)}
+                                                    leftIcon={<Circle size={12} />}
+                                                    minH="44px"
+                                                >
+                                                    Brake {brakeActive ? "ON" : "OFF"}
+                                                </Button>
+                                                <Button
+                                                    size={{ base: "sm", md: "md" }}
+                                                    colorScheme={milActive ? "red" : "gray"}
+                                                    variant={milActive ? "solid" : "outline"}
+                                                    onClick={() => setMilActive(!milActive)}
+                                                    leftIcon={<AlertTriangle size={16} />}
+                                                    minH="44px"
+                                                >
+                                                    MIL {milActive ? "ACTIVE" : "OFF"}
+                                                </Button>
+                                            </SimpleGrid>
+
+                                            <FormControl>
+                                                <HStack justify="space-between" mb={2}>
+                                                    <FormLabel mb={0} fontSize="sm">Gas Pedal Position: {gasPedal}%</FormLabel>
+                                                </HStack>
+                                                <Slider
+                                                    value={gasPedal}
+                                                    onChange={setGasPedal}
+                                                    min={0}
+                                                    max={100}
+                                                    isDisabled={!ignition}
+                                                >
+                                                    <SliderTrack h={1.5}>
+                                                        <SliderFilledTrack bg="orange.500" />
+                                                    </SliderTrack>
+                                                    <SliderThumb boxSize={4} />
+                                                </Slider>
+                                            </FormControl>
+                                        </VStack>
+                                    </TabPanel>
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <VStack spacing={4} align="stretch">
+                                                <HStack mb={4}><Icon as={Shield} color="purple.500" /><Heading size="md">Cloud Simulation</Heading></HStack>
+                                                <SimpleGrid columns={2} spacing={4}>
+                                                    <FormControl>
+                                                        <FormLabel fontSize="xs" fontWeight="bold">Battery Voltage</FormLabel>
+                                                        <HStack spacing={2}>
+                                                            <Slider
+                                                                value={batteryVoltage}
+                                                                onChange={setBatteryVoltage}
+                                                                min={9}
+                                                                max={15}
+                                                                step={0.1}
+                                                                flex={1}
+                                                            >
+                                                                <SliderTrack><SliderFilledTrack bg={batteryVoltage < 11.5 ? "red.500" : "green.500"} /></SliderTrack>
+                                                                <SliderThumb boxSize={3} />
+                                                            </Slider>
+                                                            <Text fontSize="xs" fontWeight="bold" w="40px">{batteryVoltage}V</Text>
+                                                        </HStack>
+                                                    </FormControl>
+                                                    <FormControl>
+                                                        <FormLabel fontSize="xs" fontWeight="bold">Road Surface</FormLabel>
+                                                        <Select size="sm" value={simRoadCondition} onChange={(e) => setSimRoadCondition(e.target.value)}>
+                                                            <option value="good">Good / Dry</option>
+                                                            <option value="bad">Damaged Path</option>
+                                                            <option value="wet">Wet Surface</option>
+                                                            <option value="icy">Icy / Slippery</option>
+                                                        </Select>
+                                                    </FormControl>
+                                                </SimpleGrid>
+
+                                                <SimpleGrid columns={2} spacing={3}>
+                                                    <FormControl>
+                                                        <FormLabel fontSize="xs" fontWeight="bold">eSIM Connectivity</FormLabel>
+                                                        <Select size="xs" value={tboxeSimState} onChange={(e) => setTboxeSimState(e.target.value)}>
+                                                            <option value="NORMAL_SIM">NORMAL_SIM</option>
+                                                            <option value="NO_SIM">NO_SIM</option>
+                                                            <option value="SIM_ERROR">SIM_ERROR</option>
+                                                        </Select>
+                                                    </FormControl>
+                                                    <FormControl>
+                                                        <FormLabel fontSize="xs" fontWeight="bold">Operation State</FormLabel>
+                                                        <Select size="xs" value={tboxOperatingState} onChange={(e) => setTboxOperatingState(e.target.value)}>
+                                                            <option value="NORMAL">NORMAL</option>
+                                                            <option value="DISCONNECTED">DISCONNECTED</option>
+                                                            <option value="FAIL">FAIL</option>
+                                                        </Select>
+                                                    </FormControl>
+                                                </SimpleGrid>
+
+                                                <Divider />
+
+                                                <HStack spacing={2} wrap="wrap">
+                                                    <Button size="xs" colorScheme="red" variant="outline" onClick={handleTriggerCrashLog}>Crash Log</Button>
+                                                    <Button size="xs" colorScheme="orange" variant="outline" onClick={handleTriggerTowLog}>Tow Log</Button>
+                                                    <Button
+                                                        size="xs"
+                                                        colorScheme="purple"
+                                                        variant="outline"
+                                                        isLoading={deviceStatusLoading}
+                                                        loadingText="Checking..."
+                                                        onClick={checkDeviceJoinStatus}
+                                                    >
+                                                        📡 Check Device Status
+                                                    </Button>
+                                                </HStack>
+                                                {deviceStatusInfo && (
+                                                    <VStack align="stretch" spacing={1} mt={1}>
+                                                        <HStack justify="space-between">
+                                                            <Text fontSize="xs" color="gray.500">Connection</Text>
+                                                            <Badge colorScheme={deviceStatusInfo.connectionStatus === 'CONNECTED' ? 'green' : 'red'} fontSize="xs">
+                                                                {deviceStatusInfo.connectionStatus || '—'}
+                                                            </Badge>
+                                                        </HStack>
+                                                        <HStack justify="space-between">
+                                                            <Text fontSize="xs" color="gray.500">Tamper</Text>
+                                                            <Badge colorScheme={deviceStatusInfo.tamperStatus === 'TAMPERED' ? 'red' : 'green'} fontSize="xs">
+                                                                {deviceStatusInfo.tamperStatus || '—'}
+                                                            </Badge>
+                                                        </HStack>
+                                                        <HStack justify="space-between">
+                                                            <Text fontSize="xs" color="gray.500">Device Removed</Text>
+                                                            <Badge colorScheme={isDeviceRemoved ? 'red' : 'green'} fontSize="xs">
+                                                                {isDeviceRemoved ? 'YES' : 'NO'}
+                                                            </Badge>
+                                                        </HStack>
+                                                    </VStack>
+                                                )}
+                                                <HStack spacing={2} wrap="wrap" mt={1}>
+                                                    <Button size="sm" colorScheme="teal" variant="solid" onClick={handleDismantleCheck} isLoading={deviceStatusLoading} loadingText="Checking..." w="full">
+                                                        Dismantle Check
+                                                    </Button>
+                                                </HStack>
+                                            </VStack>
+                                        </TabPanel>
+                                    )}
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <VStack align="stretch" spacing={3}>
+                                                <HStack mb={4}><Icon as={Activity} color="blue.600" /><Heading size="md">FOTA Update Center</Heading></HStack>
+                                                <HStack justify="space-between">
+                                                    <HStack>
+                                                        <Icon as={Activity} color="blue.600" />
+                                                        <Text fontWeight="bold" fontSize="sm" color="blue.800">FOTA Status</Text>
+                                                    </HStack>
+                                                    <Badge colorScheme={fotaStatus === 'SUCCESS' ? 'green' : 'blue'}>{fotaStatus}</Badge>
+                                                </HStack>
+
+                                                {fotaStatus === 'DOWNLOADING' && (
+                                                    <VStack align="stretch" spacing={1}>
+                                                        <Progress value={fotaProgress} size="xs" borderRadius="full" colorScheme="blue" />
+                                                        <Text fontSize="10px" textAlign="right">{fotaProgress}%</Text>
+                                                    </VStack>
+                                                )}
+
+                                                <Flex gap={2}>
+                                                    <Button size="xs" colorScheme="blue" onClick={runFotaSequence} isDisabled={fotaStatus !== 'IDLE'} flex={1}>Check Updates</Button>
+                                                    <Button size="xs" colorScheme="green" onClick={handleInstallFota} isDisabled={fotaStatus !== 'READY_FOR_INSTALL'} flex={1}>Install</Button>
+                                                </Flex>
+                                            </VStack>
+                                        </TabPanel>
+                                    )}
+                                    {!showTripOnly && (
+                                        <TabPanel>
+                                            <DriverProfileBuilder
+                                                savedProfiles={savedDriverProfiles}
+                                                onSaveProfile={(p) => {
+                                                    updatePersistedState(currentState => {
+                                                        const prev = currentState.savedDriverProfiles || [];
+                                                        const exists = prev.findIndex(profile => profile.id === p.id);
+                                                        let newArray;
+                                                        if (exists >= 0) {
+                                                            newArray = [...prev];
+                                                            newArray[exists] = p;
+                                                        } else {
+                                                            newArray = [...prev, p];
+                                                        }
+                                                        return { savedDriverProfiles: newArray };
+                                                    });
+                                                    toast({ title: 'Profile Saved', description: `Saved profile: ${p.name}`, status: 'success', duration: 2000 });
+                                                }}
+                                                onActivateProfile={(p) => {
+                                                    setActiveDriverProfile(p);
+
+                                                    // Auto-adjust target gas pedal to reach base speed
+                                                    const targetGas = Math.min(100, (p.baseSpeed / 200) * 100);
+                                                    setGasPedal(targetGas);
+
+                                                    toast({
+                                                        title: 'Profile Activated',
+                                                        description: `Activated profile: ${p.name}. Aggressiveness applied to simulation.`,
+                                                        status: 'info',
+                                                        duration: 3000
+                                                    });
+
+                                                    setSimSpeed(p.baseSpeed);
+                                                    if (!ignition) toggleIgnition();
+                                                }}
+                                            />
+                                        </TabPanel>
+                                    )}
+                                    {/* Multi-Domain Rule Engine tab removed - now a standalone screen */}
                                 </TabPanels>
                             </Card>
-                        </Tabs>
-                        {/* Always Visible Event Log */}
-                        <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" mt={6}>
-                            <CardHeader borderBottomWidth="1px" py={{ base: 2, md: 3 }} px={{ base: 3, md: 4 }} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
-                                <HStack justify="space-between">
-                                    <HStack>
-                                        <Icon as={Activity} color="orange.500" />
-                                        <Heading size={{ base: "2xs", md: "xs" }} textTransform="uppercase">Live Event Log</Heading>
+                            {/* Always Visible Event Log */}
+                            <Card variant="outline" borderColor="gray.200" borderRadius="xl" boxShadow="sm" mt={6}>
+                                <CardHeader borderBottomWidth="1px" py={{ base: 2, md: 3 }} px={{ base: 3, md: 4 }} bg="gray.50" borderTopLeftRadius="xl" borderTopRightRadius="xl">
+                                    <HStack justify="space-between">
+                                        <HStack>
+                                            <Icon as={Activity} color="orange.500" />
+                                            <Heading size={{ base: "2xs", md: "xs" }} textTransform="uppercase">Live Event Log</Heading>
+                                        </HStack>
+                                        <Badge colorScheme="blue" variant="solid" borderRadius="full" px={2}>{events.length}</Badge>
                                     </HStack>
-                                    <Badge colorScheme="blue" variant="solid" borderRadius="full" px={2}>{events.length}</Badge>
-                                </HStack>
-                            </CardHeader>
-                            <CardBody p={0}>
-                                <Box overflowX="auto" maxHeight="400px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' } }}>
-                                    <Box as="table" width="100%">
-                                        <Box as="thead" bg="gray.50">
-                                            <Box as="tr">
-                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Time</Box>
-                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Rule</Box>
-                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold" display={{ base: "none", md: "table-cell" }}>Message</Box>
-                                                <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Status</Box>
+                                </CardHeader>
+                                <CardBody p={0}>
+                                    <Box overflowX="auto" maxHeight="400px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' } }}>
+                                        <Box as="table" width="100%">
+                                            <Box as="thead" bg="gray.50">
+                                                <Box as="tr">
+                                                    <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Time</Box>
+                                                    <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Rule</Box>
+                                                    <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold" display={{ base: "none", md: "table-cell" }}>Message</Box>
+                                                    <Box as="th" p={{ base: 2, md: 3 }} textAlign="left" fontSize="xs" color="gray.500" textTransform="uppercase" fontWeight="bold">Status</Box>
+                                                </Box>
+                                            </Box>
+                                            <Box as="tbody">
+                                                {events.slice().reverse().map((event, index) => (
+                                                    <Box as="tr" key={index} borderBottomWidth="1px" borderColor="gray.100" _hover={{ bg: 'gray.50' }}>
+                                                        <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" color="gray.600">{new Date(event.timestamp).toLocaleTimeString()}</Box>
+                                                        <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" fontWeight="bold">{event.ruleName}</Box>
+                                                        <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" display={{ base: "none", md: "table-cell" }}>{event.message}</Box>
+                                                        <Box as="td" p={{ base: 2, md: 3 }}>
+                                                            <Badge
+                                                                size="xs"
+                                                                variant="subtle"
+                                                                colorScheme={
+                                                                    event.severity === 'critical' ? 'red' :
+                                                                        event.severity === 'warning' ? 'orange' :
+                                                                            event.severity === 'success' ? 'green' : 'blue'
+                                                                }
+                                                                borderRadius="md"
+                                                            >
+                                                                {event.severity}
+                                                            </Badge>
+                                                        </Box>
+                                                    </Box>
+                                                ))}
+                                                {events.length === 0 && (
+                                                    <Box as="tr">
+                                                        <Box as="td" colSpan={4} p={8} textAlign="center" color="gray.400">
+                                                            <VStack spacing={2}>
+                                                                <Icon as={Activity} size={24} opacity={0.3} />
+                                                                <Text fontSize="sm">No events triggered yet</Text>
+                                                            </VStack>
+                                                        </Box>
+                                                    </Box>
+                                                )}
                                             </Box>
                                         </Box>
-                                        <Box as="tbody">
-                                            {events.slice().reverse().map((event, index) => (
-                                                <Box as="tr" key={index} borderBottomWidth="1px" borderColor="gray.100" _hover={{ bg: 'gray.50' }}>
-                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" color="gray.600">{new Date(event.timestamp).toLocaleTimeString()}</Box>
-                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" fontWeight="bold">{event.ruleName}</Box>
-                                                    <Box as="td" p={{ base: 2, md: 3 }} fontSize="xs" display={{ base: "none", md: "table-cell" }}>{event.message}</Box>
-                                                    <Box as="td" p={{ base: 2, md: 3 }}>
-                                                        <Badge
-                                                            size="xs"
-                                                            variant="subtle"
-                                                            colorScheme={
-                                                                event.severity === 'critical' ? 'red' :
-                                                                    event.severity === 'warning' ? 'orange' :
-                                                                        event.severity === 'success' ? 'green' : 'blue'
-                                                            }
-                                                            borderRadius="md"
-                                                        >
-                                                            {event.severity}
-                                                        </Badge>
-                                                    </Box>
-                                                </Box>
-                                            ))}
-                                            {events.length === 0 && (
-                                                <Box as="tr">
-                                                    <Box as="td" colSpan={4} p={8} textAlign="center" color="gray.400">
-                                                        <VStack spacing={2}>
-                                                            <Icon as={Activity} size={24} opacity={0.3} />
-                                                            <Text fontSize="sm">No events triggered yet</Text>
-                                                        </VStack>
-                                                    </Box>
-                                                </Box>
-                                            )}
-                                        </Box>
                                     </Box>
-                                </Box>
-                            </CardBody>
-                        </Card>
-                    </GridItem>
-                </Grid >
+                                </CardBody>
+                            </Card>
+                        </GridItem>
+                    </Grid >
+                </Tabs>
             </VStack >
 
             {/* Dongle Alert Popup */}

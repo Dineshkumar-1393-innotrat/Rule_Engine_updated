@@ -1,0 +1,205 @@
+{
+  "Sheets": [
+    "Progress",
+    "State of device",
+    "VIN",
+    "LED",
+    "Vehicle Telemetry Data Publish",
+    "Events",
+    "Alerts",
+    "Trip setting",
+    "RO's",
+    "Power Management"
+  ],
+  "Data": {
+    "Progress": [
+      {
+        "Date": "24th Nov 2025",
+        "Action Items": "1. State of the devices\r\n2. VIN decoding\r\n3. LED status"
+      },
+      {
+        "Date": "25th Nov 2025",
+        "Action Items": "1. Vehicle Telemetry Publishing\r\n2.Event data\r\n3. Alert data"
+      },
+      {
+        "Date": "1st Dec 2025",
+        "Action Items": "Trip Setting feature State flow"
+      }
+    ],
+    "State of device": [
+      {
+        "value": 0,
+        "State": "Factory",
+        "Description": "From Traxo EOL to STLA VPC Area where device is connected to Jeep M6 vehicle with all Power , GPS and GSM modules are active."
+      },
+      {
+        "value": 1,
+        "State": "Provisioned",
+        "Description": "Device specific certificate is downloaded from CVIP"
+      },
+      {
+        "value": 2,
+        "State": "Authorized",
+        "Description": "Authorized state update command from CVIP right after provision is success. There is no VIN validation required."
+      },
+      {
+        "value": 3,
+        "State": "Customer",
+        "Description": "CVIP sends the command after App registration is success. All telemetry data will be sent once the Dongle moves into Customer state only."
+      }
+    ],
+    "VIN": [
+      {
+        "VIN is decoded from 0x3E0": "VIN is a 17 character"
+      },
+      {
+        "VIN is decoded from 0x3E0": "It has two signals "
+      },
+      {
+        "VIN is decoded from 0x3E0": "VIN_MSG",
+        "__EMPTY_1": "It captures the sequence information",
+        "__EMPTY_5": 0,
+        "__EMPTY_6": 1,
+        "__EMPTY_7": 2,
+        "__EMPTY_8": 0,
+        "__EMPTY_9": 1,
+        "__EMPTY_10": 2
+      },
+      {
+        "VIN is decoded from 0x3E0": "VIN_DATA",
+        "__EMPTY_1": "It captures the actual data",
+        "__EMPTY_5": "7 bytes data",
+        "__EMPTY_6": "7 bytes data",
+        "__EMPTY_7": "3 bytes data",
+        "__EMPTY_8": "7 bytes data",
+        "__EMPTY_9": "7 bytes data",
+        "__EMPTY_10": "3 bytes data"
+      }
+    ],
+    "LED": [
+      {
+        "__EMPTY": "Power",
+        "LED ": "Monochrome LED",
+        "In working condition": "To be filled by Traxo",
+        "Authorize State Update pattern at VPC to identify the success": "To be filled by Traxo"
+      },
+      {
+        "__EMPTY": "GPS",
+        "LED ": "Multi colour LED",
+        "In working condition": "To be filled by Traxo",
+        "Authorize State Update pattern at VPC to identify the success": "To be filled by Traxo"
+      },
+      {
+        "__EMPTY": "GSM",
+        "LED ": "Multi colour LED",
+        "In working condition": "To be filled by Traxo",
+        "Authorize State Update pattern at VPC to identify the success": "To be filled by Traxo"
+      }
+    ],
+    "Vehicle Telemetry Data Publish": [
+      {
+        "Telemetry data to be published only when Vehicle Engine is ON with a frquency of 60 seconds + One sample at Engine Off + One more Sample.": "0x46C/BH2-CAN/CmdIgnSts == ( 0x4 RUN ) OR ( 0x5 START )",
+        "__EMPTY_5": "This is the actual Engine ON. "
+      },
+      {
+        "__EMPTY_6": "Time",
+        "__EMPTY_7": "T",
+        "__EMPTY_8": "2T",
+        "__EMPTY_9": "3T",
+        "__EMPTY_10": "4T",
+        "__EMPTY_11": "4.5 T",
+        "__EMPTY_12": "5T",
+        "__EMPTY_13": "6T",
+        "__EMPTY_14": "7T"
+      },
+      {
+        "__EMPTY_6": "Sent to CVIP",
+        "__EMPTY_7": "Pub",
+        "__EMPTY_8": "Pub",
+        "__EMPTY_9": "Pub",
+        "__EMPTY_10": "Pub",
+        "__EMPTY_11": "Pub",
+        "__EMPTY_12": "Pub",
+        "__EMPTY_13": "No Pub",
+        "__EMPTY_14": "No Pub"
+      },
+      {
+        "__EMPTY_6": "Engine State",
+        "__EMPTY_7": "Engine ON",
+        "__EMPTY_8": "Engine ON",
+        "__EMPTY_9": "Engine ON",
+        "__EMPTY_10": "Engine ON",
+        "__EMPTY_11": "Engine OFF",
+        "__EMPTY_12": "Engine OFF",
+        "__EMPTY_13": "Engine OFF",
+        "__EMPTY_14": "Engine OFF"
+      },
+      {
+        "__EMPTY_6": "Data packet",
+        "__EMPTY_7": "D1",
+        "__EMPTY_8": "D2",
+        "__EMPTY_9": "D3",
+        "__EMPTY_10": "D4",
+        "__EMPTY_11": "D5_Indicator",
+        "__EMPTY_12": "D6_Indicator"
+      }
+    ],
+    "Events": [
+      {
+        "S.No": 1,
+        "Feature": "Connection Status",
+        "CAN \r\n( CAN_ID / CAN BUS / Signal )": "device specific ( NA )",
+        "Logic": "Traxo needs to fill with description and value set ",
+        "Remarks": "event",
+        "Frequency": "on occurence"
+      },
+      {
+        "S.No": 2,
+        "Feature": "Ignition status",
+        "CAN \r\n( CAN_ID / CAN BUS / Signal )": "0x46C/BH2-CAN/CmdIgnSts",
+        "Logic": "IGNITION ON:\r\n0x4 RUN\r\n0x5 START\r\n\r\nIGNITION OFF:\r\nANY OTHER VALUE",
+        "Remarks": "event",
+        "Frequency": "on occurence"
+      }
+    ],
+    "Alerts": [
+      {
+        "S.No": 10,
+        "Feature": "MILStatus",
+        "CAN \r\n( CAN_ID / CAN BUS / Signal )": "0x763/BH2-CAN/ENGINE_MIL_STAT",
+        "Logic": "To be monitored after  5 seconds delay in Engine ON.\r\n\r\nAlert is ON\r\n[ 0x46C/BH2-CAN/CmdIgnSts == ( 0x4 RUN ) OR ( 0x5 START )  ] \r\nAND\r\n[ 5 seconds timer is satisfied ]\r\nAND\r\n[ 0x763/BH2-CAN/ENGINE_MIL_STAT == ( 0x1 On ) OR ( 0x2 Blinking) ]\r\n\r\nAlert is OFF\r\n[ 0x46C/BH2-CAN/CmdIgnSts == ( 0x4 RUN ) OR ( 0x5 START )  ] \r\nAND\r\n[ 5 seconds timer is satisfied ]\r\nAND\r\n[ 0x763/BH2-CAN/ENGINE_MIL_STAT == 0x0 Off ]",
+        "Remarks": "diag alert",
+        "Frequency": "on occurence"
+      },
+      {
+        "S.No": 14,
+        "Feature": "Device Removal",
+        "CAN \r\n( CAN_ID / CAN BUS / Signal )": "device specific",
+        "Remarks": "alert",
+        "Frequency": "on occurence"
+      },
+      {
+        "S.No": 15,
+        "Feature": "Speed limit",
+        "Remarks": "alert",
+        "Frequency": "on occurence"
+      },
+      {
+        "S.No": 16,
+        "Feature": "Engine Idle",
+        "Remarks": "alert",
+        "Frequency": "on occurence"
+      },
+      {
+        "S.No": 17,
+        "Feature": "Towing",
+        "CAN \r\n( CAN_ID / CAN BUS / Signal )": "device specific",
+        "Remarks": "alert",
+        "Frequency": "on occurence"
+      }
+    ],
+    "Trip setting": [],
+    "RO's": [],
+    "Power Management": []
+  }
+}

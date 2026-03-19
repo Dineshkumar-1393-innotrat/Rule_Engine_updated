@@ -25,7 +25,8 @@ import {
 import { FaTrash, FaPlus, FaChevronDown, FaChevronRight, FaInfoCircle } from 'react-icons/fa';
 import { AvailableFacts, DeviceStates, DeviceVariables, ConfigurableParameters } from '../../utils/RuleEngine';
 
-const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveToLibrary, prefillRule }) => {
+const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveToLibrary, prefillRule, availableFacts }) => {
+    const factsToUse = availableFacts || AvailableFacts;
     const bgColor = useColorModeValue('white', 'gray.800');
     const borderColor = useColorModeValue('gray.200', 'gray.700');
     const sectionBg = useColorModeValue('gray.50', 'gray.700');
@@ -43,7 +44,7 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
     const [showStates, setShowStates] = useState(true);
 
     // Group facts by category for display
-    const factsByCategory = AvailableFacts.reduce((acc, fact) => {
+    const factsByCategory = factsToUse.reduce((acc, fact) => {
         if (!acc[fact.category]) acc[fact.category] = [];
         acc[fact.category].push(fact);
         return acc;
@@ -291,31 +292,13 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                                     color="black"
                                 >
                                     {/* Group facts by category */}
-                                    <optgroup label="📊 Sensor Data">
-                                        {AvailableFacts.filter(f => f.category === 'sensor').map(fact => (
-                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="🔄 Device State">
-                                        {AvailableFacts.filter(f => f.category === 'state').map(fact => (
-                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="📝 Internal Variables">
-                                        {AvailableFacts.filter(f => f.category === 'variable').map(fact => (
-                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="🚗 Trip Statistics">
-                                        {AvailableFacts.filter(f => f.category === 'trip').map(fact => (
-                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                        ))}
-                                    </optgroup>
-                                    <optgroup label="⚙️ Parameters">
-                                        {AvailableFacts.filter(f => f.category === 'parameter').map(fact => (
-                                            <option key={fact.name} value={fact.name}>{fact.label}</option>
-                                        ))}
-                                    </optgroup>
+                                    {Object.entries(factsByCategory).map(([category, facts]) => (
+                                        <optgroup key={category} label={category.toUpperCase()}>
+                                            {facts.map(fact => (
+                                                <option key={fact.name} value={fact.name}>{fact.label}</option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
                                 </Select>
                                 <Select
                                     value={condition.operator}

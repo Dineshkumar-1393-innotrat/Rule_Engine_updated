@@ -220,32 +220,34 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                             <VStack spacing={3} align="flex-start">
                                 <Button
                                     leftIcon={<FaCode />}
-                                    bgGradient="linear(to-br, #13428E, #2458AC)"
+                                    bg="#3182ce"
                                     color="white"
                                     _hover={{
-                                        bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                        bg: "#2b6cb0",
                                         transform: "translateY(-2px)",
                                         boxShadow: "lg"
                                     }}
                                     transition="all 0.2s"
                                     boxShadow="md"
                                     size="sm"
+                                    w="160px"
                                     onClick={handleGenerateCode}
                                 >
                                     Generate Code
                                 </Button>
                                 <Button
                                     leftIcon={<FaCode />}
-                                    bgGradient="linear(to-br, #13428E, #2458AC)"
+                                    bg="#3182ce"
                                     color="white"
                                     _hover={{
-                                        bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                        bg: "#2b6cb0",
                                         transform: "translateY(-2px)",
                                         boxShadow: "lg"
                                     }}
                                     transition="all 0.2s"
                                     boxShadow="md"
                                     size="sm"
+                                    w="160px"
                                     onClick={handleConverterCode}
                                 >
                                     Converter
@@ -505,10 +507,10 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                                 />
                             </FormControl>
                             <Button
-                                bgGradient="linear(to-br, #13428E, #2458AC)"
+                                bg="#3182ce"
                                 color="white"
                                 _hover={{
-                                    bgGradient: "linear(to-br, #0D2C5E, #13428E)",
+                                    bg: "#2b6cb0",
                                     transform: "translateY(-2px)",
                                     boxShadow: "lg"
                                 }}

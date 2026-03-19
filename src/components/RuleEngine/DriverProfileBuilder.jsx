@@ -26,6 +26,7 @@ const DriverProfileBuilder = ({ savedProfiles = [], onSaveProfile, onActivatePro
     const [profileName, setProfileName] = useState('');
     const [aggressiveness, setAggressiveness] = useState(50);
     const [baseSpeed, setBaseSpeed] = useState(60);
+    const [currentProfileId, setCurrentProfileId] = useState(null);
 
     const handleLoadProfile = (profileId) => {
         const profile = savedProfiles.find(p => p.id === profileId);
@@ -33,13 +34,20 @@ const DriverProfileBuilder = ({ savedProfiles = [], onSaveProfile, onActivatePro
             setProfileName(profile.name);
             setAggressiveness(profile.aggressiveness);
             setBaseSpeed(profile.baseSpeed);
+            setCurrentProfileId(profile.id);
+        } else {
+            // Reset if selected nothing
+            setProfileName('');
+            setAggressiveness(50);
+            setBaseSpeed(60);
+            setCurrentProfileId(null);
         }
     };
 
     const createProfileObject = () => {
         if (!profileName) return null;
         return {
-            id: `profile-${Date.now()}`,
+            id: currentProfileId || `profile-${Date.now()}`,
             name: profileName,
             aggressiveness,
             baseSpeed,
@@ -49,6 +57,7 @@ const DriverProfileBuilder = ({ savedProfiles = [], onSaveProfile, onActivatePro
     const handleSave = () => {
         const profile = createProfileObject();
         if (profile && onSaveProfile) {
+            setCurrentProfileId(profile.id); // In case it was a new profile
             onSaveProfile(profile);
         }
     };

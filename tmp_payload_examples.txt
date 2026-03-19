@@ -1,0 +1,19 @@
+Title: HTTP Request:  POST   /jeep/users/register
+{ 
+“mobileNum”:”9385698874”,  
+“countryCode”: “+91”  
+“password”:”Password@123”  
+} 
+
+Title: HTTP Response: 200 OK
+{ 
+    "message": " User is successfully registered .", 
+    "statusCode": 200  
+} 
+
+Title: HTTP Request:  POST   /jeep/users/login
+{ 
+   "mobileNum": " 9385698874 ", 
+   "countryCode": "+91",  
+   "password": "Password @123 " 
+} 

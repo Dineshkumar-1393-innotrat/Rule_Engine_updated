@@ -7,6 +7,7 @@ import { WorkspaceStateProvider } from "./contexts/WorkspaceStateContext";
 
 import { autoSaveManager } from "./utils/autoSaveManager";
 import RuleEngineDashboard from "./components/RuleEngine/RuleEngineDashboard";
+import IoTRuleEnginePage from "./components/RuleEngine/IoTRuleEnginePage";
 
 const App = () => {
 
@@ -36,7 +37,7 @@ const App = () => {
 
             <Routes>
               <Route path="/" element={<RuleEngineDashboard />} />
-
+              <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
             </Routes>
 
 
