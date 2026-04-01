@@ -47,7 +47,7 @@ import {
     Icon,
     Divider
 } from '@chakra-ui/react';
-import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle, LayoutDashboard, Compass } from 'lucide-react';
+import { Play, Square, Trash2, Zap, Activity, Car, Shield, Cpu, AlertTriangle, Circle, LayoutDashboard, Compass, Settings } from 'lucide-react';
 import {
     RuleEngine,
     defaultRules, // Keep defaultRules as it's used in DEFAULT_RULE_ENGINE_STATE
@@ -285,6 +285,14 @@ const RuleEngineDashboard = () => {
     const [activePopupAlert, setActivePopupAlert] = useState(null);
     const [isAlertPopupOpen, setIsAlertPopupOpen] = useState(false);
 
+    // Manual Override State
+    const [isManualMode, setIsManualMode] = useState(false);
+    const [manualRpm, setManualRpm] = useState(800);
+    const [manualEngineTemp, setManualEngineTemp] = useState(85);
+    const [manualFuelLevel, setManualFuelLevel] = useState(75);
+    const [manualTripDistance, setManualTripDistance] = useState(0);
+
+
     // Trip Stats (Required for simulation)
     const tripStats = useRef({
         runTime: 0,      // seconds
@@ -409,6 +417,45 @@ const RuleEngineDashboard = () => {
         }
     };
 
+    const handleOverrideState = (targetState) => {
+        const isTripState = targetState.startsWith('TRIP_');
+
+        if (isTripState) {
+            // 1. Ensure we are in CUSTOMER mode for trip states
+            if (tboxApplicationState !== DeviceStates.CUSTOMER) {
+                setTboxApplicationState(DeviceStates.CUSTOMER);
+            }
+
+            // 2. Set the trip state
+            setDeviceState(targetState);
+
+            // 3. Handle Ignition side effects (Trigger ignition if needed)
+            if (targetState === DeviceStates.TRIP_ACTIVE || targetState === DeviceStates.TRIP_PENDING) {
+                if (!ignition) {
+                    setIgnition(true);
+                    ignOnTime.current = Date.now();
+                    toast({ title: 'Auto-Ignition ON', description: `Ignition started for ${targetState}`, status: 'success' });
+                }
+            }
+        } else {
+            // 1. Handle Lifecycle State transition (FACTORY, PROVISIONED, etc.)
+            setTboxApplicationState(targetState);
+            setDeviceState(targetState); // Sync display state
+
+            // 2. Kill ignition if moving back to PRE-SALES
+            if (targetState === DeviceStates.PRE_SALES && ignition) {
+                setIgnition(false);
+                setSimSpeed(0);
+            }
+        }
+
+        toast({
+            title: `State Override: ${targetState}`,
+            status: 'info',
+            duration: 2000
+        });
+    };
+
     const clearData = () => {
         // Stop simulation
         setIsRunning(false);
@@ -432,6 +479,13 @@ const RuleEngineDashboard = () => {
         setFotaStatus('IDLE');
         setGeoFenceStatus('INSIDE');
         setLastCommand('NONE');
+
+        // Reset Manual Overrides
+        setIsManualMode(false);
+        setManualRpm(800);
+        setManualEngineTemp(85);
+        setManualFuelLevel(75);
+        setManualTripDistance(0);
 
         // Reset trip stats
         tripStats.current = { runTime: 0, distance: 0, offTime: 0 };
@@ -1441,64 +1495,72 @@ const RuleEngineDashboard = () => {
                     }
 
                     // Advanced Simulation: Calculate speed and RPM based on Gas Pedal, Brake, and Ignition
-                    const targetSpeed = (gasPedal / 100) * 200; // Max speed 200 km/h
-                    const acceleration = (gasPedal / 100) * 5;  // Max acceleration 5 km/h per second
-                    const braking = brakeActive ? 15 : 1.5;   // Braking is much stronger than natural deceleration
+                    if (!isManualMode) {
+                        const targetSpeed = (gasPedal / 100) * 200; // Max speed 200 km/h
+                        const acceleration = (gasPedal / 100) * 5;  // Max acceleration 5 km/h per second
+                        const braking = brakeActive ? 15 : 1.5;   // Braking is much stronger than natural deceleration
 
-                    let nextSpeed = simSpeed;
-                    if (nextSpeed < targetSpeed) {
-                        nextSpeed = Math.min(targetSpeed, nextSpeed + acceleration);
-                    } else if (nextSpeed > targetSpeed) {
-                        nextSpeed = Math.max(targetSpeed, nextSpeed - braking);
-                    }
-
-                    // Add small fluctuation for realism, influenced by driver profile aggressiveness
-                    const baseFluctuation = (Math.random() * 0.4) - 0.2;
-                    let aggressivenessMultiplier = 1;
-                    let erraticSpeedSpike = 0;
-
-                    if (activeDriverProfile && activeDriverProfile.aggressiveness) {
-                        // aggressiveness is 0-100. At 100, fluctuation is up to 5x higher and erratic spikes happen.
-                        aggressivenessMultiplier = 1 + (activeDriverProfile.aggressiveness / 25);
-
-                        // 10% chance per tick of erratic speed spike if aggressiveness is high
-                        if (Math.random() < (activeDriverProfile.aggressiveness / 1000)) {
-                            erraticSpeedSpike = (Math.random() * 10) - 2; // Can jump up to +8km/h suddenly
+                        let nextSpeed = simSpeed;
+                        if (nextSpeed < targetSpeed) {
+                            nextSpeed = Math.min(targetSpeed, nextSpeed + acceleration);
+                        } else if (nextSpeed > targetSpeed) {
+                            nextSpeed = Math.max(targetSpeed, nextSpeed - braking);
                         }
+
+                        // Add small fluctuation for realism, influenced by driver profile aggressiveness
+                        const baseFluctuation = (Math.random() * 0.4) - 0.2;
+                        let aggressivenessMultiplier = 1;
+                        let erraticSpeedSpike = 0;
+
+                        if (activeDriverProfile && activeDriverProfile.aggressiveness) {
+                            // aggressiveness is 0-100. At 100, fluctuation is up to 5x higher and erratic spikes happen.
+                            aggressivenessMultiplier = 1 + (activeDriverProfile.aggressiveness / 25);
+
+                            // 10% chance per tick of erratic speed spike if aggressiveness is high
+                            if (Math.random() < (activeDriverProfile.aggressiveness / 1000)) {
+                                erraticSpeedSpike = (Math.random() * 10) - 2; // Can jump up to +8km/h suddenly
+                            }
+                        }
+
+                        const totalFluctuation = (baseFluctuation * aggressivenessMultiplier) + erraticSpeedSpike;
+                        currentSpeed = Math.max(0, Math.min(200, nextSpeed + totalFluctuation));
+
+                        // Update the state so the slider and UI reflect the simulated speed
+                        setSimSpeed(currentSpeed);
                     }
-
-                    const totalFluctuation = (baseFluctuation * aggressivenessMultiplier) + erraticSpeedSpike;
-                    currentSpeed = Math.max(0, Math.min(200, nextSpeed + totalFluctuation));
-
-                    // Update the state so the slider and UI reflect the simulated speed
-                    setSimSpeed(currentSpeed);
 
                     // Dynamic RPM calculation: Base idle (800) + gas influence + speed influence
-                    if (currentSpeed < 1) {
-                        currentRpm = 800 + (gasPedal * 10) + (Math.random() * 50);
+                    if (!isManualMode) {
+                        if (currentSpeed < 1) {
+                            currentRpm = 800 + (gasPedal * 10) + (Math.random() * 50);
+                        } else {
+                            // Simple gear simulation logic (simulating 6 gears)
+                            const gear = Math.min(6, Math.floor(currentSpeed / 35) + 1);
+                            const gearRatio = 1.0 - ((gear - 1) * 0.1);
+                            currentRpm = 1000 + ((currentSpeed % 35) * 100 * gearRatio) + (gasPedal * 15);
+                        }
+                        currentRpm = Math.floor(Math.min(8000, currentRpm));
                     } else {
-                        // Simple gear simulation logic (simulating 6 gears)
-                        const gear = Math.min(6, Math.floor(currentSpeed / 35) + 1);
-                        const gearRatio = 1.0 - ((gear - 1) * 0.1);
-                        currentRpm = 1000 + ((currentSpeed % 35) * 100 * gearRatio) + (gasPedal * 15);
+                        currentRpm = manualRpm;
                     }
-                    currentRpm = Math.floor(Math.min(8000, currentRpm));
 
                     // Unified Simulation: Add noise to battery voltage if engine is ON
                     // Simulate alternator fluctuating between 13.5V and 14.5V
-                    setBatteryVoltage(prev => {
-                        // If it was forced low (e.g. 10.5) during demo, let's slowly recover it or fluctuate it?
-                        // If it's very low, maybe don't auto-recover instantly to keep the 'problem' visible.
-                        // But for normal simulation, we want 13.5-14.5.
-                        if (prev > 12) {
-                            return parseFloat((13.5 + Math.random()).toFixed(1));
-                        }
-                        return prev; // Keep it low if it was set low, until manual reset
-                    });
+                    if (!isManualMode) {
+                        setBatteryVoltage(prev => {
+                            // If it was forced low (e.g. 10.5) during demo, let's slowly recover it or fluctuate it?
+                            // If it's very low, maybe don't auto-recover instantly to keep the 'problem' visible.
+                            // But for normal simulation, we want 13.5-14.5.
+                            if (prev > 12) {
+                                return parseFloat((13.5 + Math.random()).toFixed(1));
+                            }
+                            return prev; // Keep it low if it was set low, until manual reset
+                        });
+                    }
 
                     // VIN Discovery Simulation (Section 4.1.1)
                     // Check if lifecycle rules allow VIN decoding
-                    if (rulesForState?.allowedActions?.vinDecoding && tboxApplicationState === DeviceStates.FACTORY) {
+                    if (!isManualMode && rulesForState?.allowedActions?.vinDecoding && tboxApplicationState === DeviceStates.FACTORY) {
                         const currentFragments = { ...deviceVariables.current.vinFragments };
                         const fragmentCount = Object.keys(currentFragments).length;
 
@@ -1539,9 +1601,14 @@ const RuleEngineDashboard = () => {
 
                     // Update distance (speed is km/h, time is 1s)
                     // Distance increment (km) = (speed / 3600) * 1s
-                    const distInc = currentSpeed / 3600;
-                    tripStats.current.distance += distInc;
-                    deviceVariables.current.currentTripDistance = tripStats.current.distance;
+                    if (!isManualMode) {
+                        const distInc = currentSpeed / 3600;
+                        tripStats.current.distance += distInc;
+                        deviceVariables.current.currentTripDistance = tripStats.current.distance;
+                    } else {
+                        tripStats.current.distance = manualTripDistance;
+                        deviceVariables.current.currentTripDistance = manualTripDistance;
+                    }
 
                     if (currentSpeed > deviceVariables.current.topSpeed) {
                         deviceVariables.current.topSpeed = currentSpeed;
@@ -1631,8 +1698,13 @@ const RuleEngineDashboard = () => {
                     // [ 0x46C/BH2-CAN/CmdIgnSts != ( 0x4 RUN || 0x5 START ) ] && [ IGNITION Off counter > 300s (5 mins) ]
                     if (!ignition) {
                         // Engine is OFF
-                        currentSpeed = 0;
-                        currentRpm = 0;
+                        if (!isManualMode) {
+                            currentSpeed = 0;
+                            currentRpm = 0;
+                            setSimSpeed(0);
+                        } else {
+                            currentRpm = manualRpm;
+                        }
                         tripStats.current.offTime += 1; // Increment every second
                         deviceVariables.current.elapsedIgnitionOffTime = tripStats.current.offTime;
 
@@ -1814,8 +1886,8 @@ const RuleEngineDashboard = () => {
                     speed: currentSpeed,
                     rpm: currentRpm,
                     roadCondition: simRoadCondition,
-                    engineTemp: 80 + Math.random() * 10,
-                    fuelLevel: 75,
+                    engineTemp: isManualMode ? manualEngineTemp : (80 + Math.random() * 10),
+                    fuelLevel: isManualMode ? manualFuelLevel : 75,
                     timestamp: new Date().toISOString(),
 
                     // M6 Sensors
@@ -1885,10 +1957,10 @@ const RuleEngineDashboard = () => {
                             let val = 0;
                             if (name.includes('speed') && !name.includes('engine')) val = currentSpeed;
                             else if (name.includes('rpm') || name.includes('engine speed')) val = currentRpm;
-                            else if (name.includes('temp')) val = 95 + (Math.sin(Date.now() / 10000) * 10); // Simulated Temp fluctuation
+                            else if (name.includes('temp')) val = isManualMode ? manualEngineTemp : (95 + (Math.sin(Date.now() / 10000) * 10)); // Simulated Temp fluctuation
                             else if (name.includes('battery') || name.includes('voltage')) val = batteryVoltage;
                             else if (name.includes('mil')) val = milActive ? 1 : 0;
-                            else if (name.includes('fuel')) val = 75;
+                            else if (name.includes('fuel')) val = isManualMode ? manualFuelLevel : 75;
                             else val = sig.defaultValue || 0;
 
                             canFacts[sig.name] = val; // Use exact signal name as variable
@@ -1914,8 +1986,8 @@ const RuleEngineDashboard = () => {
                         speed: currentSpeed,
                         rpm: currentRpm,
                         batteryVoltage,
-                        engineTemp: 85,
-                        fuelLevel: 75,
+                        engineTemp: isManualMode ? manualEngineTemp : 85,
+                        fuelLevel: isManualMode ? manualFuelLevel : 75,
                         engineMilStat: currentData.engineMilStat,
                         brakeActive: currentData.brakeActive
                     });
@@ -2113,6 +2185,18 @@ const RuleEngineDashboard = () => {
                                 size="sm"
                             />
                         </Tooltip>
+                        <Tooltip label={isManualMode ? "Disable Manual Mode" : "Enable Manual Mode"}>
+                            <Button
+                                size="sm"
+                                colorScheme={isManualMode ? "orange" : "gray"}
+                                variant={isManualMode ? "solid" : "outline"}
+                                onClick={() => setIsManualMode(!isManualMode)}
+                                leftIcon={<Settings size={18} />}
+                            >
+                                {isManualMode ? "Manual Active" : "Manual Mode"}
+                            </Button>
+                        </Tooltip>
+
                         <Tooltip label="Clear Data">
                             <IconButton
                                 icon={<Trash2 size={18} />}
@@ -2241,7 +2325,7 @@ const RuleEngineDashboard = () => {
                                             size="xs"
                                             width="140px"
                                             value={deviceState}
-                                            onChange={(e) => setDeviceState(e.target.value)}
+                                            onChange={(e) => handleOverrideState(e.target.value)}
                                             borderRadius="md"
                                         >
                                             {/* Always allow Trip States if in Trip View OR Customer Mode */}
@@ -2675,7 +2759,7 @@ const RuleEngineDashboard = () => {
                                                     onChange={setSimSpeed}
                                                     min={0}
                                                     max={200}
-                                                    isDisabled={!ignition}
+                                                    isDisabled={!ignition && !isManualMode}
                                                     focusThumbOnChange={false}
                                                 >
                                                     <SliderTrack h={{ base: 3, md: 2 }} borderRadius="full">
@@ -2683,7 +2767,7 @@ const RuleEngineDashboard = () => {
                                                     </SliderTrack>
                                                     <SliderThumb boxSize={6} border="2px solid white" shadow="md" />
                                                 </Slider>
-                                                {!ignition && <Text fontSize="2xs" color="red.500" mt={1}>Required: Ignition ON to adjust speed</Text>}
+                                                {!ignition && !isManualMode && <Text fontSize="2xs" color="red.500" mt={1}>Required: Ignition ON to adjust speed</Text>}
                                             </FormControl>
 
                                             <SimpleGrid columns={2} spacing={4}>
@@ -2718,7 +2802,7 @@ const RuleEngineDashboard = () => {
                                                     onChange={setGasPedal}
                                                     min={0}
                                                     max={100}
-                                                    isDisabled={!ignition}
+                                                    isDisabled={!ignition && !isManualMode}
                                                 >
                                                     <SliderTrack h={1.5}>
                                                         <SliderFilledTrack bg="orange.500" />
@@ -2726,6 +2810,74 @@ const RuleEngineDashboard = () => {
                                                     <SliderThumb boxSize={4} />
                                                 </Slider>
                                             </FormControl>
+
+                                            {/* Manual Mode Overrides Section */}
+                                            {isManualMode && (
+                                                <Box p={4} bg="orange.50" borderRadius="xl" border="1px dashed" borderColor="orange.200" mt={2}>
+                                                    <VStack spacing={4} align="stretch">
+                                                        <HStack justify="space-between">
+                                                            <HStack>
+                                                                <Icon as={Settings} size={14} color="orange.500" />
+                                                                <Text fontWeight="bold" fontSize="xs" color="orange.700" textTransform="uppercase">Manual Overrides</Text>
+                                                            </HStack>
+                                                            <Badge colorScheme="orange" variant="subtle" fontSize="10px">INPUT BYPASS</Badge>
+                                                        </HStack>
+                                                        
+                                                        <FormControl>
+                                                            <HStack justify="space-between" mb={1}>
+                                                                <FormLabel fontSize="2xs" fontWeight="bold" mb={0}>Engine RPM</FormLabel>
+                                                                <Badge variant="outline" colorScheme="orange" fontSize="xs">{manualRpm}</Badge>
+                                                            </HStack>
+                                                            <Slider value={manualRpm} onChange={setManualRpm} min={0} max={8000} step={100}>
+                                                                <SliderTrack h={1}><SliderFilledTrack bg="orange.400" /></SliderTrack>
+                                                                <SliderThumb boxSize={3} />
+                                                            </Slider>
+                                                        </FormControl>
+
+                                                        <SimpleGrid columns={2} spacing={4}>
+                                                            <FormControl>
+                                                                <HStack justify="space-between" mb={1}>
+                                                                    <FormLabel fontSize="2xs" fontWeight="bold" mb={0}>Temp (°C)</FormLabel>
+                                                                    <Text fontSize="xs" fontWeight="bold">{manualEngineTemp}</Text>
+                                                                </HStack>
+                                                                <Slider value={manualEngineTemp} onChange={setManualEngineTemp} min={0} max={150}>
+                                                                    <SliderTrack h={1}><SliderFilledTrack bg="red.400" /></SliderTrack>
+                                                                    <SliderThumb boxSize={3} />
+                                                                </Slider>
+                                                            </FormControl>
+
+                                                            <FormControl>
+                                                                <HStack justify="space-between" mb={1}>
+                                                                    <FormLabel fontSize="2xs" fontWeight="bold" mb={0}>Fuel (%)</FormLabel>
+                                                                    <Text fontSize="xs" fontWeight="bold">{manualFuelLevel}</Text>
+                                                                </HStack>
+                                                                <Slider value={manualFuelLevel} onChange={setManualFuelLevel} min={0} max={100}>
+                                                                    <SliderTrack h={1}><SliderFilledTrack bg="green.400" /></SliderTrack>
+                                                                    <SliderThumb boxSize={3} />
+                                                                </Slider>
+                                                            </FormControl>
+                                                        </SimpleGrid>
+
+                                                        <FormControl>
+                                                            <FormLabel fontSize="2xs" fontWeight="bold" mb={1}>Manual Trip Distance (km)</FormLabel>
+                                                            <NumberInput 
+                                                                size="sm" 
+                                                                value={manualTripDistance} 
+                                                                onChange={(_, val) => setManualTripDistance(isNaN(val) ? 0 : val)} 
+                                                                min={0} 
+                                                                max={10000} 
+                                                                step={0.1}
+                                                            >
+                                                                <NumberInputField bg="white" fontSize="xs" fontWeight="bold" />
+                                                                <NumberInputStepper>
+                                                                    <NumberIncrementStepper />
+                                                                    <NumberDecrementStepper />
+                                                                </NumberInputStepper>
+                                                            </NumberInput>
+                                                        </FormControl>
+                                                    </VStack>
+                                                </Box>
+                                            )}
                                         </VStack>
                                     </TabPanel>
                                     {!showTripOnly && (

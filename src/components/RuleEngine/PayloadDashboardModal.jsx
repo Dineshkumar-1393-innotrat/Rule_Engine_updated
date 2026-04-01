@@ -3046,7 +3046,8 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
     let priority = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
     if (name.includes('Trip')) priority = ['tripId', 'startTime', 'endTime', 'distance', 'duration', 'topSpeed'];
     else if (name === 'Jeep Vehicle Status') priority = ['vinNo', 'status', 'ignitionStatus', 'fuelLevel', 'batteryVoltage'];
-    const keys = allKeys.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return a.localeCompare(b); }).slice(0, 8);
+    let sortedKeys = allKeys.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return a.localeCompare(b); });
+    const keys = name === 'Jeep Vehicle Status' ? sortedKeys : sortedKeys.slice(0, 8);
     const rows = nameMatch ? arr.slice(0, 25) : arr.filter(item => keys.some(k => String(item[k] ?? '').toLowerCase().includes(term))).slice(0, 25);
     if (!rows.length) return <Flex align="center" justify="center" h="full" p={4}><Text fontSize="12px" color="gray.500">No matching records.</Text></Flex>;
     return (
@@ -3060,8 +3061,16 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
                         <Tr key={idx} _hover={{ bg: 'blue.50' }}>
                             {keys.map(k => {
                                 let v = item[k];
-                                if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
-                                if (k.toLowerCase().includes('time')) { try { const dt = new Date(v); if (!isNaN(dt)) v = dt.toLocaleString(); } catch (e) { } }
+                                if (typeof v === 'object' && v !== null) {
+                                    return (
+                                        <Td key={k} fontSize="10px" py={2} px={3}>
+                                            <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md">
+                                                <pre style={{ margin: 0, fontFamily: 'monospace' }}>{JSON.stringify(v, null, 2)}</pre>
+                                            </Box>
+                                        </Td>
+                                    );
+                                }
+                                if (k.toLowerCase().includes('time') && v) { try { const dt = new Date(v); if (!isNaN(dt)) v = dt.toLocaleString(); } catch (e) { } }
                                 return <Td key={k} fontSize="11px" py={2} px={3} fontFamily="monospace" fontWeight="500" color="gray.800" whiteSpace="nowrap">{v !== null && v !== undefined ? String(v) : '-'}</Td>;
                             })}
                         </Tr>
@@ -3230,7 +3239,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
                 else if (signal.fetchType === 'location') newData = await TraxoApi.getLocationTelemetryArray(vin);
                 else if (signal.fetchType === 'alerts') newData = await TraxoApi.getAlerts(vin);
                 else if (signal.fetchType === 'trips') {
-                    newData = await TraxoApi.getTripDetailsWithPagination(vin, 0);
+                    newData = await TraxoApi.getTripSummary(vin);
                 }
                 else if (signal.fetchType === 'logs') newData = await TraxoApi.fetchDeviceLogs(vin);
                 else if (signal.fetchType === 'vehicleStatus') newData = await TraxoApi.getVehicleStatus(vin);

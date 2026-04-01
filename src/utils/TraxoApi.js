@@ -29,7 +29,7 @@ const ACCOUNTS = {
     },
     JEEP: {
         countryCode: "+91",
-        mobileNum: "9894638059",
+        mobileNum: "9629929028",
         password: "Password@123"
     },
     FOTA: {
@@ -136,10 +136,23 @@ export const TraxoApi = {
                 timeout: 30000
             });
 
+            // Some servers return HTTP 200 but include an error in the body (e.g. "Password attempts exceeded").
+            // Detect this and treat it as a login failure so we don't loop with an undefined token.
+            if (response.data && response.data.statusCode && response.data.statusCode >= 400) {
+                const msg = response.data.message || `Login rejected by server (statusCode: ${response.data.statusCode})`;
+                console.error(`Traxo Login Body Error [${accountType}]:`, response.data);
+                throw new Error(msg);
+            }
+
             if (accountType === 'JEEP') {
-                authTokens[accountType] = response.data.token?.accessToken || response.data.access_token || response.data.accessToken;
+                // JEEP server may return token as a plain string or nested object
+                authTokens[accountType] = response.data.token?.accessToken
+                    || response.data.access_token
+                    || response.data.accessToken
+                    || (typeof response.data.token === 'string' ? response.data.token : null);
                 if (!authTokens[accountType]) {
-                    console.error("JEEP Login response missing token.accessToken:", response.data);
+                    console.error("JEEP Login response missing token:", response.data);
+                    throw new Error('JEEP login succeeded but no token found in response');
                 }
             } else {
                 authTokens[accountType] = response.data.access_token || response.data.token?.accessToken || response.data.accessToken;
@@ -661,17 +674,17 @@ export const TraxoApi = {
 
     getVehicleStatus: async (vin) => {
         return withRetry(async () => {
-            if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
             console.log(`🚗 [VehicleStatus] Fetching device state for VIN: ${vin}`);
-            const response = await axios.get(`${BASE_URL}/portal/vin/${vin}`, {
+            const response = await axios.get(`${JEEP_BASE_URL}/vehicleStatus/${vin}`, {
                 headers: {
-                    'Authorization': `Bearer ${authTokens.FACTORY}`,
+                    'Authorization': `${authTokens.JEEP}`,
                     'Accept': 'application/json'
                 },
                 timeout: 30000
             });
             return response.data;
-        }, 'FACTORY');
+        }, 'JEEP');
     },
 
 
@@ -757,7 +770,7 @@ export const TraxoApi = {
             });
             console.log('📡 Signal List:', response.data);
             return response.data;
-        }, 'PRIMARY');
+        }, 'RUN');
     },
 
     // Logs: GET /fileupload?vin={vin} - list available log files for a VIN
