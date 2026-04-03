@@ -2613,10 +2613,15 @@ const Sparkline = ({ data = [], color = '#3B6FE8', height = 32, width = 80 }) =>
 };
 
 // ─── CIRCULAR GAUGE ──────────────────────────────────────────────────────────
-const CircularGauge = ({ value, label, unit, color = '#3B6FE8', size = 110, icon: Icon, isError = false }) => {
+// displayValue = text shown in center (optional, defaults to value+unit)
+// fillPct = arc fill percentage 0-100 (optional, defaults to value/100)
+const CircularGauge = ({ value, label, unit, color = '#3B6FE8', size = 110, icon: Icon, isError = false, displayValue, fillPct }) => {
     const sw = 7, r = (size - sw) / 2, circ = 2 * Math.PI * r;
-    const pct = Math.min(Math.max((parseFloat(value) || 0) / 100, 0), 1);
+    // Use fillPct prop if given, else derive from value/100
+    const pct = Math.min(Math.max((fillPct !== undefined ? fillPct : (parseFloat(value) || 0)) / 100, 0), 1);
     const id = (label || '').replace(/\s+/g, '-');
+    // What to show in the center text
+    const centerText = displayValue !== undefined ? displayValue : `${value}${unit}`;
     return (
         <VStack spacing={2} align="center">
             <Box position="relative" width={size} height={size}>
@@ -2640,7 +2645,7 @@ const CircularGauge = ({ value, label, unit, color = '#3B6FE8', size = 110, icon
                 <VStack position="absolute" top="50%" left="50%" transform="translate(-50%, -50%)" spacing={0}>
                     {isError ? <AlertTriangle size={22} color="#EF4444" /> : (
                         <>{Icon && <Icon size={13} color={color} opacity={0.8} />}
-                            <Text fontSize="md" fontWeight="900" color="gray.800" letterSpacing="-1px">{value}{unit}</Text></>
+                            <Text fontSize="md" fontWeight="900" color="gray.800" letterSpacing="-1px">{centerText}</Text></>
                     )}
                 </VStack>
             </Box>
@@ -2691,22 +2696,11 @@ const SpeedometerGauge = ({ value, secondaryValue, highestSpeed, isSpeedError = 
                     })}
                 </svg>
                 <VStack position="absolute" top="52%" left="50%" transform="translate(-50%, -50%)" spacing={-1}>
-                    <Badge variant="outline" colorScheme="orange" fontSize="8px" px={2} borderRadius="full">MAX {Math.floor(parseFloat(highestSpeed) || 0)} KM/H</Badge>
-                    {isSpeedError ? (
-                         <VStack spacing={0} py={2}><AlertTriangle size={32} color="#EF4444" /><Text fontSize="9px" fontWeight="black" color="red.500">SPEED ERR</Text></VStack>
-                    ) : (
-                        <>
-                            <Text fontSize="6xl" fontWeight="900" color={speedColor} lineHeight="1" style={{ transition: 'color 0.3s' }}>{Math.floor(speed)}</Text>
-                            <Text fontSize="xs" fontWeight="black" color="blue.500" letterSpacing="2px">KM/H</Text>
-                        </>
-                    )}
+                    <Text fontSize="6xl" fontWeight="900" color={speedColor} lineHeight="1" style={{ transition: 'color 0.3s' }}>{Math.floor(speed)}</Text>
+                    <Text fontSize="xs" fontWeight="black" color="blue.500" letterSpacing="2px">KM/H</Text>
                     <Box mt={3} textAlign="center">
                         <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="1px">ODOMETER</Text>
-                        {isOdoError ? (
-                            <Text fontSize="xs" fontWeight="bold" color="red.500">SIG ERR</Text>
-                        ) : (
-                            <Text fontSize="sm" fontWeight="bold" color="gray.700">{odo.toLocaleString()} <Text as="span" fontSize="9px" color="gray.400">KM</Text></Text>
-                        )}
+                        <Text fontSize="sm" fontWeight="bold" color="gray.700">{odo.toLocaleString()} <Text as="span" fontSize="9px" color="gray.400">KM</Text></Text>
                     </Box>
                 </VStack>
             </Box>
@@ -2803,16 +2797,63 @@ const DeviceEventsList = ({ events }) => {
 
 // ─── VISUAL DASHBOARD ─────────────────────────────────────────────────────────
 const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
+    // ─── Jeep Vehicle Status data (exact field names from API response) ───────
+    const vsData = signals.find(s => s.name === 'Jeep Vehicle Status')?.data?.[0];
+
+    // getVal: reads the latest data point from a signal, using the EXACT same field
+    // priority as SignalCard does (signalValue → value → Event → signalUnit fallbacks).
+    // This guarantees the Visual gauge always shows the same number as the Console table.
     const getVal = (name, def = 0) => {
-        const s = signals.find(s => s.name === name);
+        // 1️⃣ PRIMARY: individual CAN telemetry signal (same source as Console table)
+        const s = signals.find(sig => sig.name === name);
         if (s?.data?.length > 0) {
             const l = s.data[0];
-            const r = l.signalValue ?? l.Event ?? l.value ?? def;
-            if (name === 'Battery Voltage Level') return parseFloat(r) || 0;
-            return r;
+            // Use the same field order as SignalCard's latestVal computation
+            const r = l.signalValue ?? l.value ?? l.Event ?? l.signalData ?? l.data;
+            if (r !== undefined && r !== null && r !== '') {
+                if (name === 'Battery Voltage Level') return parseFloat(r) || 0;
+                return r;
+            }
+        }
+        // 2️⃣ FALLBACK: Jeep Vehicle Status API (only when telemetry has no data at all)
+        if (vsData) {
+            if (name === 'Fuel Level') {
+                const v = parseFloat(vsData.fuelPercentage ?? vsData.fuelLevelPct ?? vsData.fuelLevel);
+                if (!isNaN(v) && v > 0) return v;
+            }
+            if (name === 'Vehicle Speed') {
+                const v = parseFloat(vsData.speed ?? vsData.vehicleSpeed);
+                if (!isNaN(v)) return v;
+            }
+            if (name === 'Engine Water Temp') {
+                const v = parseFloat(vsData.coolant ?? vsData.engineWaterTemp ?? vsData.engineCoolantTemp);
+                if (!isNaN(v) && v > 0) return v;
+            }
+            if (name === 'Battery Voltage Level') {
+                const v = parseFloat(vsData.battery ?? vsData.batteryVoltage);
+                if (!isNaN(v) && v > 0) return v;
+            }
+            if (name === 'Total Odometer') {
+                const v = parseFloat(vsData.odometer ?? vsData.totalOdometer);
+                if (!isNaN(v) && v > 0) return v;
+            }
+            if (name === 'Engine Speed') {
+                const v = parseFloat(vsData.engineRpm ?? vsData.engineSpeed);
+                if (!isNaN(v) && v >= 0) return v;
+            }
+            if (name === 'External Temperature (C)') {
+                const v = parseFloat(vsData.ambientTemp ?? vsData.externalTemp ?? vsData.outsideTemp);
+                if (!isNaN(v)) return v;
+            }
+            if (name === 'External Temperature (F)') {
+                const v = parseFloat(vsData.ambientTemp ?? vsData.externalTemp ?? vsData.outsideTemp);
+                if (!isNaN(v)) return (v * 1.8 + 32).toFixed(1);
+            }
         }
         return def;
     };
+    
+
     const isSigError = (name) => !!(signals.find(s => s.name === name)?.error);
     const getComplex = (name) => { const s = signals.find(s => s.name === name); return s?.data?.length > 0 ? s.data[0] : null; };
 
@@ -2826,7 +2867,8 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
     const odometer = getVal('Total Odometer', 0);
 
     const ignSig = signals.find(s => s.name === 'Ignition Status');
-    const ignition = ignSig?.data?.length > 0 ? getVal('Ignition Status') : (deviceState?.ignition ?? 'OFF');
+    // Use ignitionStatus from vehicleStatus API (confirmed field name)
+    const ignition = ignSig?.data?.length > 0 ? getVal('Ignition Status') : (vsData?.ignitionStatus ?? deviceState?.ignition ?? 'OFF');
     const locationData = getComplex('Location');
     const alertsData = getComplex('Alerts');
     const hasEmergency = Array.isArray(alertsData) ? alertsData.length > 0 : !!alertsData;
@@ -2834,8 +2876,9 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
     const lastCmds = signals.find(s => s.name === 'Remote Commands')?.data?.slice(0, 3) || [];
     const speedHistory = signals.find(s => s.name === 'Vehicle Speed')?.data || [];
 
-    const lat = locationData?.gpsLat || locationData?.latitude || locationData?.Latitude;
-    const long = locationData?.gpsLong || locationData?.longitude || locationData?.Longitude;
+    // Location: prefer live telemetry, fallback to vehicleStatus API (gpsLat/gpsLong confirmed)
+    const lat = locationData?.gpsLat || locationData?.latitude || locationData?.Latitude || vsData?.gpsLat;
+    const long = locationData?.gpsLong || locationData?.longitude || locationData?.Longitude || vsData?.gpsLong;
     const coords = (lat && long) ? `${parseFloat(lat).toFixed(4)}, ${parseFloat(long).toFixed(4)}` : '12.9529, 80.2331';
 
     const getMostRecentTs = () => {
@@ -2920,6 +2963,41 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
 
                     {/* Center */}
                     <VStack spacing={4} h="full">
+                        {/* Vehicle Status Info Card - uses confirmed API field names */}
+                        {vsData && (
+                            <Box w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="blue.100" boxShadow="sm">
+                                <HStack spacing={2} mb={3}>
+                                    <Car size={14} color="#3B6FE8" />
+                                    <Text fontWeight="800" color="gray.700" fontSize="xs">JEEP STATUS</Text>
+                                    <Spacer />
+                                    <Badge colorScheme={['RUN', 'ON', 'START'].includes(String(vsData.ignitionStatus || '').toUpperCase()) ? 'green' : 'orange'} variant="solid" fontSize="8px">
+                                        {vsData.ignitionStatus || 'OFF'}
+                                    </Badge>
+                                </HStack>
+                                <SimpleGrid columns={2} spacing={2}>
+                                    <Box p={2} bg="blue.50" borderRadius="lg">
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black">FUEL</Text>
+                                        <Text fontSize="14px" fontWeight="900" color="blue.700">{vsData.fuelPercentage ?? '--'}%</Text>
+                                    </Box>
+                                    <Box p={2} bg="green.50" borderRadius="lg">
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black">BATTERY</Text>
+                                        <Text fontSize="14px" fontWeight="900" color="green.700">{vsData.battery ?? '--'}V</Text>
+                                    </Box>
+                                    <Box p={2} bg="orange.50" borderRadius="lg">
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black">COOLANT</Text>
+                                        <Text fontSize="14px" fontWeight="900" color="orange.700">{vsData.coolant ?? '--'}°C</Text>
+                                    </Box>
+                                    <Box p={2} bg="purple.50" borderRadius="lg">
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black">ODOMETER</Text>
+                                        <Text fontSize="12px" fontWeight="900" color="purple.700">{vsData.odometer ? Number(vsData.odometer).toLocaleString() : '--'} km</Text>
+                                    </Box>
+                                    <Box p={2} bg="pink.50" borderRadius="lg">
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black">EXTERNAL</Text>
+                                        <Text fontSize="14px" fontWeight="900" color="pink.700">{vsData.ambientTemp ?? vsData.externalTemp ?? '--'}°C</Text>
+                                    </Box>
+                                </SimpleGrid>
+                            </Box>
+                        )}
                         <Box flex={1.2} w="full">
                             <TempCard temp={engineTemp} label="Engine Temp" interiorTemp={extTemp} isError={isSigError('Engine Water Temp') || isSigError('External Temperature (C)')} />
                         </Box>
@@ -2944,17 +3022,45 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
                     </Box>
                 </Grid>
 
-                {/* Gauge Row */}
+                {/* Gauge Row - values sourced from Jeep Vehicle Status API */}
                 <Flex align="center" justify="space-around" px={8} py={7} bg="white" borderRadius="3xl" boxShadow="lg" border="1px solid" borderColor="gray.50" mb={6}>
-                    <CircularGauge value={fuel} label="Fuel Level" unit="%" color="#F59E0B" icon={Fuel} isError={isSigError('Fuel Level')} />
-                    <CircularGauge value={Math.min(Math.round((engineSpeed / 8000) * 100), 100)} label={`RPM (${engineSpeed})`} unit="" color="#FF6B35" icon={Activity} isError={isSigError('Engine Speed')} />
-                    <SpeedometerGauge value={vehicleSpeed} secondaryValue={odometer} highestSpeed={highestSpeed} isSpeedError={isSigError('Vehicle Speed')} isOdoError={isSigError('Total Odometer')} />
-                    <CircularGauge value={batteryPct} label={`Battery (${batteryRaw}V)`} unit="%" color="#10B981" icon={Zap} isError={isSigError('Battery Voltage Level')} />
-                    <CircularGauge value={Math.min(Math.round((parseFloat(engineTemp) / 110) * 100), 100)} label={`Eng Temp (${engineTemp}°C)`} unit="" color={parseFloat(engineTemp) > 100 ? '#EF4444' : '#6366F1'} icon={Thermometer} isError={isSigError('Engine Water Temp')} />
+                    {/* Fuel: fuelPercentage from API (e.g. 8%) */}
+                    {/* <CircularGauge
+                        value={fuel}
+                        label="Fuel Level"
+                        unit="%"
+                        color="#F59E0B"
+                        icon={Fuel}
+                        isError={isSigError('Fuel Level')}
+                    /> */}
+
+                    {/* <SpeedometerGauge value={vehicleSpeed} secondaryValue={odometer} highestSpeed={highestSpeed} isSpeedError={isSigError('Vehicle Speed')} isOdoError={isSigError('Total Odometer')} /> */}
+                    {/* Battery: actual voltage + % of 15V max */}
+                    {/* <CircularGauge
+                        value={batteryPct}
+                        displayValue={`${parseFloat(batteryRaw).toFixed(1)}V`}
+                        fillPct={batteryPct}
+                        label={`Battery (${batteryPct}%)`}
+                        unit=""
+                        color="#10B981"
+                        icon={Zap}
+                        isError={isSigError('Battery Voltage Level')}
+                    /> */}
+                    {/* Engine Temp: show actual °C value, arc = % of 150°C max */}
+                    {/* <CircularGauge
+                        value={parseFloat(engineTemp) || 0}
+                        displayValue={`${parseFloat(engineTemp) || 0}°C`}
+                        fillPct={Math.min(Math.round(((parseFloat(engineTemp) || 0) / 150) * 100), 100)}
+                        label={parseFloat(engineTemp) > 105 ? 'OVERHEAT!' : 'Coolant Temp'}
+                        unit=""
+                        color={parseFloat(engineTemp) > 105 ? '#EF4444' : '#6366F1'}
+                        icon={Thermometer}
+                        isError={isSigError('Engine Water Temp')}
+                    /> */}
                 </Flex>
 
                 {/* Footer Actions */}
-                <HStack justify="center" spacing={4}>
+                {/* <HStack justify="center" spacing={4}>
                     {[{ icon: Activity, label: 'Diagnostics' }, { icon: Wifi, label: 'Connectivity' }, { icon: Shield, label: 'Security' }, { icon: Thermometer, label: 'Health' }, { icon: BarChart2, label: 'Analytics' }, { icon: Settings, label: 'Settings' }].map(({ icon: Icon, label }, idx) => (
                         <Tooltip key={idx} label={label} hasArrow>
                             <motion.div whileHover={{ y: -3, scale: 1.1 }} whileTap={{ scale: 0.9 }}>
@@ -2964,10 +3070,66 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
                             </motion.div>
                         </Tooltip>
                     ))}
-                </HStack>
+                </HStack> */}
             </Box>
         </Box>
     );
+};
+
+// Helper to format timestamps as DDMMYYYY HHMMSS
+const formatFullDate = (ts) => {
+    if (!ts) return '-';
+    try {
+        let date = new Date(ts);
+        // Handle numeric strings (Unix timestamps like 1775055158075)
+        if (isNaN(date.getTime()) && !isNaN(Number(ts))) {
+            date = new Date(Number(ts));
+        }
+        if (isNaN(date.getTime())) return String(ts);
+        const d = date.getDate().toString().padStart(2, '0');
+        const m = (date.getMonth() + 1).toString().padStart(2, '0');
+        const y = date.getFullYear();
+        const h = date.getHours().toString().padStart(2, '0');
+        const min = date.getMinutes().toString().padStart(2, '0');
+        const s = date.getSeconds().toString().padStart(2, '0');
+        return `${d}/${m}/${y} ${h}:${min}:${s}`;
+    } catch (e) {
+        return String(ts);
+    }
+};
+
+/**
+ * Deeply traverses an object or array and formats any 13-digit numbers
+ * into a human-readable DD/MM/YYYY HH:MM:SS string.
+ * This ensures that even if API data is nested, timestamps are readable.
+ */
+const deepFormatDates = (obj) => {
+    if (!obj || typeof obj !== 'object') {
+        // If it's a 13-digit number (timestamp), format it
+        if ((typeof obj === 'number' || (typeof obj === 'string' && !isNaN(Number(obj)))) && String(obj).length === 13) {
+            return formatFullDate(obj);
+        }
+        return obj;
+    }
+    
+    if (Array.isArray(obj)) {
+        return obj.map(item => deepFormatDates(item));
+    }
+    
+    const formatted = {};
+    for (const key in obj) {
+        if (Object.prototype.hasOwnProperty.call(obj, key)) {
+            const val = obj[key];
+            // Format if it's a timestamp key or a 13-digit value
+            if ((key.toLowerCase().includes('time') || key.toLowerCase().includes('stamp') || key.toLowerCase().includes('date')) && 
+                (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)))) && String(val).length === 13) {
+                formatted[key] = formatFullDate(val);
+            } else {
+                formatted[key] = deepFormatDates(val);
+            }
+        }
+    }
+    return formatted;
 };
 
 // ─── DATA TABLE RENDERER ──────────────────────────────────────────────────────
@@ -2977,6 +3139,7 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
     if (!arr.length) return <Flex align="center" justify="center" h="full" p={4}><Text fontSize="12px" color="gray.500">NO RECORDS</Text></Flex>;
     const term = searchTerm.toLowerCase();
     const nameMatch = name.toLowerCase().includes(term);
+    const allKeys = Array.from(new Set(arr.flatMap(item => typeof item === 'object' && item ? Object.keys(item) : [])));
 
     if (name === 'Remote Commands') {
         return (
@@ -3040,21 +3203,72 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
         );
     }
 
+    if (name === 'Log Files List') {
+        const priority = ['fileName', 'fileSize', 'createdTime', 'status'];
+        const keys = allKeys.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return a.localeCompare(b); }).slice(0, 6);
+        return (
+            <Box w="100%" overflowX="auto">
+                <Table size="sm" variant="simple">
+                    <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
+                        <Tr>
+                            {keys.map(k => <Th key={k} fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} fontWeight="800">{k}</Th>)}
+                            <Th fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} fontWeight="800">Actions</Th>
+                        </Tr>
+                    </Thead>
+                    <Tbody>
+                        {arr.map((file, idx) => (
+                            <Tr key={idx} _hover={{ bg: 'gray.50' }}>
+                                {keys.map(k => {
+                                    let v = file[k];
+                                    if (k === 'fileSize' && v) v = (v / 1024).toFixed(1) + ' KB';
+                                    if (k === 'createdTime' && v) v = formatFullDate(v);
+                                    return <Td key={k} fontSize="11px" py={2} px={3} fontFamily="monospace" color="gray.800">{v !== null && v !== undefined ? String(v) : '-'}</Td>;
+                                })}
+                                <Td px={3} py={1}>
+                                    <HStack spacing={1}>
+                                        <IconButton icon={<Download size={12} />} size="xs" colorScheme="blue" variant="ghost" onClick={() => handleDownloadLog(file.fileName)} aria-label="Download" />
+                                        <IconButton icon={<AlertTriangle size={12} />} size="xs" colorScheme="red" variant="ghost" onClick={() => handleDeleteLog(file.fileName)} aria-label="Delete" />
+                                    </HStack>
+                                </Td>
+                            </Tr>
+                        ))}
+                    </Tbody>
+                </Table>
+            </Box>
+        );
+    }
+
     // Generic
-    const allKeys = Array.from(new Set(arr.flatMap(item => typeof item === 'object' && item ? Object.keys(item) : [])));
     if (!allKeys.length) return <Flex align="center" justify="center" h="full" p={4} direction="column"><AlertTriangle size={20} color="#DD6B20" /><Text fontSize="11px" color="orange.500" mt={2}>IMPROPER FORMAT</Text></Flex>;
     let priority = ['signalValue', 'signalUnit', 'updatedTimeStamp', 'packetStatus', 'messageName'];
     if (name.includes('Trip')) priority = ['tripId', 'startTime', 'endTime', 'distance', 'duration', 'topSpeed'];
+    else if (name === 'Alerts') priority = ['alertType', 'timeStamp', 'vehicleSpeed', 'alertId', 'sourceid', 'version'];
     else if (name === 'Jeep Vehicle Status') priority = ['vinNo', 'status', 'ignitionStatus', 'fuelLevel', 'batteryVoltage'];
+    else if (name === 'Device Join Status') priority = ['alertName', 'body', 'signalTimeStamp', 'createdTimeStamp', 'updatedTimeStamp', 'gpsLat', 'gpsLong', 'read'];
+    
+    const friendlyHeaders = {
+        alertName: 'Alert',
+        body: 'Description',
+        signalTimeStamp: 'Signal Time',
+        createdTimeStamp: 'Created At',
+        updatedTimeStamp: 'Updated At',
+        gpsLat: 'Latitude',
+        gpsLong: 'Longitude',
+        read: 'Status'
+    };
+
     let sortedKeys = allKeys.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return a.localeCompare(b); });
-    const keys = name === 'Jeep Vehicle Status' ? sortedKeys : sortedKeys.slice(0, 8);
+    const keys = (name === 'Jeep Vehicle Status' || name === 'Alerts' || name === 'Device Join Status') ? sortedKeys : sortedKeys.slice(0, 8);
     const rows = nameMatch ? arr.slice(0, 25) : arr.filter(item => keys.some(k => String(item[k] ?? '').toLowerCase().includes(term))).slice(0, 25);
     if (!rows.length) return <Flex align="center" justify="center" h="full" p={4}><Text fontSize="12px" color="gray.500">No matching records.</Text></Flex>;
     return (
         <Box w="100%" overflowX="auto">
             <Table size="sm" variant="simple">
                 <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
-                    <Tr>{keys.map(k => <Th key={k} fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} borderBottom="2px solid" borderColor="gray.200" fontWeight="800" whiteSpace="nowrap">{k}</Th>)}</Tr>
+                    <Tr>
+                        {keys.map(k => <Th key={k} fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} borderBottom="2px solid" borderColor="gray.200" fontWeight="800" whiteSpace="nowrap">{friendlyHeaders[k] || k}</Th>)}
+                        {name === 'Device Join Status' && <Th fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} borderBottom="2px solid" borderColor="gray.200" fontWeight="800">Actions</Th>}
+                    </Tr>
                 </Thead>
                 <Tbody>
                     {rows.map((item, idx) => (
@@ -3062,17 +3276,34 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
                             {keys.map(k => {
                                 let v = item[k];
                                 if (typeof v === 'object' && v !== null) {
+                                    const formattedObj = deepFormatDates(v);
                                     return (
                                         <Td key={k} fontSize="10px" py={2} px={3}>
                                             <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md">
-                                                <pre style={{ margin: 0, fontFamily: 'monospace' }}>{JSON.stringify(v, null, 2)}</pre>
+                                                <pre style={{ margin: 0, fontFamily: 'monospace' }}>{JSON.stringify(formattedObj, null, 2)}</pre>
                                             </Box>
                                         </Td>
                                     );
                                 }
-                                if (k.toLowerCase().includes('time') && v) { try { const dt = new Date(v); if (!isNaN(dt)) v = dt.toLocaleString(); } catch (e) { } }
-                                return <Td key={k} fontSize="11px" py={2} px={3} fontFamily="monospace" fontWeight="500" color="gray.800" whiteSpace="nowrap">{v !== null && v !== undefined ? String(v) : '-'}</Td>;
+                                if (k && (k.toLowerCase().includes('time') || k.toLowerCase().includes('stamp') || k.toLowerCase().includes('date')) && v && (typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))))) { 
+                                    v = formatFullDate(v);
+                                }
+                                if (k === 'read' && name === 'Device Join Status') {
+                                    return <Td key={k} fontSize="11px" py={2} px={3}><Badge colorScheme={v ? 'green' : 'red'} fontSize="9px">{v ? 'READ' : 'UNREAD'}</Badge></Td>;
+                                }
+                                if ((k === 'gpsLat' || k === 'gpsLong') && !isNaN(parseFloat(v))) {
+                                    v = parseFloat(v).toFixed(6);
+                                }
+                                return <Td key={k} fontSize="11px" py={2} px={3} fontFamily="monospace" fontWeight="500" color="gray.800" whiteSpace={k === 'body' ? 'normal' : 'nowrap'}>{v !== null && v !== undefined ? String(v) : '-'}</Td>;
                             })}
+                            {name === 'Device Join Status' && (
+                                <Td px={3} py={1}>
+                                    <HStack spacing={1}>
+                                        <Button size="xxs" fontSize="8px" colorScheme="blue" variant="ghost" height="20px" px={1} onClick={() => handleNotificationAction('Mark Read', item.notificationId || item.id)}>READ</Button>
+                                        <Button size="xxs" fontSize="8px" colorScheme="red" variant="ghost" height="20px" px={1} onClick={() => handleNotificationAction('Delete', item.notificationId || item.id)}>DEL</Button>
+                                    </HStack>
+                                </Td>
+                            )}
                         </Tr>
                     ))}
                 </Tbody>
@@ -3084,7 +3315,7 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
 // ─── SIGNAL CARD ──────────────────────────────────────────────────────────────
 const SignalCard = ({ signal, searchTerm, onRefresh }) => {
     const [collapsed, setCollapsed] = useState(false);
-    const latestVal = signal.data?.[0]?.signalValue ?? signal.data?.[0]?.value ?? null;
+    const latestVal = signal.data?.[0]?.signalValue ?? signal.data?.[0]?.value ?? signal.data?.[0]?.Event ?? signal.data?.[0]?.signalData ?? null;
     const unit = signal.data?.[0]?.signalUnit ?? '';
     return (
         <Box bg="white" borderRadius="xl" border="1px solid" borderColor={signal.error ? 'red.200' : 'gray.150'} boxShadow="sm" overflow="hidden" transition="all 0.2s" _hover={{ boxShadow: 'md', borderColor: 'blue.200' }}>
@@ -3140,24 +3371,23 @@ const SignalCard = ({ signal, searchTerm, onRefresh }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104' }) => {
+const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412' }) => {
     const [vin, setVin] = useState(() => localStorage.getItem('last_vin') || vinValue);
     const [signals, setSignals] = useState([
-        { name: 'Fuel Level', apiName: 'FuelLevel', id: '0x356', isChecked: true, data: [], loading: false, error: null },
-        { name: 'Total Odometer', apiName: 'TotalOdometer', id: '0x760', isChecked: true, data: [], loading: false, error: null },
-        { name: 'Engine Water Temp', apiName: 'EngineWaterTemp', id: '0x3E2', isChecked: true, data: [], loading: false, error: null },
-        { name: 'Engine Speed', apiName: 'EngineSpeed', id: '0x3E6', isChecked: true, data: [], loading: false, error: null },
-        { name: 'Vehicle Speed', apiName: 'VehicleSpeed', id: '0x3E8', isChecked: true, data: [], loading: false, error: null, hideInConsole: true },
-        { name: 'Battery Voltage Level', apiName: 'BatteryVoltageLevel', id: '0x46C', isChecked: true, data: [], loading: false, error: null },
+        { name: 'Fuel Level', apiName: 'fuelPercentage', id: '0x356', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'Total Odometer', apiName: 'odometer', id: '0x760', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'Engine Water Temp', apiName: 'coolant', id: '0x3E2', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'Engine Speed', apiName: 'engineRpm', id: '0x3E6', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'Vehicle Speed', apiName: 'speed', id: '0x3E8', isChecked: true, data: [], loading: false, error: null, hideInConsole: true, useVehicleStatus: true },
+        { name: 'Battery Voltage Level', apiName: 'battery', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
         { name: 'Ignition Status', apiName: 'CmdIgnSts', id: '0x46C', isChecked: true, data: [], loading: false, error: null, fetchType: 'ignition' },
-        { name: 'External Temperature (F)', apiName: 'ExternalTemperatureF', id: '0x46C', isChecked: true, data: [], loading: false, error: null },
-        { name: 'External Temperature (C)', apiName: 'ExternalTemperatureC', id: '0x46C', isChecked: true, data: [], loading: false, error: null },
+        { name: 'External Temperature (F)', apiName: 'ExternalTemperatureF', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'External Temperature (C)', apiName: 'ExternalTemperatureC', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
         { name: 'Location', apiName: 'Location', id: 'location', isChecked: true, data: [], loading: false, error: null, fetchType: 'location' },
         { name: 'Alerts', apiName: 'Alerts', id: 'alerts', isChecked: true, data: [], loading: false, error: null, fetchType: 'alerts' },
         { name: 'Device Events', apiName: 'DeviceEvents', id: 'events', isChecked: true, data: [], loading: false, error: null, fetchType: 'events' },
         { name: 'Remote Commands', apiName: 'CommandLog', id: 'action', isChecked: true, data: [], loading: false, error: null, fetchType: 'manual' },
         { name: 'Trip History', apiName: 'TripSummary', id: 'trips', isChecked: true, data: [], loading: false, error: null, fetchType: 'trips' },
-        { name: 'Device Logs', apiName: 'DeviceLogs', id: 'logs', isChecked: true, data: [], loading: false, error: null, fetchType: 'logs' },
         { name: 'Jeep Vehicle Status', apiName: 'VehicleStatus', id: 'vehicleStatus', isChecked: true, data: [], loading: false, error: null, fetchType: 'vehicleStatus' },
         { name: 'Log Files List', apiName: 'LogFiles', id: 'log_files', isChecked: true, data: [], loading: false, error: null, fetchType: 'files' },
         { name: 'Alert Ingestion Audit', apiName: 'AlertIngestion', id: 'alert_audit', isChecked: true, data: [], loading: false, error: null, fetchType: 'alerts_audit' },
@@ -3166,6 +3396,8 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         { name: 'Trip Pagination', apiName: 'TripDetailsPaginated', id: 'trip_paginated', isChecked: false, data: [], loading: false, error: null, fetchType: 'trip_pagination' },
         { name: 'Trip ID Search', apiName: 'TripDetailsById', id: 'trip_by_id', isChecked: false, data: [], loading: false, error: null, fetchType: 'trip_details' },
         { name: 'Portal Search', apiName: 'PortalSearch', id: 'portal_lookup', isChecked: false, data: [], loading: false, error: null, fetchType: 'search' },
+        { name: 'Device Join Status', apiName: 'DeviceJoinStatus', id: 'notification_api', isChecked: true, data: [], loading: false, error: null, fetchType: 'notification' },
+        { name: 'Command History Audit', apiName: 'CommandAudit', id: 'cmd_audit', isChecked: true, data: [], loading: false, error: null, fetchType: 'command_audit' },
     ]);
 
     const [viewMode, setViewMode] = useState('visual');
@@ -3223,6 +3455,41 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         } catch (e) { console.error('fetchOtherData', e); }
     };
 
+    const mapVSToSignal = (vsData, signal) => {
+        if (!vsData) return null;
+        let d = vsData;
+        if (d.data && typeof d.data === 'object' && !Array.isArray(d.data)) d = d.data;
+        else if (d.result && typeof d.result === 'object' && !Array.isArray(d.result)) d = d.result;
+        else if (d.vehicleStatus && typeof d.vehicleStatus === 'object') d = d.vehicleStatus;
+        if (Array.isArray(d)) d = d[0];
+        if (!d) return null;
+
+        let val = d[signal.apiName] ?? d[signal.name.toLowerCase()] ?? null;
+        let unit = '';
+        let msg = 'STATUS_VEHICLE_STATUS';
+
+        if (signal.name === 'Fuel Level') { unit = '%'; msg = 'STATUS_BH_BCM1'; }
+        else if (signal.name === 'Total Odometer') { unit = 'km'; msg = 'TRIP_A_B'; }
+        else if (signal.name === 'Engine Water Temp') { unit = '°C'; msg = 'STATUS_CCAN3'; }
+        else if (signal.name === 'Engine Speed') { unit = '1/min'; msg = 'STATUS_CCAN5'; }
+        else if (signal.name === 'Vehicle Speed') { unit = 'km/h'; msg = 'VEHICLE_SPEED'; }
+        else if (signal.name === 'Battery Voltage Level') { unit = 'V'; msg = 'BATTERY_STATUS'; }
+        else if (signal.name === 'External Temperature (C)') { unit = '°C'; msg = 'STATUS_AMBIENT'; val = d.ambientTemp ?? d.externalTemp ?? d.outsideTemp; }
+        else if (signal.name === 'External Temperature (F)') { unit = '°F'; msg = 'STATUS_AMBIENT'; let v = d.ambientTemp ?? d.externalTemp ?? d.outsideTemp; val = v !== null ? (v * 1.8 + 32).toFixed(1) : null; }
+
+        if (val === null || val === undefined) return null;
+
+        return [{
+            signalValue: val,
+            signalUnit: unit,
+            updatedTimeStamp: d.lastUpdateTime || d.updatedtimestamp || new Date().toISOString(),
+            packetStatus: '0',
+            messageName: msg,
+            canType: 'VehicleTelemetry',
+            createdTimeStamp: new Date().toISOString()
+        }];
+    };
+
     const fetchCheckedSignals = async () => {
         if (!vin) return;
         const today = new Date().toISOString().split('T')[0];
@@ -3230,18 +3497,32 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         const fmtStart = sevenDaysAgo.toISOString().split('T')[0] + ' 00:00:00';
         const fmtEnd = today + ' 23:59:59';
 
+        const needsVS = signals.some(s => s.isChecked && s.useVehicleStatus);
+        let vsData = null;
+        if (needsVS) {
+            try { vsData = await TraxoApi.getVehicleStatus(vin); }
+            catch (e) { console.warn('VehicleStatus fetch error', e); }
+        }
+
         const promises = signals.map(async (signal) => {
             if (!signal.isChecked) return null;
             try {
                 let newData;
+                if (signal.useVehicleStatus && vsData) {
+                    newData = mapVSToSignal(vsData, signal);
+                    return { name: signal.name, newData };
+                }
+                
                 if (signal.fetchType === 'events') newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
                 else if (signal.fetchType === 'ignition') newData = await TraxoApi.getIgnitionEvents(vin, fmtStart, fmtEnd);
                 else if (signal.fetchType === 'location') newData = await TraxoApi.getLocationTelemetryArray(vin);
                 else if (signal.fetchType === 'alerts') newData = await TraxoApi.getAlerts(vin);
                 else if (signal.fetchType === 'trips') {
-                    newData = await TraxoApi.getTripSummary(vin);
+                    const format = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
+                    const now = new Date();
+                    const past = new Date(); past.setDate(past.getDate() - 30);
+                    newData = await TraxoApi.getTripSummary(vin, format(past), format(now));
                 }
-                else if (signal.fetchType === 'logs') newData = await TraxoApi.fetchDeviceLogs(vin);
                 else if (signal.fetchType === 'vehicleStatus') newData = await TraxoApi.getVehicleStatus(vin);
                 else if (signal.fetchType === 'files') newData = await TraxoApi.listLogFiles(vin);
                 else if (signal.fetchType === 'alerts_audit') newData = await TraxoApi.getAlertIngestion(vin);
@@ -3254,12 +3535,24 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
                     else throw new Error('No Trip ID available');
                 }
                 else if (signal.fetchType === 'search') newData = await TraxoApi.portalSearch(vin, 'vin');
+                else if (signal.fetchType === 'notification') newData = await TraxoApi.getDeviceJoinStatus(vin);
+                else if (signal.fetchType === 'command_audit') newData = await TraxoApi.getCommandAudit(vin);
                 else if (signal.fetchType !== 'manual') newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
                 else return null;
 
                 const normalized = (() => {
                     if (!newData) return null;
-                    if (signal.fetchType === 'vehicleStatus') return typeof newData === 'object' && !Array.isArray(newData) ? [newData] : (Array.isArray(newData) ? newData : null);
+                    if (signal.fetchType === 'vehicleStatus') {
+                        // Unwrap common API wrapper patterns so both Console & Visual see the same flat object
+                        let vsObj = newData;
+                        if (!Array.isArray(newData)) {
+                            // Unwrap { data: {...} }, { result: {...} }, { vehicleStatus: {...} }
+                            if (newData.data && typeof newData.data === 'object' && !Array.isArray(newData.data)) vsObj = newData.data;
+                            else if (newData.result && typeof newData.result === 'object' && !Array.isArray(newData.result)) vsObj = newData.result;
+                            else if (newData.vehicleStatus && typeof newData.vehicleStatus === 'object') vsObj = newData.vehicleStatus;
+                        }
+                        return Array.isArray(vsObj) ? vsObj : [vsObj];
+                    }
                     let items = newData;
                     if (newData.events) items = newData.events;
                     else if (newData.data && Array.isArray(newData.data)) items = newData.data;
@@ -3269,8 +3562,55 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
                     else if (newData.notifications) items = newData.notifications;
                     else if (newData.signals) items = newData.signals;
                     else if (newData.signalList) items = newData.signalList;
-                    else if (newData.logFiles) items = newData.logFiles;
-                    else if (newData.result && Array.isArray(newData.result)) items = newData.result;
+                    else if (newData.commandAudit) items = newData.commandAudit;
+                    else if (newData.audit) items = newData.audit;
+                    
+                    if (signal.fetchType === 'notification') {
+                        // Handle notification raw data vs nested notifications array
+                        let raw = newData.raw || (newData.notifications ? newData : null) || newData;
+                        
+                        // Support for object-based arrays { "0": {...}, "1": {...} } or objects containing notifications
+                        // Be aggressive: if it's an object but not a real array, try to find an array inside or convert it.
+                        if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                            if (raw.notifications && Array.isArray(raw.notifications)) raw = raw.notifications;
+                            else if (raw.notifications && typeof raw.notifications === 'object') raw = raw.notifications;
+                            
+                            // If it's STILL an indexed object { "0": ... }, convert to values
+                            if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+                                const keys = Object.keys(raw).filter(k => !isNaN(k));
+                                if (keys.length > 0) {
+                                    raw = keys.sort((a, b) => Number(a) - Number(b)).map(k => raw[k]);
+                                }
+                            }
+                        }
+                        
+                        let list = Array.isArray(raw) ? raw : [raw];
+                        // Support for nested 'NOTIFICATION' or 'notification' keys to flatten the data for the table
+                        const normalizedData = list.filter(Boolean).map(item => {
+                           const n = item?.NOTIFICATION || item?.notification || item;
+                           // If n is an object, merge it with the item's metadata (id, etc)
+                           let flat = item;
+                           if (typeof n === 'object' && n !== null) {
+                               flat = { ...(typeof item === 'object' ? item : {}), ...n };
+                           }
+                           // Important: ensure we deep-format timestamps even at the normalization stage
+                           return deepFormatDates(flat);
+                        });
+                        return Array.isArray(normalizedData) ? normalizedData : [normalizedData];
+                    }
+
+                    // Special Parsing for Alerts with stringified details
+                    if (signal.fetchType === 'alerts' && Array.isArray(items)) {
+                        return items.map(item => {
+                            if (typeof item.alertDetails === 'string') {
+                                try {
+                                    const parsed = JSON.parse(item.alertDetails);
+                                    return { ...item, ...parsed, alertDetailsRaw: item.alertDetails };
+                                } catch (e) { console.warn('Failed to parse alertDetails', e); }
+                            }
+                            return item;
+                        });
+                    }
                     return items;
                 })();
                 return { name: signal.name, newData: normalized };
@@ -3280,7 +3620,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         });
 
         const results = await Promise.all(promises);
-        setLastRefreshTime(new Date().toLocaleTimeString());
+        setLastRefreshTime(formatFullDate(new Date()));
 
         setSignals(prevSignals => prevSignals.map(signal => {
             const result = results.find(r => r?.name === signal.name);
@@ -3298,7 +3638,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
                         else { const ex = new Set(existing.map(d => JSON.stringify(d))); const nu = newData.filter(d => !ex.has(JSON.stringify(d))); if (nu.length > 0) updated = [...nu, ...existing].slice(0, 500); }
                     } else { if (JSON.stringify(newData) !== JSON.stringify(existing[0])) updated = [newData, ...existing].slice(0, 100); }
                 }
-                return { ...signal, data: updated, loading: false, lastUpdated: new Date().toLocaleTimeString(), hasFetched: true, error: null };
+                return { ...signal, data: updated, loading: false, lastUpdated: formatFullDate(new Date()), hasFetched: true, error: null };
             }
             return { ...signal, loading: false };
         }));
@@ -3326,7 +3666,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         toast({ title: 'Data Exported', status: 'success', duration: 2000 });
     };
 
-    const pollCommandStatus = async (commandName, commandId, isFota = false) => {
+    const pollCommandStatus = async (commandName, commandId, isFota = false, isConcurrent = false) => {
         let attempts = 0;
         const interval = setInterval(async () => {
             attempts++;
@@ -3334,6 +3674,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
             try {
                 let status;
                 if (isFota) { const d = await TraxoApi.getFotaCommandStatus(commandId); status = d.commandstatus || d.status || 'Unknown'; }
+                else if (isConcurrent) { const d = await TraxoApi.getConcurrentCommandStatus(vin, commandId); status = d.commandStatus || d.status || 'Unknown'; }
                 else { const d = await TraxoApi.getCommandStatus(vin, commandId); status = d.commandStatus || 'Unknown'; }
                 setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? { ...s, data: s.data.map(cmd => cmd.commandId === commandId ? { ...cmd, status } : cmd) } : s));
                 const terminals = isFota ? ['Success', 'Timed Out', 'Failed', 'Cancelled', 'Completed', 'Error'] : ['Success', 'Timed Out', 'Failed', 'Cancelled'];
@@ -3346,7 +3687,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
         }, 3000);
     };
 
-    const handleCommand = async (commandName, apiCall, params = []) => {
+    const handleCommand = async (commandName, apiCall, params = [], isConcurrent = false) => {
         setCommandLoading(commandName);
         const timestamp = new Date().toLocaleTimeString();
         try {
@@ -3354,11 +3695,54 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
             const commandId = result.commandId || result.data?.commandId;
             toast({ title: `${commandName} Sent`, description: 'Waiting for device...', status: 'info', duration: 2000 });
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? { ...s, data: [{ command: commandName, status: 'PENDING', time: timestamp, commandId, apiResponse: result }, ...s.data].slice(0, 50) } : s));
-            if (commandId) pollCommandStatus(commandName, commandId);
+            if (commandId) pollCommandStatus(commandName, commandId, false, isConcurrent);
         } catch (error) {
             toast({ title: `${commandName} Failed`, description: error.message, status: 'error', duration: 3000 });
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? { ...s, data: [{ command: commandName, status: 'FAILED', time: timestamp, error: error.message, apiResponse: { message: error.message } }, ...s.data].slice(0, 50) } : s));
         } finally { setCommandLoading(null); }
+    };
+
+    const handleNotificationAction = async (action, id) => {
+        if (!id) { toast({ title: 'Invalid Notification ID', status: 'error' }); return; }
+        try {
+            if (action === 'Mark Read') await TraxoApi.updateNotificationStatus(id);
+            else if (action === 'Delete') await TraxoApi.deleteNotification(id);
+            toast({ title: `Notification ${action} Success`, status: 'success', duration: 2000 });
+            handleRefresh();
+        } catch (error) {
+            toast({ title: 'Action Failed', description: error.message, status: 'error' });
+        }
+    };
+
+    const handleDownloadLog = async (filename) => {
+        toast({ title: 'Preparing Download', description: filename, status: 'info', duration: 2000 });
+        try {
+            const blob = await TraxoApi.downloadLogFile(vin, filename);
+            const url = window.URL.createObjectURL(new Blob([blob]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            toast({ title: 'Download Started', status: 'success' });
+        } catch (error) {
+            toast({ title: 'Download Failed', description: error.message, status: 'error' });
+        }
+    };
+
+    const handleDeleteLog = async (filename) => {
+        if (!confirm(`Delete log file ${filename}?`)) return;
+        try {
+            await TraxoApi.deleteLogFile(vin, filename);
+            toast({ title: 'Log File Deleted', status: 'success' });
+            // Refresh log files list signal
+            setSignals(prev => prev.map(s => s.name === 'Log Files List' ? { ...s, loading: true } : s));
+            const newData = await TraxoApi.listLogFiles(vin);
+            setSignals(prev => prev.map(s => s.name === 'Log Files List' ? { ...s, data: newData, loading: false, lastUpdated: formatFullDate(new Date()) } : s));
+        } catch (error) {
+            toast({ title: 'Delete Failed', description: error.message, status: 'error' });
+        }
     };
 
     const handleFotaUpdate = async () => {
@@ -3503,8 +3887,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'T434ZTZT155550104'
                                     { label: 'Blinker ON', icon: Zap, fn: TraxoApi.blinkerOn, color: 'orange' },
                                     { label: 'Blinker OFF', icon: Zap, fn: TraxoApi.blinkerOff, color: 'orange' },
                                     { label: 'Honk', icon: Volume2, fn: TraxoApi.honk, color: 'red' },
-                                ].map(({ label, icon: Icon, fn, color }) => (
-                                    <Button key={label} size="sm" colorScheme={color} variant="outline" isLoading={commandLoading === label} leftIcon={<Icon size={13} />} onClick={() => handleCommand(label, fn)} borderRadius="lg" fontWeight="700" fontSize="12px" _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }} transition="all 0.2s">{label}</Button>
+                                    { label: 'Fetch Logs', icon: Download, fn: TraxoApi.fetchDeviceLogs, color: 'green', isConcurrent: true },
+                                ].map(({ label, icon: Icon, fn, color, isConcurrent }) => (
+                                    <Button key={label} size="sm" colorScheme={color} variant="outline" isLoading={commandLoading === label} leftIcon={<Icon size={13} />} onClick={() => handleCommand(label, fn, [], isConcurrent)} borderRadius="lg" fontWeight="700" fontSize="12px" _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }} transition="all 0.2s">{label}</Button>
                                 ))}
                             </Wrap>
 
