@@ -1,0 +1,2 @@
+Dongle_SN,IMEI,MSISDN,ICCID,eUICCID,HW_part_number,NAD_SW_version,MCU_SW_version,encryptionKeyVersion,signingKeyVersion,plantManufacturingCountryCode,Plant_Manufactured_Date,countrycode,regioncode
+Traxo111,356741360421832,123456421893,12345678622181378993,12245246792131121892328278947923,68532321AA,ND0.00.51,MD0.00.03,1,1,1,123412218823,1,4
