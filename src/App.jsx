@@ -1,13 +1,21 @@
 import React, { useEffect } from "react";
 import { Routes, Route } from "react-router-dom";
-import { ChakraProvider, Box } from "@chakra-ui/react";
+import { ChakraProvider, Box, Text } from "@chakra-ui/react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProjectProvider } from "./contexts/ProjectContext";
 import { WorkspaceStateProvider } from "./contexts/WorkspaceStateContext";
 
 import { autoSaveManager } from "./utils/autoSaveManager";
-import RuleEngineDashboard from "./components/RuleEngine/RuleEngineDashboard";
-import IoTRuleEnginePage from "./components/RuleEngine/IoTRuleEnginePage";
+import MainLayout from "./components/Layout/MainLayout";
+
+// Lazy loading for route-level components
+const RuleEngineDashboard = React.lazy(() => import("./components/RuleEngine/RuleEngineDashboard"));
+const IoTRuleEnginePage = React.lazy(() => import("./components/RuleEngine/IoTRuleEnginePage"));
+const PayloadDashboardPage = React.lazy(() => import("./components/PayloadDashboard/PayloadDashboardPage"));
+const HistoricalDataPage = React.lazy(() => import("./components/HistoricalData/HistoricalDataPage"));
+const BulkProvisionPage = React.lazy(() => import("./components/BulkProvision/BulkProvisionPage"));
+const SystemConsolePage = React.lazy(() => import("./components/SystemOverview/SystemConsolePage"));
+
 
 const App = () => {
 
@@ -35,10 +43,22 @@ const App = () => {
         <WorkspaceStateProvider>
           <AuthProvider>
 
-            <Routes>
-              <Route path="/" element={<RuleEngineDashboard />} />
-              <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
-            </Routes>
+            <MainLayout>
+              <React.Suspense fallback={
+                <Box display="flex" alignItems="center" justifyContent="center" height="100vh">
+                  <Text fontWeight="800" color="blue.500" letterSpacing="1px">LOADING ENGINE...</Text>
+                </Box>
+              }>
+                <Routes>
+                  <Route path="/" element={<RuleEngineDashboard />} />
+                  <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
+                  <Route path="/historical-analysis" element={<HistoricalDataPage />} />
+                  <Route path="/bulk-provision" element={<BulkProvisionPage />} />
+                  <Route path="/system-console" element={<SystemConsolePage />} />
+                  <Route path="/payload-dashboard/:vin" element={<PayloadDashboardPage />} />
+                </Routes>
+              </React.Suspense>
+            </MainLayout>
 
 
           </AuthProvider>

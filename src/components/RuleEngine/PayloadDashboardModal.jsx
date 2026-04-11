@@ -2658,7 +2658,7 @@ const CircularGauge = ({ value, label, unit, color = '#3B6FE8', size = 110, icon
 const SpeedometerGauge = ({ value, secondaryValue, highestSpeed, isSpeedError = false, isOdoError = false, isError = false }) => {
     const size = 260, radius = 90, center = size / 2;
     const speed = parseFloat(value) || 0;
-    
+
     // Odometer Outlier Filter: Ignore values > 300,000 if usual is much lower
     let odo = parseFloat(secondaryValue) || 0;
     if (odo > 300000) odo = 0; // Spike protection
@@ -2709,7 +2709,7 @@ const SpeedometerGauge = ({ value, secondaryValue, highestSpeed, isSpeedError = 
 };
 
 // ─── STATUS TOGGLE ────────────────────────────────────────────────────────────
-const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false, color = 'blue' }) => (
+const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false, color = 'blue', statusText }) => (
     <Box bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor={isError ? 'red.200' : 'gray.100'} boxShadow="sm" position="relative" overflow="hidden" transition="all 0.3s">
         {isOn && !isError && <Box position="absolute" top="-20%" right="-10%" w="80px" h="80px" bg={`${color}.50`} filter="blur(30px)" opacity={0.9} zIndex={0} />}
         <Flex align="center" justify="space-between" position="relative" zIndex={1}>
@@ -2727,7 +2727,7 @@ const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false, c
             <VStack align="flex-end" spacing={1}>
                 <Box w="10px" h="10px" borderRadius="full" bg={isError ? 'red.500' : isOn ? `${color}.500` : 'gray.300'} transition="all 0.3s" />
                 <Text fontSize="8px" fontWeight="900" color={isError ? 'red.600' : isOn ? `${color}.600` : 'gray.400'} letterSpacing="1px">
-                    {isError ? 'FAILURE' : isOn ? 'ACTIVE' : 'OFF'}
+                    {statusText || (isError ? 'FAILURE' : isOn ? 'ACTIVE' : 'OFF')}
                 </Text>
             </VStack>
         </Flex>
@@ -2852,7 +2852,7 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
         }
         return def;
     };
-    
+
 
     const isSigError = (name) => !!(signals.find(s => s.name === name)?.error);
     const getComplex = (name) => { const s = signals.find(s => s.name === name); return s?.data?.length > 0 ? s.data[0] : null; };
@@ -2896,183 +2896,282 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
     const errorNames = signals.filter(s => s.error).map(s => s.name);
     const ignOn = ['ON', 'TRUE', 'CONNECTED', '1', 'RUN', 'START'].includes(String(ignition).toUpperCase());
 
+    const ignitionDisplay = (() => {
+        const val = String(ignition || '').toUpperCase();
+        if (val === 'IGN_LK') return 'PARKED';
+        if (val === 'RUN') return 'DRIVING';
+        if (val === 'START') return 'START';
+        return val || 'OFF';
+    })();
+
     return (
-        <Box w="full" bg={THEME.bg} p={8} borderRadius="none" minH="100vh" position="relative" overflow="hidden">
-            <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1px, transparent 1px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.5} zIndex={0} />
-            <DeviceEventsList events={deviceEvents} />
-            <Box position="relative" zIndex={1}>
-                {hasAnyError && (
-                    <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
-                        <Box bg="red.50" border="1px solid" borderColor="red.200" p={3} borderRadius="xl" mb={5} boxShadow="sm">
-                            <Flex align="center" gap={3}>
-                                <AlertTriangle color="#EF4444" size={16} />
-                                <VStack align="flex-start" spacing={0}>
-                                    <Text color="red.700" fontWeight="bold" fontSize="xs">DATA SYNC ALERT</Text>
-                                    <Text color="red.600" fontSize="10px">Signals with errors: {errorNames.join(', ')}</Text>
-                                </VStack>
-                            </Flex>
-                        </Box>
-                    </motion.div>
-                )}
 
-                {/* Status Row */}
-                <Grid templateColumns="repeat(4, 1fr)" gap={4} mb={6}>
-                    <StatusToggle label="Ignition Status" description="Engine status" isOn={ignOn} icon={Zap} isError={isSigError('Ignition Status')} color="blue" />
-                    <StatusToggle label="Emergency Alert" description={hasEmergency ? 'Critical Alerts!' : 'No active alerts'} isOn={hasEmergency} icon={Bell} isError={isSigError('Alerts')} color="red" />
-                    <StatusToggle label="Device Connected" description={deviceState?.deviceConnectedState || 'Unknown'} isOn={deviceState?.deviceConnectedState === 'CONNECTED'} icon={Wifi} color="green" />
-                    <StatusToggle label="Trip Active" description="Ongoing trip status" isOn={false} icon={Navigation} color="purple" />
-                </Grid>
 
-                {/* Main Grid */}
-                <Grid templateColumns="1.3fr 0.8fr 1.6fr" gap={5} mb={6} h="380px">
-                    {/* Map */}
-                    <Box bg="white" borderRadius="2xl" overflow="hidden" position="relative" border="1px solid" borderColor="gray.100" boxShadow="sm">
-                        {lat && long ? (
-                            <iframe width="100%" height="100%" style={{ border: 0 }} loading="lazy" allowFullScreen src={`https://maps.google.com/maps?q=${lat},${long}&t=&z=15&ie=UTF8&iwloc=&output=embed`} />
-                        ) : (
-                            <Flex bg="gray.50" h="full" align="center" justify="center" direction="column">
-                                <Map size={36} color="#CBD5E0" /><Text mt={2} color="gray.400" fontWeight="bold" fontSize="xs">AWAITING GPS</Text>
-                            </Flex>
-                        )}
-                        <Box position="absolute" top={3} left={3} bg="whiteAlpha.950" backdropFilter="blur(8px)" p={3} borderRadius="xl" boxShadow="lg">
-                            <Flex align="center" gap={2}>
-                                <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}><Activity size={14} color="#3B6FE8" /></motion.div>
-                                <VStack align="flex-start" spacing={0}>
-                                    <Text fontSize="sm" fontWeight="900" color="gray.800" letterSpacing="-0.5px">{coords}</Text>
-                                    <Text fontSize="8px" color="gray.500" fontWeight="black" letterSpacing="1px">LIVE COORDINATES</Text>
-                                </VStack>
-                            </Flex>
-                        </Box>
-                        <AnimatePresence>
-                            {lastCmds.length > 0 && (
-                                <Box position="absolute" bottom={3} right={3} maxW="180px" zIndex={5}>
-                                    <VStack spacing={1.5} align="stretch">
-                                        {lastCmds.map((cmd, i) => (
-                                            <motion.div key={i} initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
-                                                <Box bg={cmd.status === 'SUCCESS' ? 'green.500' : cmd.status === 'PENDING' ? 'orange.400' : 'red.500'} color="white" p={2} borderRadius="lg" boxShadow="md">
-                                                    <HStack justify="space-between"><Text fontSize="9px" fontWeight="black">{(cmd.command || 'CMD').toUpperCase()}</Text><Text fontSize="8px" opacity={0.8}>{cmd.status}</Text></HStack>
-                                                    <Text fontSize="8px" opacity={0.7}>{cmd.time}</Text>
-                                                </Box>
-                                            </motion.div>
-                                        ))}
+        // <Box w="full" bg={THEME.bg} pt={8} px={8} pb={2} borderRadius="none" position="relative" overflow="hidden">
+        //     <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1px, transparent 1px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.5} zIndex={0} />
+        //     <DeviceEventsList events={deviceEvents} />
+        //     <Box position="relative" zIndex={1}>
+        //         {hasAnyError && (
+        //             <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+        //                 <Box bg="red.50" border="1px solid" borderColor="red.200" p={3} borderRadius="xl" mb={5} boxShadow="sm">
+        //                     <Flex align="center" gap={3}>
+        //                         <AlertTriangle color="#EF4444" size={16} />
+        //                         <VStack align="flex-start" spacing={0}>
+        //                             <Text color="red.700" fontWeight="bold" fontSize="xs">DATA SYNC ALERT</Text>
+        //                             <Text color="red.600" fontSize="10px">Signals with errors: {errorNames.join(', ')}</Text>
+        //                         </VStack>
+        //                     </Flex>
+        //                 </Box>
+        //             </motion.div>
+        //         )}
+
+        //         {/* Status Row */}
+        //         <Grid templateColumns="repeat(3, 1fr)" gap={4} mb={6}>
+        //             <StatusToggle label="Ignition Status" description="Engine status" isOn={ignOn} icon={Zap} isError={isSigError('Ignition Status')} color="blue" statusText={String(ignition || 'OFF').toUpperCase()} />
+        //             <StatusToggle label="Device Connected" description={deviceState?.deviceConnectedState || 'Unknown'} isOn={deviceState?.deviceConnectedState === 'CONNECTED'} icon={Wifi} color="green" />
+        //             <StatusToggle label="Trip Active" description="Ongoing trip status" isOn={ignOn} icon={Navigation} color="purple" statusText={ignitionDisplay} />
+        //         </Grid>
+
+        //         {/* Main Grid */}
+        //         <Grid templateColumns="1.3fr 0.8fr 1.6fr" gap={5} mb={6} h="380px">
+        //             {/* Map */}
+        //             <Box bg="white" borderRadius="2xl" overflow="hidden" position="relative" border="1px solid" borderColor="gray.100" boxShadow="sm">
+        //                 {lat && long ? (
+        //                     <iframe width="100%" height="100%" style={{ border: 0 }} loading="lazy" allowFullScreen src={`https://maps.google.com/maps?q=${lat},${long}&t=&z=15&ie=UTF8&iwloc=&output=embed`} />
+        //                 ) : (
+        //                     <Flex bg="gray.50" h="full" align="center" justify="center" direction="column">
+        //                         <Map size={36} color="#CBD5E0" /><Text mt={2} color="gray.400" fontWeight="bold" fontSize="xs">AWAITING GPS</Text>
+        //                     </Flex>
+        //                 )}
+        //                 <Box position="absolute" top={3} left={3} bg="whiteAlpha.950" backdropFilter="blur(8px)" p={3} borderRadius="xl" boxShadow="lg">
+        //                     <Flex align="center" gap={2}>
+        //                         <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}><Activity size={14} color="#3B6FE8" /></motion.div>
+        //                         <VStack align="flex-start" spacing={0}>
+        //                             <Text fontSize="sm" fontWeight="900" color="gray.800" letterSpacing="-0.5px">{coords}</Text>
+        //                             <Text fontSize="8px" color="gray.500" fontWeight="black" letterSpacing="1px">LIVE COORDINATES</Text>
+        //                         </VStack>
+        //                     </Flex>
+        //                 </Box>
+        //                 <AnimatePresence>
+        //                     {lastCmds.length > 0 && (
+        //                         <Box position="absolute" bottom={3} right={3} maxW="180px" zIndex={5}>
+        //                             <VStack spacing={1.5} align="stretch">
+        //                                 {lastCmds.map((cmd, i) => (
+        //                                     <motion.div key={i} initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
+        //                                         <Box bg={cmd.status === 'SUCCESS' ? 'green.500' : cmd.status === 'PENDING' ? 'orange.400' : 'red.500'} color="white" p={2} borderRadius="lg" boxShadow="md">
+        //                                             <HStack justify="space-between"><Text fontSize="9px" fontWeight="black">{(cmd.command || 'CMD').toUpperCase()}</Text><Text fontSize="8px" opacity={0.8}>{cmd.status}</Text></HStack>
+        //                                             <Text fontSize="8px" opacity={0.7}>{cmd.time}</Text>
+        //                                         </Box>
+        //                                     </motion.div>
+        //                                 ))}
+        //                             </VStack>
+        //                         </Box>
+        //                     )}
+        //                 </AnimatePresence>
+        //             </Box>
+
+        //             {/* Center */}
+        //             <VStack spacing={4} h="full">
+        //                 {/* Vehicle Status Info Card - uses confirmed API field names */}
+        //                 {vsData && (
+        //                     <Box w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="blue.100" boxShadow="sm">
+        //                         <HStack spacing={2} mb={3}>
+        //                             <Car size={14} color="#3B6FE8" />
+        //                             <Text fontWeight="800" color="gray.700" fontSize="xs">JEEP STATUS</Text>
+        //                             <Spacer />
+        //                             <Badge colorScheme={['RUN', 'ON', 'START'].includes(String(vsData.ignitionStatus || '').toUpperCase()) ? 'green' : 'orange'} variant="solid" fontSize="8px">
+        //                                 {vsData.ignitionStatus || 'OFF'}
+        //                             </Badge>
+        //                         </HStack>
+        //                         <SimpleGrid columns={2} spacing={2}>
+        //                             <Box p={2} bg="blue.50" borderRadius="lg">
+        //                                 <Text fontSize="8px" color="gray.400" fontWeight="black">FUEL</Text>
+        //                                 <Text fontSize="14px" fontWeight="900" color="blue.700">{vsData.fuelPercentage ?? '--'}%</Text>
+        //                             </Box>
+        //                             <Box p={2} bg="green.50" borderRadius="lg">
+        //                                 <Text fontSize="8px" color="gray.400" fontWeight="black">BATTERY</Text>
+        //                                 <Text fontSize="14px" fontWeight="900" color="green.700">{vsData.battery ?? '--'}V</Text>
+        //                             </Box>
+        //                             <Box p={2} bg="orange.50" borderRadius="lg">
+        //                                 <Text fontSize="8px" color="gray.400" fontWeight="black">COOLANT</Text>
+        //                                 <Text fontSize="14px" fontWeight="900" color="orange.700">{vsData.coolant ?? '--'}°C</Text>
+        //                             </Box>
+        //                             <Box p={2} bg="purple.50" borderRadius="lg">
+        //                                 <Text fontSize="8px" color="gray.400" fontWeight="black">ODOMETER</Text>
+        //                                 <Text fontSize="12px" fontWeight="900" color="purple.700">{vsData.odometer ? Number(vsData.odometer).toLocaleString() : '--'} km</Text>
+        //                             </Box>
+        //                             <Box p={2} bg="pink.50" borderRadius="lg">
+        //                                 <Text fontSize="8px" color="gray.400" fontWeight="black">EXTERNAL</Text>
+        //                                 <Text fontSize="14px" fontWeight="900" color="pink.700">{vsData.ambientTemp ?? vsData.externalTemp ?? '--'}°C</Text>
+        //                             </Box>
+        //                         </SimpleGrid>
+        //                     </Box>
+        //                 )}
+
+        //                 <Box flex={1} w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
+        //                     <Flex justify="space-between" align="center" mb={1}>
+        //                         <Text fontWeight="800" color="blue.500" fontSize="xs">LAST UPDATED</Text>
+        //                     </Flex>
+        //                     <Text color="gray.400" fontSize="9px" fontWeight="bold" mb={1}>{lastUpdate ? lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--'}</Text>
+        //                     <Text fontSize="2xl" fontWeight="900" color="gray.800" letterSpacing="-1px">{lastUpdate ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--:--'}</Text>
+        //                     {speedHistory.length > 1 && (
+        //                         <Box mt={2}>
+        //                             <Text fontSize="8px" color="gray.400" fontWeight="black" letterSpacing="1px" mb={1}>SPEED TREND</Text>
+        //                             <Sparkline data={speedHistory} color="#3B6FE8" width={100} height={28} />
+        //                         </Box>
+        //                     )}
+        //                 </Box>
+        //             </VStack>
+
+        //             {/* Vehicle Viewer */}
+        //             <Box bg="white" borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm" overflow="hidden">
+        //                 <Vehicle360Viewer baseUrl="https://imgd.aeplcdn.com/1280x720/cw/360/jeep/1048/5364/closed-door/c2c7cb/" imageCount={60} />
+        //             </Box>
+        //         </Grid>
+
+
+        //     </Box>
+        // </Box>
+        <>
+
+            {/* demo1 */}
+            <Box
+                w="full"
+                bg={THEME.bg}
+                pt={8}
+                px={8}
+                pb={2}
+                position="relative"
+                overflow="visible" // Change from 'hidden' to 'visible'
+            // minH="100%" // Ensure minimum height
+            >
+                <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1px, transparent 1px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.5} zIndex={0} />
+                <DeviceEventsList events={deviceEvents} />
+                <Box position="relative" zIndex={1}>
+                    {hasAnyError && (
+                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                            <Box bg="red.50" border="1px solid" borderColor="red.200" p={3} borderRadius="xl" mb={5} boxShadow="sm">
+                                <Flex align="center" gap={3}>
+                                    <AlertTriangle color="#EF4444" size={16} />
+                                    <VStack align="flex-start" spacing={0}>
+                                        <Text color="red.700" fontWeight="bold" fontSize="xs">DATA SYNC ALERT</Text>
+                                        <Text color="red.600" fontSize="10px">Signals with errors: {errorNames.join(', ')}</Text>
                                     </VStack>
-                                </Box>
-                            )}
-                        </AnimatePresence>
-                    </Box>
-
-                    {/* Center */}
-                    <VStack spacing={4} h="full">
-                        {/* Vehicle Status Info Card - uses confirmed API field names */}
-                        {vsData && (
-                            <Box w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="blue.100" boxShadow="sm">
-                                <HStack spacing={2} mb={3}>
-                                    <Car size={14} color="#3B6FE8" />
-                                    <Text fontWeight="800" color="gray.700" fontSize="xs">JEEP STATUS</Text>
-                                    <Spacer />
-                                    <Badge colorScheme={['RUN', 'ON', 'START'].includes(String(vsData.ignitionStatus || '').toUpperCase()) ? 'green' : 'orange'} variant="solid" fontSize="8px">
-                                        {vsData.ignitionStatus || 'OFF'}
-                                    </Badge>
-                                </HStack>
-                                <SimpleGrid columns={2} spacing={2}>
-                                    <Box p={2} bg="blue.50" borderRadius="lg">
-                                        <Text fontSize="8px" color="gray.400" fontWeight="black">FUEL</Text>
-                                        <Text fontSize="14px" fontWeight="900" color="blue.700">{vsData.fuelPercentage ?? '--'}%</Text>
-                                    </Box>
-                                    <Box p={2} bg="green.50" borderRadius="lg">
-                                        <Text fontSize="8px" color="gray.400" fontWeight="black">BATTERY</Text>
-                                        <Text fontSize="14px" fontWeight="900" color="green.700">{vsData.battery ?? '--'}V</Text>
-                                    </Box>
-                                    <Box p={2} bg="orange.50" borderRadius="lg">
-                                        <Text fontSize="8px" color="gray.400" fontWeight="black">COOLANT</Text>
-                                        <Text fontSize="14px" fontWeight="900" color="orange.700">{vsData.coolant ?? '--'}°C</Text>
-                                    </Box>
-                                    <Box p={2} bg="purple.50" borderRadius="lg">
-                                        <Text fontSize="8px" color="gray.400" fontWeight="black">ODOMETER</Text>
-                                        <Text fontSize="12px" fontWeight="900" color="purple.700">{vsData.odometer ? Number(vsData.odometer).toLocaleString() : '--'} km</Text>
-                                    </Box>
-                                    <Box p={2} bg="pink.50" borderRadius="lg">
-                                        <Text fontSize="8px" color="gray.400" fontWeight="black">EXTERNAL</Text>
-                                        <Text fontSize="14px" fontWeight="900" color="pink.700">{vsData.ambientTemp ?? vsData.externalTemp ?? '--'}°C</Text>
-                                    </Box>
-                                </SimpleGrid>
-                            </Box>
-                        )}
-                        <Box flex={1.2} w="full">
-                            <TempCard temp={engineTemp} label="Engine Temp" interiorTemp={extTemp} isError={isSigError('Engine Water Temp') || isSigError('External Temperature (C)')} />
-                        </Box>
-                        <Box flex={1} w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
-                            <Flex justify="space-between" align="center" mb={1}>
-                                <Text fontWeight="800" color="blue.500" fontSize="xs">LAST UPDATED</Text>
-                            </Flex>
-                            <Text color="gray.400" fontSize="9px" fontWeight="bold" mb={1}>{lastUpdate ? lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--'}</Text>
-                            <Text fontSize="2xl" fontWeight="900" color="gray.800" letterSpacing="-1px">{lastUpdate ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--:--'}</Text>
-                            {speedHistory.length > 1 && (
-                                <Box mt={2}>
-                                    <Text fontSize="8px" color="gray.400" fontWeight="black" letterSpacing="1px" mb={1}>SPEED TREND</Text>
-                                    <Sparkline data={speedHistory} color="#3B6FE8" width={100} height={28} />
-                                </Box>
-                            )}
-                        </Box>
-                    </VStack>
-
-                    {/* Vehicle Viewer */}
-                    <Box bg="white" borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm" overflow="hidden">
-                        <Vehicle360Viewer baseUrl="https://imgd.aeplcdn.com/1280x720/cw/360/jeep/1048/5364/closed-door/c2c7cb/" imageCount={60} />
-                    </Box>
-                </Grid>
-
-                {/* Gauge Row - values sourced from Jeep Vehicle Status API */}
-                <Flex align="center" justify="space-around" px={8} py={7} bg="white" borderRadius="3xl" boxShadow="lg" border="1px solid" borderColor="gray.50" mb={6}>
-                    {/* Fuel: fuelPercentage from API (e.g. 8%) */}
-                    {/* <CircularGauge
-                        value={fuel}
-                        label="Fuel Level"
-                        unit="%"
-                        color="#F59E0B"
-                        icon={Fuel}
-                        isError={isSigError('Fuel Level')}
-                    /> */}
-
-                    {/* <SpeedometerGauge value={vehicleSpeed} secondaryValue={odometer} highestSpeed={highestSpeed} isSpeedError={isSigError('Vehicle Speed')} isOdoError={isSigError('Total Odometer')} /> */}
-                    {/* Battery: actual voltage + % of 15V max */}
-                    {/* <CircularGauge
-                        value={batteryPct}
-                        displayValue={`${parseFloat(batteryRaw).toFixed(1)}V`}
-                        fillPct={batteryPct}
-                        label={`Battery (${batteryPct}%)`}
-                        unit=""
-                        color="#10B981"
-                        icon={Zap}
-                        isError={isSigError('Battery Voltage Level')}
-                    /> */}
-                    {/* Engine Temp: show actual °C value, arc = % of 150°C max */}
-                    {/* <CircularGauge
-                        value={parseFloat(engineTemp) || 0}
-                        displayValue={`${parseFloat(engineTemp) || 0}°C`}
-                        fillPct={Math.min(Math.round(((parseFloat(engineTemp) || 0) / 150) * 100), 100)}
-                        label={parseFloat(engineTemp) > 105 ? 'OVERHEAT!' : 'Coolant Temp'}
-                        unit=""
-                        color={parseFloat(engineTemp) > 105 ? '#EF4444' : '#6366F1'}
-                        icon={Thermometer}
-                        isError={isSigError('Engine Water Temp')}
-                    /> */}
-                </Flex>
-
-                {/* Footer Actions */}
-                {/* <HStack justify="center" spacing={4}>
-                    {[{ icon: Activity, label: 'Diagnostics' }, { icon: Wifi, label: 'Connectivity' }, { icon: Shield, label: 'Security' }, { icon: Thermometer, label: 'Health' }, { icon: BarChart2, label: 'Analytics' }, { icon: Settings, label: 'Settings' }].map(({ icon: Icon, label }, idx) => (
-                        <Tooltip key={idx} label={label} hasArrow>
-                            <motion.div whileHover={{ y: -3, scale: 1.1 }} whileTap={{ scale: 0.9 }}>
-                                <Flex w={11} h={11} align="center" justify="center" bg="white" borderRadius="xl" cursor="pointer" boxShadow="md" border="1px solid" borderColor="gray.50">
-                                    <Icon size={18} color="#718096" />
                                 </Flex>
-                            </motion.div>
-                        </Tooltip>
-                    ))}
-                </HStack> */}
+                            </Box>
+                        </motion.div>
+                    )}
+
+                    {/* Status Row */}
+                    <Grid templateColumns="repeat(3, 1fr)" gap={4} mb={6}>
+                        <StatusToggle label="Ignition Status" description="Engine status" isOn={ignOn} icon={Zap} isError={isSigError('Ignition Status')} color="blue" statusText={String(ignition || 'OFF').toUpperCase()} />
+                        <StatusToggle label="Device Connected" description={deviceState?.deviceConnectedState || 'Unknown'} isOn={deviceState?.deviceConnectedState === 'CONNECTED'} icon={Wifi} color="green" />
+                        <StatusToggle label="Trip Active" description="Ongoing trip status" isOn={ignOn} icon={Navigation} color="purple" statusText={ignitionDisplay} />
+                    </Grid>
+
+                    {/* Main Grid */}
+                    <Grid templateColumns="1.3fr 0.8fr 1.6fr" gap={5} mb={6} h="380px">
+                        {/* Map */}
+                        <Box bg="white" borderRadius="2xl" overflow="hidden" position="relative" border="1px solid" borderColor="gray.100" boxShadow="sm">
+                            {lat && long ? (
+                                <iframe width="100%" height="100%" style={{ border: 0 }} loading="lazy" allowFullScreen src={`https://maps.google.com/maps?q=${lat},${long}&t=&z=15&ie=UTF8&iwloc=&output=embed`} />
+                            ) : (
+                                <Flex bg="gray.50" h="full" align="center" justify="center" direction="column">
+                                    <Map size={36} color="#CBD5E0" /><Text mt={2} color="gray.400" fontWeight="bold" fontSize="xs">AWAITING GPS</Text>
+                                </Flex>
+                            )}
+                            <Box position="absolute" top={3} left={3} bg="whiteAlpha.950" backdropFilter="blur(8px)" p={3} borderRadius="xl" boxShadow="lg">
+                                <Flex align="center" gap={2}>
+                                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}><Activity size={14} color="#3B6FE8" /></motion.div>
+                                    <VStack align="flex-start" spacing={0}>
+                                        <Text fontSize="sm" fontWeight="900" color="gray.800" letterSpacing="-0.5px">{coords}</Text>
+                                        <Text fontSize="8px" color="gray.500" fontWeight="black" letterSpacing="1px">LIVE COORDINATES</Text>
+                                    </VStack>
+                                </Flex>
+                            </Box>
+                            <AnimatePresence>
+                                {lastCmds.length > 0 && (
+                                    <Box position="absolute" bottom={3} right={3} maxW="180px" zIndex={5}>
+                                        <VStack spacing={1.5} align="stretch">
+                                            {lastCmds.map((cmd, i) => (
+                                                <motion.div key={i} initial={{ x: 50, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
+                                                    <Box bg={cmd.status === 'SUCCESS' ? 'green.500' : cmd.status === 'PENDING' ? 'orange.400' : 'red.500'} color="white" p={2} borderRadius="lg" boxShadow="md">
+                                                        <HStack justify="space-between"><Text fontSize="9px" fontWeight="black">{(cmd.command || 'CMD').toUpperCase()}</Text><Text fontSize="8px" opacity={0.8}>{cmd.status}</Text></HStack>
+                                                        <Text fontSize="8px" opacity={0.7}>{cmd.time}</Text>
+                                                    </Box>
+                                                </motion.div>
+                                            ))}
+                                        </VStack>
+                                    </Box>
+                                )}
+                            </AnimatePresence>
+                        </Box>
+
+                        {/* Center */}
+                        <VStack spacing={4} h="full">
+                            {/* Vehicle Status Info Card - uses confirmed API field names */}
+                            {vsData && (
+                                <Box w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="blue.100" boxShadow="sm">
+                                    <HStack spacing={2} mb={3}>
+                                        <Car size={14} color="#3B6FE8" />
+                                        <Text fontWeight="800" color="gray.700" fontSize="xs">JEEP STATUS</Text>
+                                        <Spacer />
+                                        <Badge colorScheme={['RUN', 'ON', 'START'].includes(String(vsData.ignitionStatus || '').toUpperCase()) ? 'green' : 'orange'} variant="solid" fontSize="8px">
+                                            {vsData.ignitionStatus || 'OFF'}
+                                        </Badge>
+                                    </HStack>
+                                    <SimpleGrid columns={2} spacing={2}>
+                                        <Box p={2} bg="blue.50" borderRadius="lg">
+                                            <Text fontSize="8px" color="gray.400" fontWeight="black">FUEL</Text>
+                                            <Text fontSize="14px" fontWeight="900" color="blue.700">{vsData.fuelPercentage ?? '--'}%</Text>
+                                        </Box>
+                                        <Box p={2} bg="green.50" borderRadius="lg">
+                                            <Text fontSize="8px" color="gray.400" fontWeight="black">BATTERY</Text>
+                                            <Text fontSize="14px" fontWeight="900" color="green.700">{vsData.battery ?? '--'}V</Text>
+                                        </Box>
+                                        <Box p={2} bg="orange.50" borderRadius="lg">
+                                            <Text fontSize="8px" color="gray.400" fontWeight="black">COOLANT</Text>
+                                            <Text fontSize="14px" fontWeight="900" color="orange.700">{vsData.coolant ?? '--'}°C</Text>
+                                        </Box>
+                                        <Box p={2} bg="purple.50" borderRadius="lg">
+                                            <Text fontSize="8px" color="gray.400" fontWeight="black">ODOMETER</Text>
+                                            <Text fontSize="12px" fontWeight="900" color="purple.700">{vsData.odometer ? Number(vsData.odometer).toLocaleString() : '--'} km</Text>
+                                        </Box>
+                                        <Box p={2} bg="pink.50" borderRadius="lg">
+                                            <Text fontSize="8px" color="gray.400" fontWeight="black">EXTERNAL</Text>
+                                            <Text fontSize="14px" fontWeight="900" color="pink.700">{vsData.ambientTemp ?? vsData.externalTemp ?? '--'}°C</Text>
+                                        </Box>
+                                    </SimpleGrid>
+                                </Box>
+                            )}
+
+                            <Box flex={1} w="full" bg="white" p={4} borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
+                                <Flex justify="space-between" align="center" mb={1}>
+                                    <Text fontWeight="800" color="blue.500" fontSize="xs">LAST UPDATED</Text>
+                                </Flex>
+                                <Text color="gray.400" fontSize="9px" fontWeight="bold" mb={1}>{lastUpdate ? lastUpdate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '--'}</Text>
+                                <Text fontSize="2xl" fontWeight="900" color="gray.800" letterSpacing="-1px">{lastUpdate ? lastUpdate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--:--'}</Text>
+                                {speedHistory.length > 1 && (
+                                    <Box mt={2}>
+                                        <Text fontSize="8px" color="gray.400" fontWeight="black" letterSpacing="1px" mb={1}>SPEED TREND</Text>
+                                        <Sparkline data={speedHistory} color="#3B6FE8" width={100} height={28} />
+                                    </Box>
+                                )}
+                            </Box>
+                        </VStack>
+
+                        {/* Vehicle Viewer */}
+                        <Box bg="white" borderRadius="2xl" border="1px solid" borderColor="gray.100" boxShadow="sm" overflow="hidden">
+                            <Vehicle360Viewer baseUrl="https://imgd.aeplcdn.com/1280x720/cw/360/jeep/1048/5364/closed-door/c2c7cb/" imageCount={60} />
+                        </Box>
+                    </Grid>
+
+
+                </Box>
             </Box>
-        </Box>
+        </>
+
+
     );
 };
 
@@ -3111,17 +3210,17 @@ const deepFormatDates = (obj) => {
         }
         return obj;
     }
-    
+
     if (Array.isArray(obj)) {
         return obj.map(item => deepFormatDates(item));
     }
-    
+
     const formatted = {};
     for (const key in obj) {
         if (Object.prototype.hasOwnProperty.call(obj, key)) {
             const val = obj[key];
             // Format if it's a timestamp key or a 13-digit value
-            if ((key.toLowerCase().includes('time') || key.toLowerCase().includes('stamp') || key.toLowerCase().includes('date')) && 
+            if ((key.toLowerCase().includes('time') || key.toLowerCase().includes('stamp') || key.toLowerCase().includes('date')) &&
                 (typeof val === 'number' || (typeof val === 'string' && !isNaN(Number(val)))) && String(val).length === 13) {
                 formatted[key] = formatFullDate(val);
             } else {
@@ -3245,7 +3344,7 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
     else if (name === 'Alerts') priority = ['alertType', 'timeStamp', 'vehicleSpeed', 'alertId', 'sourceid', 'version'];
     else if (name === 'Jeep Vehicle Status') priority = ['vinNo', 'status', 'ignitionStatus', 'fuelLevel', 'batteryVoltage'];
     else if (name === 'Device Join Status') priority = ['alertName', 'body', 'signalTimeStamp', 'createdTimeStamp', 'updatedTimeStamp', 'gpsLat', 'gpsLong', 'read'];
-    
+
     const friendlyHeaders = {
         alertName: 'Alert',
         body: 'Description',
@@ -3285,7 +3384,7 @@ const renderDataAsTable = (data, name, searchTerm = '') => {
                                         </Td>
                                     );
                                 }
-                                if (k && (k.toLowerCase().includes('time') || k.toLowerCase().includes('stamp') || k.toLowerCase().includes('date')) && v && (typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))))) { 
+                                if (k && (k.toLowerCase().includes('time') || k.toLowerCase().includes('stamp') || k.toLowerCase().includes('date')) && v && (typeof v === 'number' || (typeof v === 'string' && !isNaN(Number(v))))) {
                                     v = formatFullDate(v);
                                 }
                                 if (k === 'read' && name === 'Device Join Status') {
@@ -3512,7 +3611,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
                     newData = mapVSToSignal(vsData, signal);
                     return { name: signal.name, newData };
                 }
-                
+
                 if (signal.fetchType === 'events') newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
                 else if (signal.fetchType === 'ignition') newData = await TraxoApi.getIgnitionEvents(vin, fmtStart, fmtEnd);
                 else if (signal.fetchType === 'location') newData = await TraxoApi.getLocationTelemetryArray(vin);
@@ -3564,17 +3663,17 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
                     else if (newData.signalList) items = newData.signalList;
                     else if (newData.commandAudit) items = newData.commandAudit;
                     else if (newData.audit) items = newData.audit;
-                    
+
                     if (signal.fetchType === 'notification') {
                         // Handle notification raw data vs nested notifications array
                         let raw = newData.raw || (newData.notifications ? newData : null) || newData;
-                        
+
                         // Support for object-based arrays { "0": {...}, "1": {...} } or objects containing notifications
                         // Be aggressive: if it's an object but not a real array, try to find an array inside or convert it.
                         if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
                             if (raw.notifications && Array.isArray(raw.notifications)) raw = raw.notifications;
                             else if (raw.notifications && typeof raw.notifications === 'object') raw = raw.notifications;
-                            
+
                             // If it's STILL an indexed object { "0": ... }, convert to values
                             if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
                                 const keys = Object.keys(raw).filter(k => !isNaN(k));
@@ -3583,18 +3682,18 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
                                 }
                             }
                         }
-                        
+
                         let list = Array.isArray(raw) ? raw : [raw];
                         // Support for nested 'NOTIFICATION' or 'notification' keys to flatten the data for the table
                         const normalizedData = list.filter(Boolean).map(item => {
-                           const n = item?.NOTIFICATION || item?.notification || item;
-                           // If n is an object, merge it with the item's metadata (id, etc)
-                           let flat = item;
-                           if (typeof n === 'object' && n !== null) {
-                               flat = { ...(typeof item === 'object' ? item : {}), ...n };
-                           }
-                           // Important: ensure we deep-format timestamps even at the normalization stage
-                           return deepFormatDates(flat);
+                            const n = item?.NOTIFICATION || item?.notification || item;
+                            // If n is an object, merge it with the item's metadata (id, etc)
+                            let flat = item;
+                            if (typeof n === 'object' && n !== null) {
+                                flat = { ...(typeof item === 'object' ? item : {}), ...n };
+                            }
+                            // Important: ensure we deep-format timestamps even at the normalization stage
+                            return deepFormatDates(flat);
                         });
                         return Array.isArray(normalizedData) ? normalizedData : [normalizedData];
                     }
@@ -3780,11 +3879,187 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
     const errorSignals = signals.filter(s => s.error).length;
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} size="full" scrollBehavior="inside">
-            <ModalOverlay />
-            <ModalContent bg={THEME.bg} borderRadius="none">
-                <ModalBody p={0} overflowX="hidden" overflowY="auto">
 
+
+        // <Modal isOpen={isOpen} onClose={onClose} size="full" scrollBehavior="inside">
+        //     <ModalOverlay />
+        //     <ModalContent bg={THEME.bg} borderRadius="none">
+        //         <ModalBody p={0} overflowX="hidden" overflowY="auto">
+
+        //             {/* HEADER */}
+        //             <Box bg="white" borderBottom="1px solid" borderColor="gray.100" px={6} py={3} position="sticky" top={0} zIndex={20} boxShadow="sm">
+        //                 <Flex justify="space-between" align="center">
+        //                     <HStack spacing={4}>
+        //                         <IconButton icon={<ArrowLeft size={16} />} aria-label="Back" variant="ghost" onClick={onClose} size="sm" />
+        //                         <VStack align="flex-start" spacing={0}>
+        //                             <HStack spacing={2}>
+        //                                 <Heading size="sm" color="gray.800" fontWeight="900" letterSpacing="-0.5px">Payload Dashboard</Heading>
+        //                                 <Badge colorScheme="blue" variant="subtle" fontSize="9px">V0.4</Badge>
+        //                             </HStack>
+        //                             <HStack spacing={3}>
+        //                                 <Text fontSize="9px" color="gray.400" fontWeight="bold">{activeSignals}/{totalSignals} signals active</Text>
+        //                                 {errorSignals > 0 && <Text fontSize="9px" color="red.500" fontWeight="bold">{errorSignals} errors</Text>}
+        //                                 {lastRefreshTime && <Text fontSize="9px" color="gray.400">Updated: {lastRefreshTime}</Text>}
+        //                             </HStack>
+        //                         </VStack>
+        //                         <HStack spacing={1} bg="gray.100" p={1} borderRadius="xl">
+        //                             <Button size="xs" variant={viewMode === 'visual' ? 'solid' : 'ghost'} colorScheme={viewMode === 'visual' ? 'blue' : 'gray'} borderRadius="lg" onClick={() => setViewMode('visual')} leftIcon={<LayoutDashboard size={11} />}>Visual</Button>
+        //                             <Button size="xs" variant={viewMode === 'console' ? 'solid' : 'ghost'} colorScheme={viewMode === 'console' ? 'blue' : 'gray'} borderRadius="lg" onClick={() => setViewMode('console')} leftIcon={<Monitor size={11} />}>Console</Button>
+        //                         </HStack>
+        //                     </HStack>
+
+        //                     <HStack spacing={3}>
+        //                         <InputGroup size="sm" w="200px">
+        //                             <InputLeftElement pointerEvents="none"><Search size={13} color="#A0AEC0" /></InputLeftElement>
+        //                             <Input placeholder="Search signals..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} borderRadius="lg" bg="gray.50" border="none" color="black" fontSize="12px" _focus={{ bg: 'white', boxShadow: 'outline' }} />
+        //                         </InputGroup>
+        //                         <HStack spacing={1} align="center">
+        //                             <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="0.5px">VIN</Text>
+        //                             <Input value={vin} onChange={e => setVin(e.target.value)} size="sm" w="155px" borderRadius="lg" color="black" fontWeight="bold" fontSize="11px" bg="gray.50" border="none" />
+        //                         </HStack>
+        //                         <HStack spacing={1}>
+        //                             <Text fontSize="9px" color="gray.400" fontWeight="bold">Poll</Text>
+        //                             <Select size="xs" value={pollingInterval} onChange={e => setPollingInterval(Number(e.target.value))} w="60px" borderRadius="md" bg="gray.50" border="none" color="black" fontSize="11px">
+        //                                 <option value={5}>5s</option><option value={10}>10s</option><option value={30}>30s</option><option value={60}>60s</option>
+        //                             </Select>
+        //                         </HStack>
+        //                         <HStack spacing={2} bg={isLive ? 'green.50' : 'gray.100'} px={3} py={1.5} borderRadius="full" border="1px solid" borderColor={isLive ? 'green.100' : 'gray.200'} cursor="pointer" onClick={() => setIsLive(!isLive)}>
+        //                             {isLive && <motion.div animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.5, repeat: Infinity }}><Box w={2} h={2} borderRadius="full" bg="green.500" /></motion.div>}
+        //                             <Text fontSize="9px" fontWeight="900" color={isLive ? 'green.600' : 'gray.600'} letterSpacing="1px">{isLive ? 'LIVE' : 'PAUSED'}</Text>
+        //                         </HStack>
+        //                         <IconButton icon={<RotateCcw size={14} />} aria-label="Refresh" size="sm" variant="ghost" onClick={handleRefresh} borderRadius="full" />
+        //                         <IconButton icon={<Download size={14} />} aria-label="Export JSON" size="sm" variant="ghost" onClick={handleExport} borderRadius="full" title="Export data as JSON" />
+        //                     </HStack>
+        //                 </Flex>
+        //             </Box>
+
+        //             {/* VISUAL VIEW */}
+        //             {viewMode === 'visual' && <VisualDashboardView signals={signals} deviceState={deviceState} highestSpeed={highestSpeed} />}
+
+
+
+        //             {/* CONSOLE VIEW */}
+        //             {viewMode === 'console' && (
+        //                 <Box p={6} bg={THEME.bg} position="relative">
+        //                     <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px)" backgroundSize="40px 40px" pointerEvents="none" />
+        //                     <Flex align="center" gap={3} mb={4} p={3} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm" position="relative" zIndex={1}>
+        //                         <HStack spacing={4}>
+        //                             <HStack spacing={1}><Box w={2} h={2} bg="green.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{activeSignals} with data</Text></HStack>
+        //                             <HStack spacing={1}><Box w={2} h={2} bg="red.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{errorSignals} errors</Text></HStack>
+        //                             <HStack spacing={1}><Box w={2} h={2} bg="gray.300" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{totalSignals - activeSignals - errorSignals} pending</Text></HStack>
+        //                         </HStack>
+        //                         <Spacer />
+        //                         <Text fontSize="10px" color="gray.400">{filteredSignals.filter(s => s.isChecked && !s.hideInConsole).length} signals shown</Text>
+        //                     </Flex>
+        //                     <SimpleGrid columns={2} gap={4} position="relative" zIndex={1}>
+        //                         {filteredSignals.filter(s => s.isChecked && !s.hideInConsole).map((signal, index) => (
+        //                             <SignalCard key={signal.id + index} signal={signal} searchTerm={searchTerm} onRefresh={handleRefresh} />
+        //                         ))}
+        //                     </SimpleGrid>
+        //                 </Box>
+        //             )}
+
+        //             {/* BOTTOM PANELS */}
+        //             <Box>
+        //                 {deviceState && (
+        //                     <Box>
+        //                         <HStack spacing={2} mb={3}>
+        //                             <Info size={15} color="#3B6FE8" />
+        //                             <Heading size="xs" color="gray.700">Device Details</Heading>
+        //                             <Badge colorScheme={deviceState.deviceConnectedState === 'CONNECTED' ? 'green' : 'red'} variant="solid" fontSize="9px">{deviceState.deviceConnectedState || 'UNKNOWN'}</Badge>
+        //                         </HStack>
+        //                         <SimpleGrid columns={{ base: 2, md: 6 }} gap={3}>
+        //                             {[['VIN', deviceState.vinNo || vin], ['ICCID', deviceState.iccid], ['IMEI', deviceState.imei], ['Model', deviceState.car_model], ['FW Version', deviceState.firmwareVersion || deviceState.fwVersion], ['Last Seen', deviceState.lastActiveTime ? new Date(deviceState.lastActiveTime).toLocaleTimeString() : null]].map(([label, value]) => value && (
+        //                                 <Box key={label} p={3} bg="gray.50" borderRadius="lg">
+        //                                     <Text fontSize="9px" color="gray.400" fontWeight="black" textTransform="uppercase" mb={0.5}>{label}</Text>
+        //                                     <Text fontWeight="700" fontSize="11px" color="gray.800" fontFamily="monospace" isTruncated>{value}</Text>
+        //                                 </Box>
+        //                             ))}
+        //                         </SimpleGrid>
+        //                     </Box>
+        //                 )}
+
+        //                 <Box bg="white" p={5} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
+        //                     <HStack spacing={2} mb={4}><Radio size={15} color="#3B6FE8" /><Heading size="xs" color="gray.700">Remote Commands</Heading></HStack>
+        //                     <Wrap spacing={3} mb={4}>
+        //                         {[
+        //                             { label: 'Lock Door', icon: Lock, fn: TraxoApi.lockDoor, color: 'blue' },
+        //                             { label: 'Unlock Door', icon: Unlock, fn: TraxoApi.unlockDoor, color: 'blue' },
+        //                             { label: 'Blinker ON', icon: Zap, fn: TraxoApi.blinkerOn, color: 'orange' },
+        //                             { label: 'Blinker OFF', icon: Zap, fn: TraxoApi.blinkerOff, color: 'orange' },
+        //                             { label: 'Honk', icon: Volume2, fn: TraxoApi.honk, color: 'red' },
+        //                             { label: 'Fetch Logs', icon: Download, fn: TraxoApi.fetchDeviceLogs, color: 'green', isConcurrent: true },
+        //                         ].map(({ label, icon: Icon, fn, color, isConcurrent }) => (
+        //                             <Button key={label} size="sm" colorScheme={color} variant="outline" isLoading={commandLoading === label} leftIcon={<Icon size={13} />} onClick={() => handleCommand(label, fn, [], isConcurrent)} borderRadius="lg" fontWeight="700" fontSize="12px" _hover={{ transform: 'translateY(-1px)', boxShadow: 'md' }} transition="all 0.2s">{label}</Button>
+        //                         ))}
+        //                     </Wrap>
+
+        //                     <Box pt={3} borderTop="1px dashed" borderColor="gray.200" mb={3}>
+        //                         <Text fontSize="10px" fontWeight="800" color="gray.500" textTransform="uppercase" mb={2}>Speed Alert</Text>
+        //                         <HStack spacing={2}>
+        //                             <Input placeholder="Speed limit (km/h)" value={speedAlert} onChange={e => setSpeedAlert(e.target.value)} size="sm" w="160px" bg="gray.50" borderRadius="lg" color="black" border="none" />
+        //                             <Button size="sm" colorScheme="red" variant="outline" borderRadius="lg" leftIcon={<AlertTriangle size={13} />} isLoading={commandLoading === 'Speed Alert'} isDisabled={!speedAlert} onClick={() => handleCommand('Speed Alert', TraxoApi.setSpeedAlert, [speedAlert])}>Set Alert</Button>
+        //                         </HStack>
+        //                     </Box>
+
+        //                     <Box pt={3} borderTop="1px dashed" borderColor="gray.200">
+        //                         <Text fontSize="10px" fontWeight="800" color="gray.500" textTransform="uppercase" mb={2}>Firmware Over-The-Air (FOTA)</Text>
+        //                         <HStack spacing={3}>
+        //                             <Input placeholder="Version (e.g. 2314.0)" value={fotaVersion} onChange={e => setFotaVersion(e.target.value)} size="sm" w="170px" bg="gray.50" borderRadius="lg" color="black" border="none" />
+        //                             <Button size="sm" colorScheme="purple" isLoading={isFotaUpdating} loadingText="Updating..." onClick={handleFotaUpdate} leftIcon={<RotateCcw size={13} />} borderRadius="lg">Trigger FOTA</Button>
+        //                             <Button size="sm" variant="ghost" colorScheme="gray" onClick={handleFotaReset} leftIcon={<RefreshCw size={13} />} borderRadius="lg">Reset State</Button>
+        //                         </HStack>
+        //                     </Box>
+        //                 </Box>
+        //             </Box>
+
+        //         </ModalBody>
+        //     </ModalContent>
+        // </Modal>
+
+
+        // In PayloadDashboardModal component, update the Modal props demo 1
+
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            size="full"
+            scrollBehavior="inside"  // Keep this
+            motionPreset="slideInBottom" // Add smooth animation
+        >
+            <ModalOverlay />
+            <ModalContent
+                bg={THEME.bg}
+                borderRadius="none"
+                maxH="100vh"  // Ensure modal doesn't exceed viewport
+                h="100vh"     // Fixed height
+                display="flex"
+                flexDirection="column"
+            >
+                <ModalBody
+                    p={0}
+                    overflowY="auto"  // Ensure vertical scrolling
+                    overflowX="hidden" // Prevent horizontal scroll
+                    flex="1"
+                // sx={{
+                //     '&::-webkit-scrollbar': {
+                //         width: '8px',
+                //         height: '8px',
+                //     },
+                //     '&::-webkit-scrollbar-track': {
+                //         background: '#f1f1f1',
+                //         borderRadius: '4px',
+                //     },
+                //     '&::-webkit-scrollbar-thumb': {
+                //         background: '#888',
+                //         borderRadius: '4px',
+                //     },
+                //     '&::-webkit-scrollbar-thumb:hover': {
+                //         background: '#555',
+                //     },
+                // }}
+                >
+                    {/* Your existing content */}
                     {/* HEADER */}
                     <Box bg="white" borderBottom="1px solid" borderColor="gray.100" px={6} py={3} position="sticky" top={0} zIndex={20} boxShadow="sm">
                         <Flex justify="space-between" align="center">
@@ -3859,9 +4134,9 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
                     )}
 
                     {/* BOTTOM PANELS */}
-                    <Box px={8} pb={8} bg={THEME.bg}>
+                    <Box>
                         {deviceState && (
-                            <Box bg="white" p={5} borderRadius="xl" mb={4} border="1px solid" borderColor="gray.100" boxShadow="sm">
+                            <Box>
                                 <HStack spacing={2} mb={3}>
                                     <Info size={15} color="#3B6FE8" />
                                     <Heading size="xs" color="gray.700">Device Details</Heading>

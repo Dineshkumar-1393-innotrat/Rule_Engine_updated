@@ -24,9 +24,9 @@ import {
     NumberInput, NumberInputField, Wrap, WrapItem, Icon, SimpleGrid,
 } from '@chakra-ui/react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    Play, Square, Plus, Trash2, Bell, ChevronDown, ChevronRight, 
-    RefreshCcw, CheckCircle2, AlertTriangle, XCircle, Info, 
+import {
+    Play, Square, Plus, Trash2, Bell, ChevronDown, ChevronRight,
+    RefreshCcw, CheckCircle2, AlertTriangle, XCircle, Info,
     Layers, Filter, Zap, Activity, Cpu, Radio, ShieldAlert,
     Gauge, Database, Code, Settings, Download, Search, LayoutDashboard
 } from 'lucide-react';
@@ -60,15 +60,15 @@ const ArcGauge = ({ value, max, label, unit, color, warningAt, invertAlert }) =>
     const angle = (pct / 100) * 180;
     const r = 40;
     const cx = 55, cy = 55;
-    
+
     const toRad = (deg) => (deg - 180) * (Math.PI / 180);
     const x = cx + r * Math.cos(toRad(angle));
     const y = cy + r * Math.sin(toRad(angle));
-    
+
     const isWarn = warningAt !== undefined
         ? (invertAlert ? value <= warningAt : value >= warningAt)
         : false;
-        
+
     const gaugeColor = isWarn ? '#E53E3E' : (color || '#3182CE');
     const gradientId = `gauge-grad-${label.replace(/\s+/g, '-')}`;
 
@@ -82,32 +82,32 @@ const ArcGauge = ({ value, max, label, unit, color, warningAt, invertAlert }) =>
                             <stop offset="100%" stopColor={gaugeColor} />
                         </linearGradient>
                         <filter id="shadow">
-                            <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.1"/>
+                            <feDropShadow dx="0" dy="1" stdDeviation="1" floodOpacity="0.1" />
                         </filter>
                     </defs>
                     {/* Background Track */}
                     <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
                         fill="none" stroke="#EDF2F7" strokeWidth="8" strokeLinecap="round" />
-                    
+
                     {/* Active Track */}
                     {pct > 0 && (
-                        <motion.path 
+                        <motion.path
                             initial={{ pathLength: 0 }}
                             animate={{ pathLength: pct / 100 }}
                             transition={{ duration: 1.5, ease: "easeOut" }}
                             d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-                            fill="none" stroke={`url(#${gradientId})`} strokeWidth="8" 
+                            fill="none" stroke={`url(#${gradientId})`} strokeWidth="8"
                             strokeLinecap="round" filter="url(#shadow)"
                         />
                     )}
-                    
+
                     {/* Needle/Indicator Point */}
-                    <motion.circle 
+                    <motion.circle
                         animate={{ cx: x, cy: y }}
                         transition={{ duration: 1.5, ease: "easeOut" }}
                         r="4" fill="white" stroke={gaugeColor} strokeWidth="2"
                     />
-                    
+
                     <text x={cx} y={cy - 5} textAnchor="middle" fontSize="16" fontWeight="800" fill="gray.800">
                         {typeof value === 'number' ? value.toFixed(value > 10 ? 0 : 1) : '--'}
                     </text>
@@ -148,7 +148,7 @@ const AlertItem = ({ alert, onDismiss }) => {
 
     return (
         <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}>
-            <HStack 
+            <HStack
                 p={3} mb={1} borderRadius="lg" align="center"
                 bg="white" border="1px solid" borderColor="gray.100"
                 _hover={{ bg: "gray.50", boxShadow: "sm" }} transition="all 0.2s"
@@ -172,10 +172,10 @@ const AlertItem = ({ alert, onDismiss }) => {
                         {new Date(alert.timestamp).toLocaleTimeString()}
                     </Text>
                 </VStack>
-                <IconButton 
+                <IconButton
                     size="xs" variant="ghost" color="gray.300" _hover={{ color: "red.500", bg: "red.50" }}
-                    icon={<Trash2 size={12} />} 
-                    onClick={() => onDismiss(alert.ruleId + alert.timestamp)} 
+                    icon={<Trash2 size={12} />}
+                    onClick={() => onDismiss(alert.ruleId + alert.timestamp)}
                     aria-label="Dismiss Incident"
                 />
             </HStack>
@@ -190,9 +190,9 @@ const SignalCard = ({ fact, value, history, isAlert, domain }) => {
     const accentColor = isAlert ? '#E53E3E' : domainColor;
 
     return (
-        <Box 
-            bg="white" borderRadius="xl" border="1px solid" 
-            borderColor={isAlert ? "red.200" : "gray.100"} 
+        <Box
+            bg="white" borderRadius="xl" border="1px solid"
+            borderColor={isAlert ? "red.200" : "gray.100"}
             boxShadow="sm" overflow="hidden" transition="all 0.2s"
             _hover={{ borderColor: accentColor, boxShadow: "md" }}
         >
@@ -220,9 +220,9 @@ const SignalCard = ({ fact, value, history, isAlert, domain }) => {
             <Collapse in={open}>
                 <Box px={4} pb={4} pt={2} borderTop="1px solid" borderColor="gray.50">
                     <SimpleGrid columns={2} spacing={6} align="center">
-                        <ArcGauge 
-                            value={value} max={fact.max || 100} label={fact.label} 
-                            unit={fact.unit} color={domainColor} 
+                        <ArcGauge
+                            value={value} max={fact.max || 100} label={fact.label}
+                            unit={fact.unit} color={domainColor}
                             warningAt={fact.warningAt} invertAlert={fact.invertAlert}
                         />
                         <VStack align="start" justify="center" spacing={3}>
@@ -289,27 +289,27 @@ const DomainRuleBuilder = ({ domain, onAdd }) => {
                 <Text fontSize="10px" fontWeight="800" color="gray.500" letterSpacing="1px">RULE SPECIFICATION</Text>
             </HStack>
             <Input {...inputStyle} placeholder="RULE IDENTITY (E.G. OVERHEAT_THRESHOLD)" value={name} onChange={e => setName(e.target.value)} />
-            
+
             <HStack>
                 <Select {...inputStyle} value={fact} onChange={e => setFact(e.target.value)} flex={2}>
-                    {domain.facts.map(f => <option key={f.name} value={f.name} style={{background: 'white'}}>{f.label.toUpperCase()}</option>)}
+                    {domain.facts.map(f => <option key={f.name} value={f.name} style={{ background: 'white' }}>{f.label.toUpperCase()}</option>)}
                 </Select>
                 <Select {...inputStyle} value={op} onChange={e => setOp(e.target.value)} flex={1}>
-                    {OPERATORS.map(o => <option key={o.value} value={o.value} style={{background: 'white'}}>{o.label}</option>)}
+                    {OPERATORS.map(o => <option key={o.value} value={o.value} style={{ background: 'white' }}>{o.label}</option>)}
                 </Select>
                 <Input {...inputStyle} placeholder="VALUE" value={val} onChange={e => setVal(e.target.value)} flex={1} />
             </HStack>
 
             <HStack>
                 <Select {...inputStyle} value={severity} onChange={e => setSeverity(e.target.value)} flex={1}>
-                    <option value="info" style={{background: 'white'}}>INFO</option>
-                    <option value="warning" style={{background: 'white'}}>WARNING</option>
-                    <option value="critical" style={{background: 'white'}}>CRITICAL</option>
+                    <option value="info" style={{ background: 'white' }}>INFO</option>
+                    <option value="warning" style={{ background: 'white' }}>WARNING</option>
+                    <option value="critical" style={{ background: 'white' }}>CRITICAL</option>
                 </Select>
                 <Input {...inputStyle} placeholder="ALERT MESSAGE DISPATCH" value={message} onChange={e => setMessage(e.target.value)} flex={3} />
             </HStack>
 
-            <Button 
+            <Button
                 size="md" bg={domain.color.hex} color="white" _hover={{ filter: "brightness(1.1)" }}
                 leftIcon={<Plus size={16} />} onClick={handleAdd}
                 fontWeight="800" fontSize="11px" letterSpacing="1px" boxShadow="sm"
@@ -439,9 +439,10 @@ const MultiDomainRuleEngine = () => {
     };
 
     return (
-        <Box minH="100vh" bg={LIGHT_THEME.bg} p={{ base: 3, md: 5 }}>
+        <Box minH="100vh" bg={LIGHT_THEME.bg} p={{ base: 0, md: 5 }}>
+            <VStack spacing={6} align="stretch" w="full">
             {/* ── Premium Header ── */}
-            <Box 
+            <Box
                 bg="white" mb={6} borderRadius="xl" px={6} py={4}
                 border="1px solid" borderColor="gray.100" boxShadow="sm"
             >
@@ -467,11 +468,11 @@ const MultiDomainRuleEngine = () => {
                             </HStack>
                         </VStack>
                     </HStack>
-                    
+
                     <Spacer />
-                    
+
                     <HStack spacing={4}>
-                        <Button 
+                        <Button
                             leftIcon={isRunning ? <Square size={16} fill="white" /> : <Play size={16} fill="white" />}
                             colorScheme={isRunning ? "red" : "blue"}
                             onClick={() => setIsRunning(!isRunning)}
@@ -484,8 +485,8 @@ const MultiDomainRuleEngine = () => {
                     </HStack>
                 </Flex>
             </Box>
- 
-            <Grid templateColumns={{ base: "1fr", lg: "320px 1fr" }} gap={6}>
+
+            <Grid templateColumns={{ base: "1fr", lg: "320px 1fr" }} gap={6} px={{ base: 3, md: 5 }}>
                 {/* ── Left Sidebar: Domain Selection ── */}
                 <GridItem>
                     <VStack align="stretch" spacing={6}>
@@ -496,14 +497,15 @@ const MultiDomainRuleEngine = () => {
                                 <Spacer />
                                 <Badge colorScheme="gray" variant="subtle" borderRadius="md">{DOMAIN_LIST.length}</Badge>
                             </HStack>
-                            
-                            <VStack align="stretch" spacing={2.5} maxH="75vh" overflowY="auto" pr={2} sx={{
-                                '&::-webkit-scrollbar': { width: '4px' },
-                                '&::-webkit-scrollbar-track': { background: 'transparent' },
-                                '&::-webkit-scrollbar-thumb': { background: 'gray.200', borderRadius: '10px' },
-                            }}>
+
+                            <VStack align="stretch" spacing={2.5} maxH="75vh" overflowY="auto" pr={2}
+                                sx={{
+                                    '&::-webkit-scrollbar': { width: '4px' },
+                                    '&::-webkit-scrollbar-track': { background: 'transparent' },
+                                    '&::-webkit-scrollbar-thumb': { background: 'gray.200', borderRadius: '10px' },
+                                }}>
                                 {DOMAIN_LIST.map(d => (
-                                    <Box 
+                                    <Box
                                         key={d.id} p={3.5} borderRadius="xl" cursor="pointer"
                                         bg={selectedDomainId === d.id ? "blue.50" : "white"}
                                         border="1px solid"
@@ -532,7 +534,7 @@ const MultiDomainRuleEngine = () => {
                                 ))}
                             </VStack>
                         </Box>
-                        
+
                         <Box bg="white" p={6} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
                             <VStack align="start" spacing={4}>
                                 <HStack>
@@ -553,14 +555,14 @@ const MultiDomainRuleEngine = () => {
                         </Box>
                     </VStack>
                 </GridItem>
- 
+
                 {/* ── Main Content Area ── */}
                 <GridItem>
                     <VStack align="stretch" spacing={6}>
                         {/* Domain Title Bar */}
                         <HStack spacing={4}>
-                            <Box 
-                                flex={1} bg="white" p={5} borderRadius="xl" border="1px solid" 
+                            <Box
+                                flex={1} bg="white" p={5} borderRadius="xl" border="1px solid"
                                 borderColor="gray.100" boxShadow="sm" borderLeft="4px solid" borderLeftColor={domain.color.hex}
                             >
                                 <HStack spacing={5}>
@@ -581,15 +583,27 @@ const MultiDomainRuleEngine = () => {
                                     </Badge>
                                 </HStack>
                             </Box>
-                            
+
                             <HStack bg="white" p={2} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm" spacing={2}>
                                 <IconButton size="md" variant="ghost" icon={<RefreshCcw size={18} />} aria-label="Reset" onClick={handleRefresh} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
                                 <IconButton size="md" variant="ghost" icon={<Download size={18} />} aria-label="Export" onClick={handleDownload} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
                             </HStack>
                         </HStack>
 
-                        <Tabs variant="unstyled" onChange={setActiveTabIndex} index={activeTabIndex}>
-                            <TabList bg="white" p={1.5} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm" display="flex" gap={2}>
+                        <Tabs variant="unstyled" index={activeTabIndex} onChange={setActiveTabIndex} isLazy>
+                            <TabList
+                                bg="white"
+                                p={1.5}
+                                borderRadius="2xl"
+                                border="1px solid"
+                                borderColor="gray.100"
+                                boxShadow="sm"
+                                overflowX={{ base: "auto", md: "visible" }}
+                                whiteSpace="nowrap"
+                                display="flex"
+                                w="full"
+                                gap={2}
+                            >
                                 <Tab _selected={{ bg: 'blue.500', color: 'white', boxShadow: 'lg' }} flex={1} borderRadius="lg" py={3} color="gray.500">
                                     <HStack spacing={2} justify="center">
                                         <Activity size={18} />
@@ -622,8 +636,8 @@ const MultiDomainRuleEngine = () => {
                                 <TabPanel p={0}>
                                     <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={6} mb={8}>
                                         {domain.gauges.map(g => (
-                                            <Box 
-                                                key={g.fact} textAlign="center" p={6} bg="white" 
+                                            <Box
+                                                key={g.fact} textAlign="center" p={6} bg="white"
                                                 borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm"
                                                 _hover={{ borderColor: g.color, boxShadow: "md" }} transition="all 0.3s"
                                             >
@@ -634,12 +648,12 @@ const MultiDomainRuleEngine = () => {
                                             </Box>
                                         ))}
                                     </SimpleGrid>
-                                    
+
                                     <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} spacing={6}>
                                         {domain.facts.map(f => (
-                                            <SignalCard 
-                                                key={f.name} fact={f} value={liveData[f.name]} 
-                                                history={dataHistory[f.name] || []} domain={domain} 
+                                            <SignalCard
+                                                key={f.name} fact={f} value={liveData[f.name]}
+                                                history={dataHistory[f.name] || []} domain={domain}
                                                 isAlert={visibleAlerts.some(a => a.ruleId.includes(f.name))}
                                             />
                                         ))}
@@ -678,9 +692,9 @@ const MultiDomainRuleEngine = () => {
                                                 </AnimatePresence>
                                             </VStack>
                                         </Box>
-                                        
+
                                         <VStack align="stretch" spacing={6}>
-                                            <Box 
+                                            <Box
                                                 bg="blue.600" p={6} borderRadius="xl" color="white" boxShadow="xl"
                                                 backgroundImage="linear-gradient(135deg, #3182CE 0%, #2B6CB0 100%)"
                                             >
@@ -723,7 +737,7 @@ const MultiDomainRuleEngine = () => {
                                                 {allRules.map((rule) => {
                                                     const isCustom = rule.id.startsWith('custom-');
                                                     return (
-                                                        <Box 
+                                                        <Box
                                                             key={rule.id} p={5} borderBottom="1px solid" borderColor="gray.50"
                                                             _hover={{ bg: 'gray.50' }} transition="all 0.2s"
                                                         >
@@ -754,8 +768,8 @@ const MultiDomainRuleEngine = () => {
                                                                     {rule.event.severity.toUpperCase()}
                                                                 </Badge>
                                                                 {isCustom && (
-                                                                    <IconButton 
-                                                                        size="sm" icon={<Trash2 size={14} />} variant="ghost" 
+                                                                    <IconButton
+                                                                        size="sm" icon={<Trash2 size={14} />} variant="ghost"
                                                                         onClick={() => deleteRule(rule.id)} aria-label="Delete"
                                                                         color="gray.400" _hover={{ color: "red.500", bg: "red.50" }} borderRadius="lg"
                                                                     />
@@ -775,7 +789,7 @@ const MultiDomainRuleEngine = () => {
 
                                 {/* Forge/RAW Panel */}
                                 <TabPanel p={0}>
-                                    <Box 
+                                    <Box
                                         bg="gray.900" borderRadius="xl" p={6} border="1px solid" borderColor="gray.800"
                                         boxShadow="2xl"
                                     >
@@ -791,18 +805,18 @@ const MultiDomainRuleEngine = () => {
                                                 a.download = `iot_payload_${selectedDomainId}.json`; a.click();
                                             }}>EXPORT JSON</Button>
                                         </HStack>
-                                        <Box 
-                                            position="relative" maxH="400px" overflowY="auto" 
+                                        <Box
+                                            position="relative" maxH="400px" overflowY="auto"
                                             p={4} bg="blackAlpha.500" borderRadius="lg"
-                                            sx={{
-                                                '&::-webkit-scrollbar': { width: '4px' },
-                                                '&::-webkit-scrollbar-thumb': { background: 'whiteAlpha.200', borderRadius: '10px' },
-                                            }}
+                                        // sx={{
+                                        //     '&::-webkit-scrollbar': { width: '4px' },
+                                        //     '&::-webkit-scrollbar-thumb': { background: 'whiteAlpha.200', borderRadius: '10px' },
+                                        // }}
                                         >
                                             <Text color="green.300" fontFamily="monospace" fontSize="12px" whiteSpace="pre-wrap">
-                                                {JSON.stringify({ 
-                                                    domain: selectedDomainId, 
-                                                    timestamp: new Date().toISOString(), 
+                                                {JSON.stringify({
+                                                    domain: selectedDomainId,
+                                                    timestamp: new Date().toISOString(),
                                                     telemetry: liveData,
                                                     active_rules: allRules.length,
                                                     tick: tickCount
@@ -816,6 +830,7 @@ const MultiDomainRuleEngine = () => {
                     </VStack>
                 </GridItem>
             </Grid>
+            </VStack>
         </Box>
     );
 };

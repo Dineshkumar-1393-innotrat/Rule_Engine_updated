@@ -67,7 +67,6 @@ import RuleTemplateLibrary from './RuleTemplateLibrary';
 import TripConfiguration from './TripConfiguration';
 import CANSignalBuilder from './CANSignalBuilder'; // Added
 import DongleAlertPopup from './DongleAlertPopup'; // Added
-import PayloadDashboardModal from './PayloadDashboardModal'; // Added
 import DriverProfileBuilder from './DriverProfileBuilder'; // Added
 
 import { useAutoPersist } from '../../hooks/useAutoPersist';
@@ -101,6 +100,7 @@ import {
 
 import { DOMAINS } from '../../utils/DomainConfig';
 import { TraxoApi } from '../../utils/TraxoApi';
+import { BulkProvisionSection } from '../PayloadDashboard/BulkProvisionSection';
 
 // Default initial state for the Rule Engine screen
 const DEFAULT_RULE_ENGINE_STATE = {
@@ -304,7 +304,6 @@ const RuleEngineDashboard = () => {
 
     const [activeTabIndex, setActiveTabIndex] = useState(1);
     const [prefillRule, setPrefillRule] = useState(null);
-    const [isDashboardModalOpen, setIsDashboardModalOpen] = useState(false);
 
 
     // Handlers
@@ -2144,7 +2143,7 @@ const RuleEngineDashboard = () => {
     const [showTripOnly, setShowTripOnly] = useState(false);
 
     return (
-        <Flex direction="column" minH="100vh" bg="gray.50" p={5}>
+        <Flex direction="column" minH="100vh" bg="gray.50">
             <VStack spacing={5} align="stretch" w="full">
                 {/* <Box display="flex" justifyContent="space-between" alignItems="center"> */}
                 <Box
@@ -2154,7 +2153,7 @@ const RuleEngineDashboard = () => {
                     flexDirection={{ base: "column", md: "row" }}
                     gap={{ base: 2, md: 0 }}
                 >
-                    <Heading size="lg">Rule Engine Dashboard</Heading>
+                    <Heading size="lg">Rule Engine Overview</Heading>
                     <HStack>
                         <Tooltip label={showTripOnly ? "Show All Controls" : "Run Trip Simulation"}>
                             <Button
@@ -2438,6 +2437,7 @@ const RuleEngineDashboard = () => {
                         </CardBody>
                     </Card>
                 </SimpleGrid>
+                <BulkProvisionSection />
 
 
                 {/* Main Layout */}
@@ -2447,7 +2447,7 @@ const RuleEngineDashboard = () => {
                     index={activeTabIndex}
                     onChange={setActiveTabIndex}
                     isLazy
-                    orientation="vertical"
+                    orientation={{ base: "horizontal", lg: "vertical" }}
                 >
                     <Grid
                         templateColumns={{ base: "1fr", lg: "280px 1fr", xl: "320px 1fr" }}
@@ -2457,7 +2457,7 @@ const RuleEngineDashboard = () => {
                     >
                         {/* Sidebar - Control Panel */}
                         <GridItem w="full">
-                            <VStack spacing={{ base: 4, md: 5, lg: 6 }} align="stretch" position={{ lg: "sticky" }} top="20px" width={{ base: "85vw", md: "93vw", lg: "auto" }}>
+                            <VStack spacing={{ base: 4, md: 5, lg: 6 }} align="stretch" position={{ lg: "sticky" }} top="20px">
                                 {/* Navigation Tabs */}
                                 <Card
                                     variant="elevated"
@@ -2480,12 +2480,26 @@ const RuleEngineDashboard = () => {
                                     </CardHeader>
                                     <CardBody p={3} bg="gray.50">
                                         <TabList
-                                            flexDirection="column"
+                                            flexDirection={{ base: "row", lg: "column" }}
+                                            overflowX={{ base: "auto", lg: "visible" }}
+                                            pb={{ base: 2, lg: 0 }}
                                             border="none"
                                             w="full"
                                             gap={2}
+                                            css={{
+                                                '&::-webkit-scrollbar': {
+                                                    height: '4px',
+                                                },
+                                                '&::-webkit-scrollbar-track': {
+                                                    background: 'transparent',
+                                                },
+                                                '&::-webkit-scrollbar-thumb': {
+                                                    background: '#CBD5E0',
+                                                    borderRadius: '24px',
+                                                },
+                                            }}
                                         >
-                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }} onClick={() => setIsDashboardModalOpen(true)}>Dashboard</Tab>
+                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }} onClick={() => navigate('/payload-dashboard/MCANJREB1MFA65412')}>Dashboard</Tab>
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Alert Rules</Tab>}
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Rule Templates</Tab>}
                                             <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Trip Configuration</Tab>
@@ -2497,32 +2511,32 @@ const RuleEngineDashboard = () => {
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Cloud Simulation</Tab>}
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>FOTA Status</Tab>}
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Driver Profile</Tab>}
-                                            <Tab 
-                                                justifyContent="flex-start" 
-                                                py={3} 
-                                                px={4} 
-                                                borderRadius="xl" 
-                                                fontWeight="bold" 
-                                                fontSize="sm" 
-                                                color="gray.600" 
-                                                transition="all 0.3s ease" 
-                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} 
+                                            <Tab
+                                                justifyContent="flex-start"
+                                                py={3}
+                                                px={4}
+                                                borderRadius="xl"
+                                                fontWeight="bold"
+                                                fontSize="sm"
+                                                color="gray.600"
+                                                transition="all 0.3s ease"
+                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }}
                                                 _selected={{ bgGradient: "linear(to-r, teal.500, teal.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}
                                                 onClick={() => navigate('/iot-rule-engine')}
                                             >
                                                 Multi-Domain
                                             </Tab>
-                                            <Tab 
-                                                justifyContent="flex-start" 
-                                                py={3} 
-                                                px={4} 
-                                                borderRadius="xl" 
-                                                fontWeight="bold" 
-                                                fontSize="sm" 
-                                                color="blue.600" 
+                                            <Tab
+                                                justifyContent="flex-start"
+                                                py={3}
+                                                px={4}
+                                                borderRadius="xl"
+                                                fontWeight="bold"
+                                                fontSize="sm"
+                                                color="blue.600"
                                                 bg="blue.50"
-                                                transition="all 0.3s ease" 
-                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.800" }} 
+                                                transition="all 0.3s ease"
+                                                _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.800" }}
                                                 _selected={{ bgGradient: "linear(to-r, blue.600, blue.700)", color: "white", shadow: "md", transform: "scale(1.02)" }}
                                                 onClick={() => navigate('/iot-rule-engine')}
                                             >
@@ -2558,9 +2572,9 @@ const RuleEngineDashboard = () => {
                                 <TabPanels bg="white">
                                     <TabPanel>
                                         <VStack align="center" justify="center" h="200px" spacing={4}>
-                                            <Text color="gray.500">Payload Dashboard is open in a modal.</Text>
-                                            <Button size="sm" colorScheme="blue" onClick={() => setIsDashboardModalOpen(true)}>
-                                                Re-open Dashboard
+                                            <Text color="gray.500">Payload View is open in a separate window.</Text>
+                                            <Button size="sm" colorScheme="blue" onClick={() => navigate('/payload-dashboard/MCANJREB1MFA65412')}>
+                                                Open Live View
                                             </Button>
                                         </VStack>
                                     </TabPanel>
@@ -2822,7 +2836,7 @@ const RuleEngineDashboard = () => {
                                                             </HStack>
                                                             <Badge colorScheme="orange" variant="subtle" fontSize="10px">INPUT BYPASS</Badge>
                                                         </HStack>
-                                                        
+
                                                         <FormControl>
                                                             <HStack justify="space-between" mb={1}>
                                                                 <FormLabel fontSize="2xs" fontWeight="bold" mb={0}>Engine RPM</FormLabel>
@@ -2860,12 +2874,12 @@ const RuleEngineDashboard = () => {
 
                                                         <FormControl>
                                                             <FormLabel fontSize="2xs" fontWeight="bold" mb={1}>Manual Trip Distance (km)</FormLabel>
-                                                            <NumberInput 
-                                                                size="sm" 
-                                                                value={manualTripDistance} 
-                                                                onChange={(_, val) => setManualTripDistance(isNaN(val) ? 0 : val)} 
-                                                                min={0} 
-                                                                max={10000} 
+                                                            <NumberInput
+                                                                size="sm"
+                                                                value={manualTripDistance}
+                                                                onChange={(_, val) => setManualTripDistance(isNaN(val) ? 0 : val)}
+                                                                min={0}
+                                                                max={10000}
                                                                 step={0.1}
                                                             >
                                                                 <NumberInputField bg="white" fontSize="xs" fontWeight="bold" />
@@ -3058,7 +3072,7 @@ const RuleEngineDashboard = () => {
                                     </HStack>
                                 </CardHeader>
                                 <CardBody p={0}>
-                                    <Box overflowX="auto" maxHeight="400px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' } }}>
+                                    <Box overflowX="auto" maxHeight="400px" overflowY="auto" css={{ '&::-webkit-scrollbar': { width: '10px' }, '&::-webkit-scrollbar-thumb': { background: '#CBD5E0', borderRadius: '4px' } }}>
                                         <Box as="table" width="100%">
                                             <Box as="thead" bg="gray.50">
                                                 <Box as="tr">
@@ -3117,12 +3131,7 @@ const RuleEngineDashboard = () => {
                 alert={activePopupAlert}
             />
 
-            {/* Payload Dashboard Modal */}
-            <PayloadDashboardModal
-                isOpen={isDashboardModalOpen}
-                onClose={() => setIsDashboardModalOpen(false)}
-                vinValue={deviceVariables.current.vehicleId}
-            />
+            {/* Payload Dashboard is now a separate page: /payload-dashboard/:vin */}
         </Flex>
     );
 };

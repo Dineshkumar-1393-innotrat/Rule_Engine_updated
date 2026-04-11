@@ -372,7 +372,17 @@ const RuleBuilder = ({ rules, savedRules = [], onAddRule, onDeleteRule, onSaveTo
                 <Heading size="md" mb={4}>Active Rules</Heading>
                 <List spacing={3}>
                     {rules.map((rule) => (
-                        <ListItem key={rule.id} p={3} borderWidth="1px" borderRadius="md" display="flex" justifyContent="space-between" alignItems="center">
+                        <ListItem
+                            key={rule.id}
+                            p={3}
+                            borderWidth="1px"
+                            borderRadius="md"
+                            display="flex"
+                            flexDirection={{ base: "column", sm: "row" }}
+                            justifyContent="space-between"
+                            alignItems={{ base: "flex-start", sm: "center" }}
+                            gap={3}
+                        >
                             <Box>
                                 <HStack mb={1}>
                                     <Text fontWeight="bold">{rule.name}</Text>

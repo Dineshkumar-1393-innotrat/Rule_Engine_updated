@@ -74,6 +74,7 @@ const Vehicle360Viewer = ({ baseUrl, imageCount = 60, format = 'jpg' }) => {
             ref={containerRef}
             w="100%"
             h="100%"
+            minH={{ base: "300px", md: "450px", lg: "550px" }}
             position="relative"
             cursor={isDragging ? 'grabbing' : 'grab'}
             onMouseDown={handleMouseDown}

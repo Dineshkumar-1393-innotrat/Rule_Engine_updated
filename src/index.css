@@ -71,3 +71,24 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* scroll demo 2 */
+/* Add to your global CSS or component style */
+/* .modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.payload-dashboard-modal .chakra-modal__content {
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.payload-dashboard-modal .chakra-modal__body {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  flex: 1 !important;
+} */

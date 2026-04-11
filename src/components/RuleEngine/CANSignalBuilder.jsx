@@ -355,7 +355,7 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                 <GridItem>
                     <Box p={5} bg={bgColor} borderWidth="1px" borderRadius="lg" borderColor={borderColor}>
                         <Heading size="md" mb={4}>Defined Signals ({signals.length})</Heading>
-                        <Box overflowX="auto">
+                        <Box overflowX="auto" pb={4}>
                             <Table variant="simple" size="sm">
                                 <Thead>
                                     <Tr>
@@ -454,8 +454,8 @@ const CANSignalBuilder = ({ signals = [], onUpdateSignals, busData = [] }) => {
                     <ModalHeader>Generated MISRA-C Code</ModalHeader>
                     <ModalCloseButton />
                     <ModalBody>
-                        <Tabs variant="enclosed">
-                            <TabList>
+                        <Tabs variant="enclosed" isFitted>
+                            <TabList overflowX="auto" whiteSpace="nowrap">
                                 <Tab>can_config.h</Tab>
                                 <Tab>can_config.c</Tab>
                                 <Tab>can_decode.h</Tab>
