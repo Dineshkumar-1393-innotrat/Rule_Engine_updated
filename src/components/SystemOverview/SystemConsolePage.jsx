@@ -454,14 +454,15 @@ const SystemConsolePage = () => {
             return;
         }
         
-        const auditCategory = API_CATEGORIES.find(c => c.id === 'audit');
-        if (auditCategory) {
-            toast({ title: 'Fetching All Diagnostics...', status: 'info', duration: 2000 });
-            // Execute all audit endpoints
-            auditCategory.endpoints.forEach(ep => {
-                handleExecute(auditCategory, ep);
-            });
-        }
+        // Just save and confirm, don't execute everything automatically
+        localStorage.setItem('last_vin', globalVin);
+        toast({ 
+            title: 'VIN Updated', 
+            description: `Ready to run diagnostics for ${globalVin}`, 
+            status: 'success', 
+            duration: 2000,
+            position: 'top'
+        });
     };
 
     return (
