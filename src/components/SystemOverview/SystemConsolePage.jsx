@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import {
     Box,
@@ -283,7 +284,8 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
 };
 
 const SystemConsolePage = () => {
-    const [globalVin, setGlobalVin] = useState('MCANJREB1MFA65412');
+    const { vin: urlVin } = useParams();
+    const [globalVin, setGlobalVin] = useState(urlVin || localStorage.getItem('last_vin') || 'MCANJREB1MFA65412');
     const [params, setParams] = useState({ 
         version: '2314.0', 
         category: 'Tbox', 
@@ -298,6 +300,7 @@ const SystemConsolePage = () => {
     const [apiResults, setApiResults] = useState({});
     const [loadingMap, setLoadingMap] = useState({});
     const lastRequestRef = useRef(null);
+    const lastResponseRef = useRef(null);
     const toast = useToast();
 
     // Setup axios interceptor to capture the the exact request/response made by TraxoApi
@@ -317,12 +320,24 @@ const SystemConsolePage = () => {
             (response) => {
                 const duration = new Date() - response.config.metadata.startTime;
                 response.duration = duration;
+                lastResponseRef.current = {
+                    status: response.status,
+                    statusText: response.statusText,
+                    data: response.data,
+                    headers: response.headers
+                };
                 return response;
             },
             (error) => {
                 if (error.config?.metadata) {
                     error.duration = new Date() - error.config.metadata.startTime;
                 }
+                lastResponseRef.current = error.response ? {
+                    status: error.response.status,
+                    statusText: error.response.statusText,
+                    data: error.response.data,
+                    headers: error.response.headers
+                } : null;
                 return Promise.reject(error);
             }
         );
@@ -332,6 +347,14 @@ const SystemConsolePage = () => {
             axios.interceptors.response.eject(resInterceptor);
         };
     }, []);
+
+    useEffect(() => {
+        if (globalVin) {
+            localStorage.setItem('last_vin', globalVin);
+            const patterns = globalVin.substring(0, 12);
+            setParams(prev => ({ ...prev, pattern: patterns }));
+        }
+    }, [globalVin]);
 
     const toggleCard = (id) => {
         setExpandedCards(prev => 
@@ -354,18 +377,23 @@ const SystemConsolePage = () => {
             const result = await endpoint.handler(globalVin, params);
             const endTime = Date.now();
             
-            // If it's a blob, the interceptor caught it but TraxoApi returns the blob data
-            // We'll store a mock response for the UI if needed, but usually TraxoApi returns what we need
+            // The interceptor captured the real response details
+            const lastRes = lastResponseRef.current;
             
             setApiResults(prev => ({ 
                 ...prev, 
                 [key]: { 
                     request: lastRequestRef.current,
-                    response: {
-                        status: 200, // Handle execute usually hits 200 if it doesn't throw
+                    response: lastRes ? {
+                        status: lastRes.status,
+                        statusText: lastRes.statusText,
+                        data: lastRes.data, // Show raw data from server in console
+                        headers: lastRes.headers
+                    } : {
+                        status: 200,
                         statusText: 'OK',
                         data: result,
-                        headers: {} // Interceptor might have headers in a real axios object but we'll try to refine
+                        headers: {}
                     },
                     duration: endTime - startTime
                 } 
@@ -420,84 +448,66 @@ const SystemConsolePage = () => {
         }
     };
 
+    const handleFetchAll = async () => {
+        if (!globalVin) {
+            toast({ title: 'Please enter a VIN', status: 'warning' });
+            return;
+        }
+        
+        const auditCategory = API_CATEGORIES.find(c => c.id === 'audit');
+        if (auditCategory) {
+            toast({ title: 'Fetching All Diagnostics...', status: 'info', duration: 2000 });
+            // Execute all audit endpoints
+            auditCategory.endpoints.forEach(ep => {
+                handleExecute(auditCategory, ep);
+            });
+        }
+    };
+
     return (
         <Box p={6} bg="gray.50" minH="100vh">
             {/* Variables Header */}
-            <Card mb={8} shadow="lg" borderRadius="2xl" border="1px solid" borderColor="blue.100">
-                <CardBody p={5}>
-                    <HStack spacing={8} wrap="wrap">
-                        <VStack align="flex-start" spacing={1}>
-                            <HStack><Icon as={Settings} color="blue.500" /><Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">TEST VARIABLES</Text></HStack>
-                            <HStack>
+            <Card mb={8} shadow="lg" borderRadius="2xl" border="1px solid" borderColor="blue.100" bg="white">
+                <CardBody p={6}>
+                    <Flex align="center" justify="space-between" wrap="wrap" gap={8}>
+                        <VStack align="flex-start" spacing={3} flex={1}>
+                            <HStack><Icon as={Terminal} color="blue.500" /><Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">DIAGNOSTIC DASHBOARD</Text></HStack>
+                            <HStack w="full" spacing={4}>
                                 <Input 
-                                    placeholder="Target VIN" 
+                                    placeholder="Enter Target VIN" 
                                     value={globalVin} 
                                     onChange={(e) => setGlobalVin(e.target.value)}
-                                    size="md"
-                                    bg="white"
-                                    width="240px"
+                                    size="lg"
+                                    bg="gray.50"
+                                    width="450px"
                                     fontWeight="bold"
                                     variant="filled"
-                                    _focus={{ borderColor: "blue.500", bg: "white" }}
+                                    _focus={{ borderColor: "blue.500", bg: "white", boxShadow: "0 0 0 1px #3182ce" }}
+                                    borderRadius="xl"
                                 />
-                                <Badge colorScheme="blue" variant="subtle">VIN</Badge>
+                                <Button 
+                                    colorScheme="blue" 
+                                    size="lg" 
+                                    px={10} 
+                                    borderRadius="xl" 
+                                    leftIcon={<Play size={16} />}
+                                    onClick={handleFetchAll}
+                                    boxShadow="0 4px 12px rgba(49, 130, 206, 0.3)"
+                                    _hover={{ transform: "translateY(-1px)", boxShadow: "0 6px 16px rgba(49, 130, 206, 0.4)" }}
+                                    _active={{ transform: "translateY(0)" }}
+                                >
+                                    Submit
+                                </Button>
                             </HStack>
                         </VStack>
 
-                        <Divider orientation="vertical" h="40px" />
-
-                        <VStack align="flex-start" spacing={1}>
-                            <Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">TELEMETRY & SEARCH</Text>
-                            <HStack spacing={2} wrap="wrap">
-                                <Tooltip label="Search Pattern">
-                                    <Input 
-                                        placeholder="Pattern" 
-                                        value={params.pattern} 
-                                        onChange={(e) => setParams({...params, pattern: e.target.value})}
-                                        size="xs" bg="white" width="100px"
-                                    />
-                                </Tooltip>
-                                <Tooltip label="Device Type">
-                                    <Input 
-                                        placeholder="cc-21" 
-                                        value={params.deviceType} 
-                                        onChange={(e) => setParams({...params, deviceType: e.target.value})}
-                                        size="xs" bg="white" width="60px"
-                                    />
-                                </Tooltip>
-                                <Tooltip label="Message ID">
-                                    <Input 
-                                        placeholder="B6" 
-                                        value={params.messageId} 
-                                        onChange={(e) => setParams({...params, messageId: e.target.value})}
-                                        size="xs" bg="white" width="50px"
-                                    />
-                                </Tooltip>
-                                <Tooltip label="Signal Name">
-                                    <Input 
-                                        placeholder="VITV" 
-                                        value={params.signalName} 
-                                        onChange={(e) => setParams({...params, signalName: e.target.value})}
-                                        size="xs" bg="white" width="80px"
-                                    />
-                                </Tooltip>
-                                <Tooltip label="Limit/Speed">
-                                    <Input 
-                                        placeholder="80" 
-                                        value={params.speed} 
-                                        onChange={(e) => setParams({...params, speed: e.target.value})}
-                                        size="xs" bg="white" width="50px"
-                                    />
-                                </Tooltip>
-                            </HStack>
-                        </VStack>
-                        
-                        <Flex flex={1} justify="flex-end">
+                        <HStack spacing={4}>
+                            <Badge colorScheme="blue" p={2} borderRadius="lg" fontSize="10px">READY FOR DIAGNOSTICS</Badge>
                             <Tag size="lg" colorScheme="purple" variant="subtle" borderRadius="full">
-                                <Icon as={Terminal} mr={2} /> Preprod Environment
+                                <Icon as={Shield} mr={2} /> Preprod Environment
                             </Tag>
-                        </Flex>
-                    </HStack>
+                        </HStack>
+                    </Flex>
                 </CardBody>
             </Card>
 

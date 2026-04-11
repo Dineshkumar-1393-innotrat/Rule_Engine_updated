@@ -54,7 +54,7 @@ const App = () => {
                   <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
                   <Route path="/historical-analysis" element={<HistoricalDataPage />} />
                   <Route path="/bulk-provision" element={<BulkProvisionPage />} />
-                  <Route path="/system-console" element={<SystemConsolePage />} />
+                  <Route path="/system-console/:vin?" element={<SystemConsolePage />} />
                   <Route path="/payload-dashboard/:vin" element={<PayloadDashboardPage />} />
                 </Routes>
               </React.Suspense>
