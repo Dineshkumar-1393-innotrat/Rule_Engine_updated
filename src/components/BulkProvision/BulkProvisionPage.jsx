@@ -36,6 +36,7 @@ import {
     TabPanel,
     Code,
     Tooltip,
+    Textarea,
 } from '@chakra-ui/react';
 import { UploadCloud, FileText, CheckCircle2, AlertCircle, Trash2, ShieldCheck, Clock, Terminal, Activity, FileJson } from 'lucide-react';
 import axios from 'axios';
@@ -50,6 +51,12 @@ const BulkProvisionPage = () => {
     const [imeiResult, setImeiResult] = useState(null);
     const [supplierResult, setSupplierResult] = useState(null);
     const [apiTraces, setApiTraces] = useState({});
+    
+    // Editor State
+    const [imeiText, setImeiText] = useState('356769705035673');
+    const [supplierText, setSupplierText] = useState('Dongle_SN,IMEI,MSISDN,ICCID,eUICCID,HW_part_number,NAD_SW_version,MCU_SW_version,encryptionKeyVersion,signingKeyVersion,plantManufacturingCountryCode,Plant_Manufactured_Date,countrycode,regioncode\nTraxo111,356741360421832,123456421893,12345678622181378993,12245246792131121892328278947923,68532321AA,ND0.00.51,MD0.00.03,1,1,1,123412218823,1,4');
+    const [imeiMode, setImeiMode] = useState(0); // 0: File, 1: Editor
+    const [supplierMode, setSupplierMode] = useState(0); // 0: File, 1: Editor
 
     const imeiInputRef = useRef();
     const supplierInputRef = useRef();
@@ -143,11 +150,27 @@ const BulkProvisionPage = () => {
     };
 
     const handleImeiUpload = async () => {
-        if (!imeiFile) return;
+        let fileToUpload = imeiFile;
+        
+        if (imeiMode === 1) {
+            const blob = new Blob([imeiText], { type: 'text/csv' });
+            fileToUpload = new File([blob], 'imei_editor.csv', { type: 'text/csv' });
+        }
+
+        if (!fileToUpload) {
+            toast({
+                title: 'No Data',
+                description: 'Please upload a file or enter data in the editor.',
+                status: 'warning',
+                duration: 3000
+            });
+            return;
+        }
+
         setIsImeiUploading(true);
         setImeiResult(null);
         try {
-            const response = await TraxoApi.bulkImeiUpload(imeiFile);
+            const response = await TraxoApi.bulkImeiUpload(fileToUpload);
             setImeiResult({ status: 'success', data: response });
             toast({
                 title: 'IMEI Upload Successful',
@@ -155,7 +178,7 @@ const BulkProvisionPage = () => {
                 status: 'success',
                 duration: 5000,
             });
-            setImeiFile(null);
+            if (imeiMode === 0) setImeiFile(null);
         } catch (error) {
             setImeiResult({ status: 'error', message: error.message });
             toast({
@@ -170,11 +193,27 @@ const BulkProvisionPage = () => {
     };
 
     const handleSupplierUpload = async () => {
-        if (!supplierFile) return;
+        let fileToUpload = supplierFile;
+
+        if (supplierMode === 1) {
+            const blob = new Blob([supplierText], { type: 'text/csv' });
+            fileToUpload = new File([blob], 'supplier_editor.csv', { type: 'text/csv' });
+        }
+
+        if (!fileToUpload) {
+            toast({
+                title: 'No Data',
+                description: 'Please upload a file or enter data in the editor.',
+                status: 'warning',
+                duration: 3000
+            });
+            return;
+        }
+
         setIsSupplierUploading(true);
         setSupplierResult(null);
         try {
-            const response = await TraxoApi.bulkSupplierFeed(supplierFile);
+            const response = await TraxoApi.bulkSupplierFeed(fileToUpload);
             setSupplierResult({ status: 'success', data: response });
             toast({
                 title: 'Supplier Feed Successful',
@@ -182,7 +221,7 @@ const BulkProvisionPage = () => {
                 status: 'success',
                 duration: 5000,
             });
-            setSupplierFile(null);
+            if (supplierMode === 0) setSupplierFile(null);
         } catch (error) {
             setSupplierResult({ status: 'error', message: error.message });
             toast({
@@ -228,64 +267,99 @@ const BulkProvisionPage = () => {
                                 <Badge colorScheme="blue">CSV Batch</Badge>
                             </HStack>
                         </CardHeader>
-                        <CardBody py={10}>
-                            <VStack spacing={6}>
-                                {!imeiFile ? (
-                                    <Box
-                                        w="full"
-                                        h="200px"
-                                        border="2px dashed"
-                                        borderColor="gray.200"
-                                        borderRadius="xl"
-                                        display="flex"
-                                        flexDirection="column"
-                                        alignItems="center"
-                                        justifyContent="center"
-                                        cursor="pointer"
-                                        transition="0.2s"
-                                        _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
-                                        onClick={() => imeiInputRef.current.click()}
-                                    >
-                                        <Icon as={UploadCloud} boxSize={12} color="gray.400" mb={4} />
-                                        <Text fontWeight="bold" color="gray.600">Click to upload IMEI CSV</Text>
-                                        <Text fontSize="xs" color="gray.400">Standard IMEI list format</Text>
-                                        <input
-                                            type="file"
-                                            ref={imeiInputRef}
-                                            style={{ display: 'none' }}
-                                            accept=".csv"
-                                            onChange={(e) => handleFileChange(e, setImeiFile)}
-                                        />
-                                    </Box>
-                                ) : (
-                                    <Box w="full" p={6} bg="blue.50" borderRadius="xl" border="1px" borderColor="blue.100">
-                                        <HStack spacing={4}>
-                                            <Icon as={FileText} boxSize={10} color="blue.500" />
-                                            <VStack align="flex-start" spacing={0} flex={1}>
-                                                <Text fontWeight="bold" fontSize="sm" isTruncated maxW="200px">{imeiFile.name}</Text>
-                                                <Text fontSize="xs" color="gray.500">{(imeiFile.size / 1024).toFixed(2)} KB</Text>
-                                            </VStack>
-                                            <IconButton
-                                                icon={<Trash2 size={18} />}
-                                                variant="ghost"
-                                                colorScheme="red"
-                                                onClick={() => setImeiFile(null)}
+                        <CardBody p={0}>
+                            <Tabs isFitted variant="soft-rounded" colorScheme="blue" size="sm" index={imeiMode} onChange={(idx) => setImeiMode(idx)}>
+                                <TabList bg="gray.100" p={2} borderRadius="0">
+                                    <Tab borderRadius="lg" fontWeight="bold">FILE UPLOAD</Tab>
+                                    <Tab borderRadius="lg" fontWeight="bold">INLINE EDITOR</Tab>
+                                </TabList>
+                                <TabPanels p={6}>
+                                    <TabPanel p={0}>
+                                        <VStack spacing={6}>
+                                            {!imeiFile ? (
+                                                <Box
+                                                    w="full"
+                                                    h="200px"
+                                                    border="2px dashed"
+                                                    borderColor="gray.200"
+                                                    borderRadius="xl"
+                                                    display="flex"
+                                                    flexDirection="column"
+                                                    alignItems="center"
+                                                    justifyContent="center"
+                                                    cursor="pointer"
+                                                    transition="0.2s"
+                                                    _hover={{ borderColor: 'blue.400', bg: 'blue.50' }}
+                                                    onClick={() => imeiInputRef.current.click()}
+                                                >
+                                                    <Icon as={UploadCloud} boxSize={12} color="gray.400" mb={4} />
+                                                    <Text fontWeight="bold" color="gray.600">Click to upload IMEI CSV</Text>
+                                                    <Text fontSize="xs" color="gray.400">Standard IMEI list format</Text>
+                                                    <input
+                                                        type="file"
+                                                        ref={imeiInputRef}
+                                                        style={{ display: 'none' }}
+                                                        accept=".csv"
+                                                        onChange={(e) => handleFileChange(e, setImeiFile)}
+                                                    />
+                                                </Box>
+                                            ) : (
+                                                <Box w="full" p={6} bg="blue.50" borderRadius="xl" border="1px" borderColor="blue.100">
+                                                    <HStack spacing={4}>
+                                                        <Icon as={FileText} boxSize={10} color="blue.500" />
+                                                        <VStack align="flex-start" spacing={0} flex={1}>
+                                                            <Text fontWeight="bold" fontSize="sm" isTruncated maxW="200px">{imeiFile.name}</Text>
+                                                            <Text fontSize="xs" color="gray.500">{(imeiFile.size / 1024).toFixed(2)} KB</Text>
+                                                        </VStack>
+                                                        <IconButton
+                                                            icon={<Trash2 size={18} />}
+                                                            variant="ghost"
+                                                            colorScheme="red"
+                                                            onClick={() => setImeiFile(null)}
+                                                        />
+                                                    </HStack>
+                                                    <Button
+                                                        mt={6}
+                                                        w="full"
+                                                        colorScheme="blue"
+                                                        onClick={handleImeiUpload}
+                                                        isLoading={isImeiUploading}
+                                                        loadingText="Uploading to Gateway..."
+                                                    >
+                                                        Start Batch Upload
+                                                    </Button>
+                                                </Box>
+                                            )}
+                                        </VStack>
+                                    </TabPanel>
+                                    <TabPanel p={0}>
+                                        <VStack spacing={4}>
+                                            <Textarea 
+                                                value={imeiText}
+                                                onChange={(e) => setImeiText(e.target.value)}
+                                                placeholder="Enter IMEI data (one per line)..."
+                                                minH="200px"
+                                                fontSize="xs"
+                                                fontFamily="monospace"
+                                                bg="gray.50"
                                             />
-                                        </HStack>
-                                        <Button
-                                            mt={6}
-                                            w="full"
-                                            colorScheme="blue"
-                                            onClick={handleImeiUpload}
-                                            isLoading={isImeiUploading}
-                                            loadingText="Uploading to Gateway..."
-                                        >
-                                            Start Batch Upload
-                                        </Button>
-                                    </Box>
-                                )}
+                                            <Button
+                                                w="full"
+                                                colorScheme="blue"
+                                                onClick={handleImeiUpload}
+                                                isLoading={isImeiUploading}
+                                                loadingText="Executing Batch..."
+                                                leftIcon={<Terminal size={14} />}
+                                            >
+                                                Submit Editor Data
+                                            </Button>
+                                        </VStack>
+                                    </TabPanel>
+                                </TabPanels>
+                            </Tabs>
 
-                                {isImeiUploading && <Progress w="full" size="xs" isIndeterminate colorScheme="blue" borderRadius="full" />}
+                            <Box px={6} pb={6}>
+                                {isImeiUploading && <Progress w="full" size="xs" isIndeterminate colorScheme="blue" borderRadius="full" mb={4} />}
 
                                 {imeiResult && (
                                     <BulkResultExplorer 
@@ -298,7 +372,7 @@ const BulkProvisionPage = () => {
                                         }} 
                                     />
                                 )}
-                            </VStack>
+                            </Box>
                         </CardBody>
                     </Card>
 
@@ -312,64 +386,99 @@ const BulkProvisionPage = () => {
                                 <Badge colorScheme="purple">Dongle Batch</Badge>
                             </HStack>
                         </CardHeader>
-                        <CardBody py={10}>
-                            <VStack spacing={6}>
-                                {!supplierFile ? (
-                                    <Box
-                                        w="full"
-                                        h="200px"
-                                        border="2px dashed"
-                                        borderColor="gray.200"
-                                        borderRadius="xl"
-                                        display="flex"
-                                        flexDirection="column"
-                                        alignItems="center"
-                                        justifyContent="center"
-                                        cursor="pointer"
-                                        transition="0.2s"
-                                        _hover={{ borderColor: 'purple.400', bg: 'purple.50' }}
-                                        onClick={() => supplierInputRef.current.click()}
-                                    >
-                                        <Icon as={UploadCloud} boxSize={12} color="gray.400" mb={4} />
-                                        <Text fontWeight="bold" color="gray.600">Click to upload Supplier CSV</Text>
-                                        <Text fontSize="xs" color="gray.400">Supplier/Dongle mapping format</Text>
-                                        <input
-                                            type="file"
-                                            ref={supplierInputRef}
-                                            style={{ display: 'none' }}
-                                            accept=".csv"
-                                            onChange={(e) => handleFileChange(e, setSupplierFile)}
-                                        />
-                                    </Box>
-                                ) : (
-                                    <Box w="full" p={6} bg="purple.50" borderRadius="xl" border="1px" borderColor="purple.100">
-                                        <HStack spacing={4}>
-                                            <Icon as={FileText} boxSize={10} color="purple.500" />
-                                            <VStack align="flex-start" spacing={0} flex={1}>
-                                                <Text fontWeight="bold" fontSize="sm" isTruncated maxW="200px">{supplierFile.name}</Text>
-                                                <Text fontSize="xs" color="gray.500">{(supplierFile.size / 1024).toFixed(2)} KB</Text>
-                                            </VStack>
-                                            <IconButton
-                                                icon={<Trash2 size={18} />}
-                                                variant="ghost"
-                                                colorScheme="red"
-                                                onClick={() => setSupplierFile(null)}
+                        <CardBody p={0}>
+                            <Tabs isFitted variant="soft-rounded" colorScheme="purple" size="sm" index={supplierMode} onChange={(idx) => setSupplierMode(idx)}>
+                                <TabList bg="gray.100" p={2} borderRadius="0">
+                                    <Tab borderRadius="lg" fontWeight="bold">FILE UPLOAD</Tab>
+                                    <Tab borderRadius="lg" fontWeight="bold">INLINE EDITOR</Tab>
+                                </TabList>
+                                <TabPanels p={6}>
+                                    <TabPanel p={0}>
+                                        <VStack spacing={6}>
+                                            {!supplierFile ? (
+                                                <Box
+                                                    w="full"
+                                                    h="200px"
+                                                    border="2px dashed"
+                                                    borderColor="gray.200"
+                                                    borderRadius="xl"
+                                                    display="flex"
+                                                    flexDirection="column"
+                                                    alignItems="center"
+                                                    justifyContent="center"
+                                                    cursor="pointer"
+                                                    transition="0.2s"
+                                                    _hover={{ borderColor: 'purple.400', bg: 'purple.50' }}
+                                                    onClick={() => supplierInputRef.current.click()}
+                                                >
+                                                    <Icon as={UploadCloud} boxSize={12} color="gray.400" mb={4} />
+                                                    <Text fontWeight="bold" color="gray.600">Click to upload Supplier CSV</Text>
+                                                    <Text fontSize="xs" color="gray.400">Supplier/Dongle mapping format</Text>
+                                                    <input
+                                                        type="file"
+                                                        ref={supplierInputRef}
+                                                        style={{ display: 'none' }}
+                                                        accept=".csv"
+                                                        onChange={(e) => handleFileChange(e, setSupplierFile)}
+                                                    />
+                                                </Box>
+                                            ) : (
+                                                <Box w="full" p={6} bg="purple.50" borderRadius="xl" border="1px" borderColor="purple.100">
+                                                    <HStack spacing={4}>
+                                                        <Icon as={FileText} boxSize={10} color="purple.500" />
+                                                        <VStack align="flex-start" spacing={0} flex={1}>
+                                                            <Text fontWeight="bold" fontSize="sm" isTruncated maxW="200px">{supplierFile.name}</Text>
+                                                            <Text fontSize="xs" color="gray.500">{(supplierFile.size / 1024).toFixed(2)} KB</Text>
+                                                        </VStack>
+                                                        <IconButton
+                                                            icon={<Trash2 size={18} />}
+                                                            variant="ghost"
+                                                            colorScheme="red"
+                                                            onClick={() => setSupplierFile(null)}
+                                                        />
+                                                    </HStack>
+                                                    <Button
+                                                        mt={6}
+                                                        w="full"
+                                                        colorScheme="purple"
+                                                        onClick={handleSupplierUpload}
+                                                        isLoading={isSupplierUploading}
+                                                        loadingText="Processing Feed..."
+                                                    >
+                                                        Start Batch Upload
+                                                    </Button>
+                                                </Box>
+                                            )}
+                                        </VStack>
+                                    </TabPanel>
+                                    <TabPanel p={0}>
+                                        <VStack spacing={4}>
+                                            <Textarea 
+                                                value={supplierText}
+                                                onChange={(e) => setSupplierText(e.target.value)}
+                                                placeholder="Enter Supplier CSV data..."
+                                                minH="200px"
+                                                fontSize="xs"
+                                                fontFamily="monospace"
+                                                bg="gray.50"
                                             />
-                                        </HStack>
-                                        <Button
-                                            mt={6}
-                                            w="full"
-                                            colorScheme="purple"
-                                            onClick={handleSupplierUpload}
-                                            isLoading={isSupplierUploading}
-                                            loadingText="Processing Feed..."
-                                        >
-                                            Start Batch Upload
-                                        </Button>
-                                    </Box>
-                                )}
+                                            <Button
+                                                w="full"
+                                                colorScheme="purple"
+                                                onClick={handleSupplierUpload}
+                                                isLoading={isSupplierUploading}
+                                                loadingText="Executing Feed..."
+                                                leftIcon={<Terminal size={14} />}
+                                            >
+                                                Submit Editor Data
+                                            </Button>
+                                        </VStack>
+                                    </TabPanel>
+                                </TabPanels>
+                            </Tabs>
 
-                                {isSupplierUploading && <Progress w="full" size="xs" isIndeterminate colorScheme="purple" borderRadius="full" />}
+                            <Box px={6} pb={6}>
+                                {isSupplierUploading && <Progress w="full" size="xs" isIndeterminate colorScheme="purple" borderRadius="full" mb={4} />}
 
                                 {supplierResult && (
                                     <BulkResultExplorer 
@@ -382,7 +491,7 @@ const BulkProvisionPage = () => {
                                         }} 
                                     />
                                 )}
-                            </VStack>
+                            </Box>
                         </CardBody>
                     </Card>
                 </SimpleGrid>

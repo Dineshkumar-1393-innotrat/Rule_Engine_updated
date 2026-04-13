@@ -23,7 +23,7 @@ import { VisualView } from './VisualView';
 import { SignalCard } from './SignalCard';
 import { DeviceEventsList } from './DeviceEventsList';
 import { DeviceDetails, RemoteCommands } from './DeviceControlPanel';
-import { BulkProvisionSection } from './BulkProvisionSection';
+// import { BulkProvisionSection } from './BulkProvisionSection';
 
 const THEME = { bg: 'gray.50' };
 
@@ -391,46 +391,46 @@ const PayloadDashboardPage = () => {
                 handleExport={handleExport}
             />
 
-                {viewMode === 'visual' ? (
-                    <VisualView signals={signals} deviceState={deviceState} highestSpeed={highestSpeed} />
-                ) : (
-                    <Box position="relative">
-                        <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1.5px, transparent 1.5px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.4} zIndex={0} />
-                        <Box position="relative" zIndex={1}>
-                            <Flex align="center" justify="space-between" mb={4} p={3} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
-                                <HStack spacing={4}>
-                                    <HStack spacing={1}><Box w={2} h={2} bg="green.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{activeSignals} with data</Text></HStack>
-                                    <HStack spacing={1}><Box w={2} h={2} bg="red.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{errorSignals} errors</Text></HStack>
-                                    <HStack spacing={1}><Box w={2} h={2} bg="gray.300" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{totalSignals - activeSignals - errorSignals} pending</Text></HStack>
-                                </HStack>
-                                <Text fontSize="10px" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px">{filteredSignalsCount} signals shown</Text>
-                            </Flex>
-                            <SimpleGrid columns={{ base: 1, md: 2, xl: 3, "2xl": 4 }} spacing={6}>
-                                {filteredSignals.map((signal, index) => (
-                                    <SignalCard
-                                        key={signal.id + index}
-                                        signal={signal}
-                                        searchTerm={searchTerm}
-                                        onRefresh={handleRefresh}
-                                        handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }}
-                                    />
-                                ))}
-                            </SimpleGrid>
-                        </Box>
+            {viewMode === 'visual' ? (
+                <VisualView signals={signals} deviceState={deviceState} highestSpeed={highestSpeed} />
+            ) : (
+                <Box position="relative">
+                    <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1.5px, transparent 1.5px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.4} zIndex={0} />
+                    <Box position="relative" zIndex={1}>
+                        <Flex align="center" justify="space-between" mb={4} p={3} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
+                            <HStack spacing={4}>
+                                <HStack spacing={1}><Box w={2} h={2} bg="green.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{activeSignals} with data</Text></HStack>
+                                <HStack spacing={1}><Box w={2} h={2} bg="red.400" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{errorSignals} errors</Text></HStack>
+                                <HStack spacing={1}><Box w={2} h={2} bg="gray.300" borderRadius="full" /><Text fontSize="11px" fontWeight="bold" color="gray.600">{totalSignals - activeSignals - errorSignals} pending</Text></HStack>
+                            </HStack>
+                            <Text fontSize="10px" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px">{filteredSignalsCount} signals shown</Text>
+                        </Flex>
+                        <SimpleGrid columns={{ base: 1, md: 2, xl: 3, "2xl": 4 }} spacing={6}>
+                            {filteredSignals.map((signal, index) => (
+                                <SignalCard
+                                    key={signal.id + index}
+                                    signal={signal}
+                                    searchTerm={searchTerm}
+                                    onRefresh={handleRefresh}
+                                    handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }}
+                                />
+                            ))}
+                        </SimpleGrid>
                     </Box>
-                )}
-
-                <Box mt={2}>
-                    <DeviceDetails deviceState={deviceState} vin={vin} />
-                    <BulkProvisionSection />
-                    <RemoteCommands
-                        commandLoading={commandLoading} handleCommand={handleCommand}
-                        speedAlert={speedAlert} setSpeedAlert={setSpeedAlert}
-                        fotaVersion={fotaVersion} setFotaVersion={setFotaVersion}
-                        isFotaUpdating={isFotaUpdating} handleFotaUpdate={handleFotaUpdate}
-                        handleFotaReset={handleFotaReset} TraxoApi={TraxoApi}
-                    />
                 </Box>
+            )}
+
+            <Box mt={2}>
+                <DeviceDetails deviceState={deviceState} vin={vin} />
+
+                <RemoteCommands
+                    commandLoading={commandLoading} handleCommand={handleCommand}
+                    speedAlert={speedAlert} setSpeedAlert={setSpeedAlert}
+                    fotaVersion={fotaVersion} setFotaVersion={setFotaVersion}
+                    isFotaUpdating={isFotaUpdating} handleFotaUpdate={handleFotaUpdate}
+                    handleFotaReset={handleFotaReset} TraxoApi={TraxoApi}
+                />
+            </Box>
         </Box>
     );
 };

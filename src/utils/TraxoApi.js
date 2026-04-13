@@ -1371,5 +1371,125 @@ export const TraxoApi = {
             });
             return response.data;
         }, 'FACTORY');
+    },
+
+    // ========== NEW TRIP & MOBILITY APIs ==========
+    getTripDetailsPaginated: async (vin, pageNo = 0) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/details`, {
+                params: { pageNo },
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    getTripSummary: async (vin, startTime, endTime) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
+                params: { starttime: startTime, endtime: endTime },
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    getTripById: async (vin, tripId) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/tripId/${tripId}`, {
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    getOngoingTrip: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/ongoing`, {
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    // ========== ADVANCED LOG MANAGEMENT ==========
+    listAvailableLogs: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            const response = await axios.get(`${BASE_URL}/fileupload`, {
+                params: { vin },
+                headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'RUN');
+    },
+
+    deleteLogFile: async (vin, filename) => {
+        return withRetry(async () => {
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            const response = await axios.delete(`${BASE_URL}/fileupload`, {
+                params: { vin, filename },
+                headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'RUN');
+    },
+
+    // ========== REMOTE COMMANDS (ADDITIONAL) ==========
+    remoteBlinkerControl: async (vin, action = 'ON') => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const actionType = action === 'ON' ? 'remoteblinkeroncommand' : 'remoteblinkeroffcommand';
+            const response = await axios.post(`${JEEP_BASE_URL}/commands/vinno`, {
+                deviceVinno: vin,
+                actionType: actionType
+            }, {
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    remoteHonk: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.post(`${JEEP_BASE_URL}/commands/vinno`, {
+                deviceVinno: vin,
+                actionType: 'remotehonkcommand'
+            }, {
+                headers: { 'Authorization': `${authTokens.JEEP}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'JEEP');
+    },
+
+    /**
+     * Calculates the SHA-256 hash of a File object.
+     * Provides 1:1 parity with 'certutil -hashfile <file> SHA256'
+     */
+    calculateSHA256: async (file) => {
+        if (!file) return null;
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        } catch (error) {
+            console.error('Checksum calculation failed:', error);
+            throw error;
+        }
     }
 };

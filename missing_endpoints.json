@@ -1,0 +1,209 @@
+{
+  "missing": [
+    {
+      "postmanName": "undefined > BulkProvision > Bulk Token API",
+      "epName": "Bulk Token API",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/authentication/login"
+    },
+    {
+      "postmanName": "undefined > PKI > PKI Token for CommonCertificate",
+      "epName": "PKI Token for CommonCertificate",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/authentication/login"
+    },
+    {
+      "postmanName": "undefined > PKI > CreateCertificate API for CommonCertificate",
+      "epName": "CreateCertificate API for CommonCertificate",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/csr/createCertificate"
+    },
+    {
+      "postmanName": "undefined > PKI > PKI Token for tbox certificate",
+      "epName": "PKI Token for tbox certificate",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/authentication/login"
+    },
+    {
+      "postmanName": "undefined > PKI > CreateCertificate API for TBOX certificate",
+      "epName": "CreateCertificate API for TBOX certificate",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/csr/createCertificate"
+    },
+    {
+      "postmanName": "undefined > Device state update & check > tbox state update API",
+      "epName": "tbox state update API",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/concurrentcommands/vinno"
+    },
+    {
+      "postmanName": "undefined > Device state update & check > get device state API",
+      "epName": "get device state API",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/portal/vin/MCANJPCY9RFB06405"
+    },
+    {
+      "postmanName": "undefined > Device state update & check > reset-state",
+      "epName": "reset-state",
+      "method": "POST",
+      "url": "https://gp98o9kt3c.execute-api.ap-south-1.amazonaws.com/jeep/reset-device-state"
+    },
+    {
+      "postmanName": "undefined > Devices Details > Retrieve Specific Vin details ",
+      "epName": "Retrieve Specific Vin details ",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/portal/vin/A234ZTZT000000491"
+    },
+    {
+      "postmanName": "undefined > Events > get events audit ",
+      "epName": "get events audit ",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/events/MCANJREB1MFA65412/DEVICE"
+    },
+    {
+      "postmanName": "undefined > Telemetry -Jeep > Vehicle Telemetry > Vehicle Telemetry Step1",
+      "epName": "Vehicle Telemetry Step1",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/jeep/can/decoder/messagelist/jeep/vehicleTelemetry"
+    },
+    {
+      "postmanName": "undefined > Telemetry -Jeep > Vehicle Telemetry > Vehicle Telemetry Step 2",
+      "epName": "Vehicle Telemetry Step 2",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/jeep/can/decoder/signallist/356"
+    },
+    {
+      "postmanName": "undefined > Telemetry -Jeep > Vehicle Telemetry > Get vehicle Telemtry data",
+      "epName": "Get vehicle Telemtry data",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/jeep/can/decoder/MCANJREB1MFA65412/vehicleTelemetry/signalname/FuelLevel"
+    },
+    {
+      "postmanName": "undefined > Telemetry -Jeep > Location Telemetry > Get location Telemtry data",
+      "epName": "Get location Telemtry data",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/jeep/devices/vin/MCANJREB1MFA65412/states?subcategory=LocationTelemetry&startTime=2026-26-03 15:30:00&endTime=2026-26-03 16:10:00&count=1000"
+    },
+    {
+      "postmanName": "undefined > Alerts > Get Alerts Ingestion Audit Api",
+      "epName": "Get Alerts Ingestion Audit Api",
+      "method": "GET",
+      "url": "https://{{url_preprod}}/jeep/alerts/MCANJREB1MFA65412/"
+    },
+    {
+      "postmanName": "undefined > Trip > trip details with pagination",
+      "epName": "trip details with pagination",
+      "method": "GET",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/details?pageNo=0"
+    },
+    {
+      "postmanName": "undefined > Trip > Trip details by TripId",
+      "epName": "Trip details by TripId",
+      "method": "GET",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/tripId/MCANJREB1MFA654121103202603"
+    },
+    {
+      "postmanName": "undefined > Trip > Trip summary",
+      "epName": "Trip summary",
+      "method": "GET",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/summary?starttime=2026-03-16 00:00:01&endtime=2026-03-17 23:22:21"
+    },
+    {
+      "postmanName": "undefined > Trip Audit > Trip Audit",
+      "epName": "Trip Audit",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/trip/v2/vin/MCANJREB1MFA65412/states?subcategory=tripCurrent"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > Token_API",
+      "epName": "Token_API",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/authentication/login"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > fetch logs command",
+      "epName": "fetch logs command",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/concurrentcommands/vinno"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > Log upload",
+      "epName": "Log upload",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/tboxfileupload?vin=MCANJREB1MFA76523"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > download the file from CVIP",
+      "epName": "download the file from CVIP",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/fileupload/download?vin=MZZCCHPTPPV220068&filename=tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1)"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > CVIP fetch list of available logs under a VIN",
+      "epName": "CVIP fetch list of available logs under a VIN",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/fileupload?vin=MZZCCHPTPPV220068"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > 01a_Get List of Details based on Search Pattern and Search Keys",
+      "epName": "01a_Get List of Details based on Search Pattern and Search Keys",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/portal/search?searchPattern=MCANJREB1MFA76524&searchKey=vin"
+    },
+    {
+      "postmanName": "undefined > Fetch Logs > Delete logs",
+      "epName": "Delete logs",
+      "method": "DELETE",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/fileupload?vin=MCANJREB1MFA65412&filename=tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1).zip"
+    },
+    {
+      "postmanName": "undefined > Vehicle Speed Alert command > speedalertcommand",
+      "epName": "speedalertcommand",
+      "method": "POST",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno"
+    },
+    {
+      "postmanName": "undefined > Remote commands > remoteblinkeroncommand",
+      "epName": "remoteblinkeroncommand",
+      "method": "POST",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno"
+    },
+    {
+      "postmanName": "undefined > Remote commands > remoteblinkeroffcommand",
+      "epName": "remoteblinkeroffcommand",
+      "method": "POST",
+      "url": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno"
+    },
+    {
+      "postmanName": "undefined > FOTA_Upload_delete_firmware > Fota upload devicetype",
+      "epName": "Fota upload devicetype",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware"
+    },
+    {
+      "postmanName": "undefined > FOTA_Upload_delete_firmware > check uploaded firmware",
+      "epName": "check uploaded firmware",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware/versions?firmwareVersion=2305"
+    },
+    {
+      "postmanName": "undefined > FOTA_Upload_delete_firmware > Delete uploaded image based on release version",
+      "epName": "Delete uploaded image based on release version",
+      "method": "DELETE",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware?category=BATCH&releaseVersion=2309.0"
+    },
+    {
+      "postmanName": "undefined > FOTA_Download > Tbox-Download Request Trigger from platform_VIN",
+      "epName": "Tbox-Download Request Trigger from platform_VIN",
+      "method": "POST",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/ota/downloadfirmware"
+    },
+    {
+      "postmanName": "undefined > FOTA_Download > download files",
+      "epName": "download files",
+      "method": "GET",
+      "url": "https://cvipiot-preprod.fca-india.com:40543/jeep/files/device/downloadfirmware?filename=MD0_15_00.ulp&releaseversion=2314.0&filetype=mcu&category=BATCH&fotaid=40b78009-00ee-11f1-8eaa-956adc3440c3"
+    }
+  ],
+  "total_missing": 34
+}
