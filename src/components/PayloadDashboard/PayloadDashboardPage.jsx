@@ -23,7 +23,7 @@ import { VisualView } from './VisualView';
 import { SignalCard } from './SignalCard';
 import { DeviceEventsList } from './DeviceEventsList';
 import { DeviceDetails, RemoteCommands } from './DeviceControlPanel';
-// import { BulkProvisionSection } from './BulkProvisionSection';
+import { BulkProvisionSection } from './BulkProvisionSection';
 
 const THEME = { bg: 'gray.50' };
 
@@ -422,7 +422,7 @@ const PayloadDashboardPage = () => {
 
             <Box mt={2}>
                 <DeviceDetails deviceState={deviceState} vin={vin} />
-
+                <BulkProvisionSection />
                 <RemoteCommands
                     commandLoading={commandLoading} handleCommand={handleCommand}
                     speedAlert={speedAlert} setSpeedAlert={setSpeedAlert}

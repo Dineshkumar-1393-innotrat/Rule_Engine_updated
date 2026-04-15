@@ -87,6 +87,7 @@ import {
     FileJson,
 } from 'lucide-react';
 import { TraxoApi } from '../../utils/TraxoApi';
+import { isValidVin, formatVin } from '../../utils/validation';
 
 const API_CATEGORIES = [
     {
@@ -127,6 +128,7 @@ const API_CATEGORIES = [
         icon: Activity,
         color: 'cyan.500',
         endpoints: [
+            { name: 'Login (JEEP)', method: 'POST', handler: () => TraxoApi.login('JEEP') },
             { name: 'Ongoing Trip', method: 'GET', handler: (vin) => TraxoApi.getOngoingTrip(vin) },
             { 
                 name: 'Trip Summary', 
@@ -149,10 +151,12 @@ const API_CATEGORIES = [
             { 
                 name: 'Trip Audit (States)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.getTripAudit(vin), 
+                handler: (vin, p) => TraxoApi.getTripAudit(vin, p.subcategory || 'tripCurrent'),
+                params: ['subcategory']
             },
         ]
     },
+
     {
         id: 'bulk',
         name: 'Bulk Provisioning',
@@ -209,6 +213,12 @@ const API_CATEGORIES = [
             { name: 'Honk', method: 'POST', handler: (vin) => TraxoApi.remoteHonk(vin) },
             { name: 'Blinker ON', method: 'POST', handler: (vin) => TraxoApi.remoteBlinkerControl(vin, 'ON') },
             { name: 'Blinker OFF', method: 'POST', handler: (vin) => TraxoApi.remoteBlinkerControl(vin, 'OFF') },
+            { 
+                name: 'Command Status (JEEP)', 
+                method: 'GET', 
+                handler: (vin, p) => TraxoApi.getCommandStatus(vin, p.commandId),
+                params: ['commandId']
+            },
         ]
     },
     {
@@ -234,7 +244,7 @@ const API_CATEGORIES = [
         endpoints: [
             { name: 'Login (FOTA_UPLOAD)', method: 'POST', handler: () => TraxoApi.login('FOTA_UPLOAD') },
             { 
-                name: 'Check Project Inventory', 
+                name: 'Check Inventory (4.0)', 
                 method: 'GET', 
                 handler: (vin, p) => TraxoApi.checkUploadedFirmware(p.version),
                 params: ['version']
@@ -245,32 +255,37 @@ const API_CATEGORIES = [
                 handler: (vin, p) => {
                     try {
                         const details = typeof p.fileDetails === 'string' ? JSON.parse(p.fileDetails) : p.fileDetails;
-                        return TraxoApi.uploadFirmware(details, p.files);
+                        const files = [];
+                        if (p.mcuFile) files.push(p.mcuFile);
+                        if (p.nadFile) files.push(p.nadFile);
+                        return TraxoApi.uploadFirmware(details, files);
                     } catch (e) {
                         throw new Error("Invalid fileDetails JSON. Please check the format.");
                     }
                 },
-                params: ['fileDetails', 'files'],
+                params: ['fileDetails'],
                 isJSON: true,
                 isMultiFile: true
             },
             { 
                 name: 'Download to Laptop', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.downloadFirmwareFile(p.category, p.version), 
-                isBlob: true,
-                params: ['category', 'version']
+                // fotaId is OPTIONAL — leave blank to auto-detect from versions API,
+                // or paste it manually from the Postman collection / Check Inventory response
+                handler: (vin, p) => TraxoApi.downloadFirmwareFromRepo(p.category, p.version, p.fotaId || null), 
+                isBlob: false,
+                params: ['category', 'version', 'fotaId']
             },
             { 
-                name: 'Delete Firmware', 
+                name: 'Delete Firmware (4.0)', 
                 method: 'DELETE', 
-                handler: (vin, p) => TraxoApi.deleteFirmware(p.category, p.releaseVersion),
+                handler: (vin, p) => TraxoApi.deleteFirmware(p.category || 'BATCH', p.releaseVersion),
                 params: ['category', 'releaseVersion']
             },
             { 
-                name: 'Download from DEVICE', 
+                name: 'Download from DEVICE (4.0)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.downloadFirmwareFile(p.filename, p.releaseVersion, p.fileType, p.category, p.fotaId),
+                handler: (vin, p) => TraxoApi.downloadFirmwareFile(p.filename, p.releaseVersion, p.fileType, p.category || 'BATCH', p.fotaId),
                 params: ['filename', 'releaseVersion', 'fileType', 'category', 'fotaId']
             },
         ]
@@ -284,23 +299,23 @@ const API_CATEGORIES = [
             { 
                 name: 'FOTA Trigger (Download)', 
                 method: 'POST', 
-                handler: (vin, p) => TraxoApi.triggerFirmwareDownload(vin, p.version),
+                handler: (vin, p) => TraxoApi.triggerFotaDownload(vin, p.version),
                 params: ['version']
             },
             { 
                 name: 'FOTA Update (Execute)', 
                 method: 'POST', 
-                handler: (vin, p) => TraxoApi.triggerFotaUpdate(vin, p.version),
+                handler: (vin, p) => TraxoApi.triggerFotaExecution(vin, p.version),
                 params: ['version']
             },
             { 
-                name: 'Check Command Status', 
+                name: 'Check Command Status (VALIDITY)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.getFotaCommandStatus(p.commandId),
+                handler: (vin, p) => TraxoApi.getFotaCommandValidity(vin, p.commandId),
                 params: ['commandId']
             },
             { 
-                name: 'Reset FOTA State', 
+                name: 'Reset FOTA State (4.0)', 
                 method: 'PUT', 
                 handler: (vin, p) => TraxoApi.resetFotaState(vin, p.commandName || 'firmwaredownloadcommand'),
                 params: ['commandName']
@@ -330,40 +345,55 @@ const API_CATEGORIES = [
         color: 'teal.500',
         endpoints: [
             { name: 'Login (FACTORY)', method: 'POST', handler: () => TraxoApi.login('FACTORY') },
+            { name: 'Login (RUN)', method: 'POST', handler: () => TraxoApi.login('RUN') },
             { name: 'List All Devices', method: 'GET', handler: () => TraxoApi.getDevices() },
+            { name: 'Retrieve Specific VIN Details', method: 'GET', handler: (vin) => TraxoApi.getPortalDeviceState(vin) },
+            { name: 'Vehicle Status (JEEP)', method: 'GET', handler: (vin) => TraxoApi.getVehicleStatus(vin) },
             { 
                 name: 'Portal Search (Advanced)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.portalSearch(p.searchPattern || vin, p.searchKey),
+                handler: (vin, p) => TraxoApi.portalSearch(p.searchPattern || vin, p.searchKey || 'vin'),
                 params: ['searchPattern', 'searchKey']
             },
         ]
     },
+
     {
         id: 'telematics',
         name: 'Telematics & Performance',
         icon: Activity,
         color: 'yellow.500',
         endpoints: [
+            { name: 'Login (RUN)', method: 'POST', handler: () => TraxoApi.login('RUN') },
             { 
                 name: 'Vehicle Telemetry (Step 1)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.getCanMessages(p.deviceType),
+                handler: (vin, p) => TraxoApi.getCanMessages(p.deviceType || 'jeep'),
                 params: ['deviceType']
             },
             { 
                 name: 'Vehicle Telemetry (Step 2)', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.getCanSignals(p.messageId),
+                handler: (vin, p) => TraxoApi.getCanSignals(p.messageId || '356'),
                 params: ['messageId']
             },
             { 
                 name: 'Get Telemetry Data', 
                 method: 'GET', 
-                handler: (vin, p) => TraxoApi.getVehicleTelemetryData(vin, p.telemetrySignal),
+                handler: (vin, p) => TraxoApi.getVehicleTelemetryData(vin, p.telemetrySignal || 'FuelLevel'),
                 params: ['telemetrySignal']
             },
-            { name: 'Location Telemetry (RAW)', method: 'GET', handler: (vin) => TraxoApi.getLocationTelemetryArray(vin) },
+            { 
+                name: 'Location Telemetry (RAW)', 
+                method: 'GET', 
+                handler: (vin) => TraxoApi.getLocationTelemetryArray(vin) 
+            },
+            { 
+                name: 'Location Telemetry (Time Range)', 
+                method: 'GET', 
+                handler: (vin, p) => TraxoApi.getHistoricalTelemetry(vin, p.startTime, p.endTime, p.count || 1000, 'LocationTelemetry'),
+                params: ['startTime', 'endTime', 'count']
+            },
             { 
                 name: 'Set Speed Alert', 
                 method: 'POST', 
@@ -372,6 +402,7 @@ const API_CATEGORIES = [
             },
         ]
     },
+
     {
         id: 'audit',
         name: 'Audit & Diagnostic',
@@ -395,6 +426,12 @@ const API_CATEGORIES = [
                 name: 'Available Logs (Portal)', 
                 method: 'GET', 
                 handler: (vin) => TraxoApi.listAvailableLogs(vin) 
+            },
+            { 
+                name: 'Concurrent Command Status', 
+                method: 'GET', 
+                handler: (vin, p) => TraxoApi.getConcurrentCommandStatus(vin, p.commandId),
+                params: ['commandId']
             },
         ]
     },
@@ -455,13 +492,16 @@ const PROCEDURAL_DOCS = {
     mobility: {
         title: "Mobility & Trip Analysis Guide",
         steps: [
-            "Set the target VIN in the global variables dashboard.",
+            "Login via 'Login (JEEP)' first using mobile user credentials.",
             "Use 'Ongoing Trip' to monitor real-time telemetry for an active session.",
             "Configure startTime and endTime to query 'Trip Summary' for historical analysis.",
-            "Use 'Trip Details (Paginated)' to fetch granular location and event data for past trips."
+            "Use 'Trip Details (Paginated)' with pageNo=0 to fetch granular past trip data.",
+            "Use 'Trip by ID' with a specific tripId to retrieve a single trip's full data.",
+            "Use 'Trip Audit (States)' with subcategory=tripCurrent or tripStart to audit raw trip state records."
         ],
-        tips: "Ensure the vehicle has a clear GPS sky-view for accurate 'Ongoing Trip' location data. Historical summaries may take longer to process for large time windows."
+        tips: "Ensure the vehicle has a clear GPS sky-view for accurate 'Ongoing Trip' data. Use subcategory 'tripCurrent' for active trip state and 'tripStart' for completed trips."
     },
+
     remote: {
         title: "Remote Commands Control",
         steps: [
@@ -509,19 +549,29 @@ const PROCEDURAL_DOCS = {
         title: "Inventory & Discovery",
         steps: [
             "Login via 'Login (FACTORY)' to gain system-wide traversal rights.",
+            "Login via 'Login (RUN)' for portal VIN lookup permissions.",
             "Use 'List All Devices' for a raw dump of the environment's fleet.",
-            "Execute 'Search Portal' with a VIN pattern to locate specific hardware clusters."
-        ]
+            "Use 'Retrieve Specific VIN Details' to get portal state for the current VIN.",
+            "Use 'Vehicle Status (JEEP)' to get live connectivity and telemetry status.",
+            "Execute 'Portal Search (Advanced)' with a searchPattern and searchKey (e.g., 'vin') to locate devices."
+        ],
+        tips: "Vehicle Status uses the JEEP mobile API. Factory/Run tokens give access to platform-level device registry queries."
     },
+
     telematics: {
         title: "Telematics & Performance",
         steps: [
-            "Fetch CAN descriptors using 'Vehicle Telemetry (Step 1)'.",
-            "Identify signal IDs in Step 2 to map raw hex to meaningful units.",
-            "Use 'Set Speed Alert' to verify the end-to-end alert ingestion pipeline."
+            "Login via 'Login (RUN)' for management-level telemetry access.",
+            "Fetch CAN message descriptors using 'Vehicle Telemetry (Step 1)' (default: jeep/vehicleTelemetry).",
+            "Identify signal IDs by running 'Vehicle Telemetry (Step 2)' with a messageId (e.g., 356).",
+            "Use 'Get Telemetry Data' with a signalName (e.g., FuelLevel) to query live values.",
+            "Use 'Location Telemetry (RAW)' for the latest location fix.",
+            "Use 'Location Telemetry (Time Range)' with startTime, endTime (format: YYYY-MM-DD HH:mm:ss) and count to query history.",
+            "Use 'Set Speed Alert' with speedLimit (numeric) to configure speed threshold commands."
         ],
-        tips: "Signal names (e.g., VITV, ODO) must exactly match the DBC specifications."
+        tips: "Signal names (e.g., FuelLevel, VehicleSpeed, ODO) must exactly match the DBC decoder specifications. Time range queries may return up to 'count' records."
     },
+
     audit: {
         title: "Audit & Diagnostic Center",
         steps: [
@@ -706,117 +756,90 @@ const ApiPreview = ({ epKey, result }) => {
     return <Text fontSize="xs" color="gray.500">Preview not available for this data type.</Text>;
 };
 
-const FotaParameterManager = ({ params, setParams, ep, handleFileParamChange }) => {
+const FotaParameterManager = ({ params, setParams, ep, handleFirmwareSelection }) => {
     const [tabIndex, setTabIndex] = useState(0);
 
+    const renderDropzone = (type, title, accept) => {
+        const currentFile = type === 'mcu' ? params.mcuFile : params.nadFile;
+        return (
+            <VStack align="stretch" spacing={2} flex={1}>
+                <Text fontSize="10px" fontWeight="black" color="gray.500" letterSpacing="1px">{title.toUpperCase()}</Text>
+                <Box
+                    h="120px"
+                    border="2px dashed"
+                    borderColor={currentFile ? "purple.400" : "gray.200"}
+                    borderRadius="2xl"
+                    display="flex"
+                    flexDirection="column"
+                    alignItems="center"
+                    justifyContent="center"
+                    cursor="pointer"
+                    transition="0.2s"
+                    position="relative"
+                    bg={currentFile ? "purple.50" : "white"}
+                    _hover={{ borderColor: 'purple.500', bg: 'purple.50' }}
+                >
+                    <Input 
+                        type="file" 
+                        accept={accept}
+                        opacity={0} 
+                        position="absolute" 
+                        top={0} left={0} width="100%" height="100%" zIndex={2} cursor="pointer"
+                        onChange={(e) => handleFirmwareSelection(e.target.files[0], type)}
+                    />
+                    <Icon as={UploadCloud} boxSize={6} color={currentFile ? "purple.500" : "gray.300"} mb={2} />
+                    <Text fontWeight="bold" color="gray.600" fontSize="10px" textAlign="center" px={4}>
+                        {currentFile ? currentFile.name : `Select ${title}`}
+                    </Text>
+                    {currentFile && <Badge size="xs" colorScheme="purple">{(currentFile.size / 1024 / 1024).toFixed(2)} MB</Badge>}
+                </Box>
+            </VStack>
+        );
+    };
+
     return (
-        <Box width="full" maxW="850px" my={2}>
-            <Tabs 
-                variant="soft-rounded" 
-                colorScheme="purple" 
-                size="sm" 
-                index={tabIndex} 
-                onChange={setTabIndex}
-            >
+        <Box width="full" maxW="1000px" my={2}>
+            <Tabs variant="soft-rounded" colorScheme="purple" size="sm" index={tabIndex} onChange={setTabIndex}>
                 <TabList bg="gray.50" p={2} borderRadius="xl" border="1px solid" borderColor="gray.100">
-                    <Tab borderRadius="lg" fontWeight="bold" px={8}>
-                        <HStack spacing={2}>
-                            <Icon as={UploadCloud} size={14} />
-                            <Text>FILE UPLOAD</Text>
-                        </HStack>
+                    <Tab borderRadius="lg" fontWeight="black" px={8} fontSize="11px">
+                        <HStack spacing={2}><UploadCloud size={14} /><Text>FIRMWARE BINARIES</Text></HStack>
                     </Tab>
-                    <Tab borderRadius="lg" fontWeight="bold" px={8}>
-                        <HStack spacing={2}>
-                            <Icon as={FileJson} size={14} />
-                            <Text>INLINE EDITOR</Text>
-                        </HStack>
+                    <Tab borderRadius="lg" fontWeight="black" px={8} fontSize="11px">
+                        <HStack spacing={2}><FileJson size={14} /><Text>METADATA JSON</Text></HStack>
                     </Tab>
                 </TabList>
                 
                 <TabPanels mt={4}>
-                    {/* Tab 1: File Manager */}
                     <TabPanel p={0}>
                         <VStack align="stretch" spacing={4}>
-                            <Box
-                                w="full"
-                                h="160px"
-                                border="2px dashed"
-                                borderColor={params.files?.length > 0 ? "purple.400" : "gray.200"}
-                                borderRadius="2xl"
-                                display="flex"
-                                flexDirection="column"
-                                alignItems="center"
-                                justifyContent="center"
-                                cursor="pointer"
-                                transition="0.2s"
-                                position="relative"
-                                bg={params.files?.length > 0 ? "purple.50" : "white"}
-                                _hover={{ borderColor: 'purple.500', bg: 'purple.50' }}
-                            >
-                                <Input 
-                                    type="file" 
-                                    multiple 
-                                    opacity={0} 
-                                    position="absolute" 
-                                    top={0} left={0} width="100%" height="100%" zIndex={2} cursor="pointer"
-                                    onChange={(e) => handleFileParamChange(e, ep, 'files')}
-                                />
-                                <Icon as={UploadCloud} boxSize={10} color={params.files?.length > 0 ? "purple.500" : "gray.300"} mb={3} />
-                                <Text fontWeight="bold" color="gray.600" fontSize="sm">
-                                    {params.files?.length > 0 ? `${params.files.length} Firmware Files Selected` : "Click or Drag Firmware (.ulp, .zip) here"}
-                                </Text>
-                                <Text fontSize="xs" color="gray.400">Standard FOTA packages only</Text>
-                            </Box>
+                            <Flex gap={4} direction={{ base: "column", md: "row" }}>
+                                {renderDropzone('mcu', 'MCU File (.ulp, .zip)', '.ulp,.zip')}
+                                {renderDropzone('nad', 'NAD File (.zip)', '.zip')}
+                            </Flex>
                             
-                            {params.files?.length > 0 && (
-                                <Box bg="gray.50" p={4} borderRadius="xl" border="1px solid" borderColor="gray.100">
-                                    <Text fontSize="10px" fontWeight="bold" color="gray.500" mb={3} letterSpacing="1px">READY FOR DEPLOYMENT</Text>
-                                    <VStack align="stretch" spacing={2}>
-                                        {Array.from(params.files).map((f, i) => (
-                                            <HStack key={i} justify="space-between" bg="white" p={2} borderRadius="md" border="1px solid" borderColor="gray.100">
-                                                <HStack>
-                                                    <Icon as={Terminal} size={14} color="purple.500" />
-                                                    <Text fontSize="11px" fontWeight="bold" color="gray.700">{f.name}</Text>
-                                                </HStack>
-                                                <Badge size="xs" colorScheme="purple" variant="subtle">{(f.size / 1024 / 1024).toFixed(2)} MB</Badge>
-                                            </HStack>
-                                        ))}
-                                    </VStack>
-                                    <Alert status="success" size="sm" mt={4} borderRadius="lg" variant="subtle">
-                                            <AlertIcon />
-                                            <Box>
-                                                <AlertTitle fontSize="xs" fontWeight="bold">Checksm & Size Validated</AlertTitle>
-                                                <AlertDescription fontSize="10px">Metadata has been automatically synchronized in the Inline Editor.</AlertDescription>
-                                            </Box>
-                                    </Alert>
-                                </Box>
+                            {(params.mcuFile || params.nadFile) && (
+                                <Alert status="success" size="sm" borderRadius="xl" variant="subtle" border="1px solid" borderColor="green.100">
+                                    <AlertIcon />
+                                    <Box>
+                                        <AlertTitle fontSize="xs" fontWeight="black">Postman Sync Active</AlertTitle>
+                                        <AlertDescription fontSize="10px">Checksums and versions are automatically populated in the Inline Editor tab.</AlertDescription>
+                                    </Box>
+                                </Alert>
                             )}
                         </VStack>
                     </TabPanel>
 
-                    {/* Tab 2: Metadata Logic */}
-                    <TabPanel p={0} position="relative">
+                    <TabPanel p={0}>
                         <VStack align="stretch" spacing={2}>
                             <HStack justify="space-between" px={1}>
-                                <Text fontSize="10px" color="gray.400" fontWeight="bold" letterSpacing="1px">FILEDETAILS JSON</Text>
-                                <Badge colorScheme="green" variant="solid" fontSize="9px" px={2} borderRadius="full">ACTIVE SYNC ON</Badge>
+                                <Text fontSize="10px" color="gray.400" fontWeight="bold">GENERATED FILEDETAILS (JEEP 4.0 SCHEMA)</Text>
+                                <Badge colorScheme="green" variant="solid" fontSize="9px">AUTO-SYNC ENABLED</Badge>
                             </HStack>
                             <Box borderRadius="2xl" overflow="hidden" border="1px solid" borderColor="gray.700" bg="gray.900" p={1}>
                                 <Textarea 
-                                    placeholder="Metadata JSON"
                                     value={params.fileDetails || ''}
                                     onChange={(e) => setParams(prev => ({ ...prev, fileDetails: e.target.value }))}
-                                    size="xs"
-                                    width="full"
-                                    minH="350px"
-                                    bg="transparent"
-                                    color="green.300"
-                                    border="none"
-                                    _focus={{ border: "none", ring: 0 }}
-                                    fontSize="12px"
-                                    fontFamily="monospace"
-                                    p={4}
-                                    className="custom-scrollbar"
+                                    size="xs" width="full" minH="380px" bg="transparent" color="green.300" border="none" fontSize="12px" fontFamily="monospace" p={4} className="custom-scrollbar"
                                 />
                             </Box>
                         </VStack>
@@ -835,29 +858,43 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
     const isSuccess = !error && response && response.status < 400;
 
     return (
-        <Box bg="white" borderRadius="xl" border="1px solid" borderColor="gray.200" overflow="hidden" my={4} shadow="xl">
-            <Flex bg="gray.50" p={2} align={{ base: "flex-start", md: "center" }} justify="space-between" direction={{ base: "column", md: "row" }} gap={3} borderBottom="1px solid" borderColor="gray.200">
-                <Flex wrap="wrap" gap={{ base: 2, md: 6 }} align="center">
-                    <Badge colorScheme={isSuccess ? 'green' : (response?.status === 204 ? 'blue' : 'red')} variant="solid" px={3} py={1} borderRadius="full" fontSize="10px">
-                        {response?.status || 'ERROR'} {response?.statusText || (error ? 'FAILED' : '')}
-                    </Badge>
+        <Box bg="#0d1117" borderRadius="xl" border="1px solid" borderColor="gray.700" overflow="hidden" my={4} shadow="2xl">
+            <Flex bg="#161b22" p={3} align="center" justify="space-between" borderBottom="1px solid" borderColor="gray.800">
+                <Flex wrap="wrap" gap={6} align="center">
+                    <HStack>
+                        <Text fontSize="10px" color="gray.500" fontWeight="black" letterSpacing="1px">STATUS:</Text>
+                        <Badge colorScheme={isSuccess ? 'green' : (response?.status === 204 ? 'blue' : 'red')} variant="solid" px={3} py={0.5} borderRadius="full" fontSize="10px">
+                            {response?.status || (error ? 'FAILURE' : 'ERROR')} {response?.statusText || (error ? 'NETWORK_ERR' : '')}
+                        </Badge>
+                    </HStack>
                     <HStack spacing={1}>
                         <Clock size={12} color="#8b949e" />
-                        <Text fontSize="10px" color="gray.400" fontWeight="bold">Time:</Text>
+                        <Text fontSize="10px" color="gray.500" fontWeight="black" letterSpacing="1px">TIME:</Text>
                         <Text fontSize="10px" color="cyan.400" fontWeight="bold">{duration ? `${duration}ms` : '--'}</Text>
                     </HStack>
                     <HStack spacing={1}>
                         <Database size={12} color="#8b949e" />
-                        <Text fontSize="10px" color="gray.400" fontWeight="bold">Size:</Text>
+                        <Text fontSize="10px" color="gray.500" fontWeight="black" letterSpacing="1px">SIZE:</Text>
                         <Text fontSize="10px" color="blue.400" fontWeight="bold">
                             {response?.data ? `${(JSON.stringify(response.data).length / 1024).toFixed(2)} KB` : '0 KB'}
                         </Text>
                     </HStack>
                 </Flex>
                 <HStack>
-                    <Tooltip label="Copy Response">
-                        <IconButton icon={<Icon as={Map} size={14} />} size="xs" variant="ghost" color="gray.400" onClick={() => navigator.clipboard.writeText(JSON.stringify(response?.data, null, 2))} />
+                    <Tooltip label="Copy Response" placement="top">
+                        <IconButton 
+                            icon={<FileJson size={14} />} 
+                            size="xs" 
+                            variant="ghost" 
+                            color="gray.500" 
+                            _hover={{ color: "white", bg: "gray.700" }}
+                            onClick={() => {
+                                navigator.clipboard.writeText(JSON.stringify(response?.data, null, 2));
+                                // Could add a small "Copied" toast here if needed
+                            }} 
+                        />
                     </Tooltip>
+                    <Divider orientation="vertical" h="15px" borderColor="gray.700" />
                     <IconButton 
                         icon={<Trash2 size={14} />} 
                         size="xs" 
@@ -869,74 +906,116 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
                 </HStack>
             </Flex>
 
-            <Tabs variant="line" size="sm" colorScheme="blue">
-                <TabList px={4} borderBottom="1px solid" borderColor="gray.200" bg="white">
-                    <Tab color="gray.500" _selected={{ color: 'blue.600', borderColor: 'blue.600' }} fontSize="11px" fontWeight="bold" py={3}>Body</Tab>
-                    <Tab color="gray.500" _selected={{ color: 'blue.600', borderColor: 'blue.600' }} fontSize="11px" fontWeight="bold" py={3}>Headers</Tab>
-                    <Tab color="gray.500" _selected={{ color: 'blue.600', borderColor: 'blue.600' }} fontSize="11px" fontWeight="bold" py={3}>Request</Tab>
-                    <Tab color="gray.500" _selected={{ color: 'blue.600', borderColor: 'blue.600' }} fontSize="11px" fontWeight="bold" py={3}>Preview</Tab>
+            <Tabs variant="enclosed" size="sm" colorScheme="blue">
+                <TabList px={4} borderBottom="1px solid" borderColor="gray.800" bg="#0d1117">
+                    <Tab color="gray.500" _selected={{ color: 'white', bg: '#161b22', borderBottomColor: '#161b22' }} fontSize="10px" fontWeight="black" letterSpacing="1px">RESPONSE BODY</Tab>
+                    <Tab color="gray.500" _selected={{ color: 'white', bg: '#161b22', borderBottomColor: '#161b22' }} fontSize="10px" fontWeight="black" letterSpacing="1px">HEADERS</Tab>
+                    <Tab color="gray.500" _selected={{ color: 'white', bg: '#161b22', borderBottomColor: '#161b22' }} fontSize="10px" fontWeight="black" letterSpacing="1px">REQUEST</Tab>
                 </TabList>
 
-                <TabPanels>
+                <TabPanels bg="#0d1117">
                     {/* Response Body */}
                     <TabPanel p={0}>
-                        <Box p={4} maxH="500px" overflowY="auto" bg="white" className="custom-scrollbar">
+                        <Box p={4} maxH="500px" overflowY="auto" className="custom-scrollbar" bg="#0d1117">
                             {response?.data ? (
-                                <Code display="block" whiteSpace="pre" bg="gray.50" p={4} borderRadius="md" color="black" fontSize="xs" fontFamily="monospace" border="1px solid" borderColor="gray.100">
+                                <Code display="block" whiteSpace="pre" bg="#161b22" p={4} borderRadius="md" color="green.300" fontSize="xs" fontFamily="monospace" border="1px solid" borderColor="gray.800">
                                     {JSON.stringify(response.data, null, 2)}
                                 </Code>
                             ) : error ? (
-                                <Box p={4} borderRadius="md" bg="rgba(248, 81, 73, 0.1)" border="1px solid" borderColor="red.500">
-                                    <Text color="red.400" fontSize="xs" fontWeight="bold">Error:</Text>
-                                    <Text color="red.200" fontSize="xs" mt={1}>{error}</Text>
+                                <Box p={4} borderRadius="md" bg="rgba(248, 81, 73, 0.1)" border="1px solid" borderColor="red.900">
+                                    <HStack mb={2}><Icon as={Info} color="red.400" size={14} /><Text color="red.400" fontSize="xs" fontWeight="bold">EXECUTION ERROR</Text></HStack>
+                                    <Text color="red.100" fontSize="xs" fontFamily="monospace" whiteSpace="pre-wrap">{error}</Text>
                                 </Box>
                             ) : (
-                                <Text color="gray.600" fontSize="xs" fontStyle="italic" p={4}>No response data available</Text>
+                                <Text color="gray.500" fontSize="xs" fontStyle="italic" p={4}>No response data available</Text>
                             )}
                         </Box>
                     </TabPanel>
 
                     {/* Headers */}
                     <TabPanel p={0}>
-                        <Box overflowX="auto">
-                            <Table size="sm" variant="simple">
-                                <Thead bg="gray.50">
-                                    <Tr>
-                                        <Th color="gray.500" fontSize="10px" borderBottom="1px solid" borderColor="gray.200">HEADER</Th>
-                                        <Th color="gray.500" fontSize="10px" borderBottom="1px solid" borderColor="gray.200">VALUE</Th>
-                                    </Tr>
-                                </Thead>
-                                <Tbody fontSize="xs">
-                                    {response?.headers && Object.entries(response.headers).map(([key, value]) => (
-                                        <Tr key={key} borderColor="gray.100">
-                                            <Td color="blue.600" fontWeight="bold" borderBottom="1px solid" borderColor="gray.100">{key}</Td>
-                                            <Td color="gray.700" borderBottom="1px solid" borderColor="gray.100" wordBreak="break-all">{String(value)}</Td>
-                                        </Tr>
-                                    ))}
-                                </Tbody>
-                            </Table>
-                        </Box>
+                        <VStack align="stretch" spacing={0} divider={<Divider borderColor="gray.800" />}>
+                            {/* Request Headers Section */}
+                            <Box>
+                                <Box bg="#161b22" px={4} py={2} borderBottom="1px solid" borderColor="gray.800">
+                                    <HStack spacing={2}>
+                                        <Icon as={UploadCloud} size={12} color="blue.400" />
+                                        <Text fontSize="10px" fontWeight="black" color="blue.300" letterSpacing="widest">REQUEST HEADERS</Text>
+                                    </HStack>
+                                </Box>
+                                <Box overflowX="auto">
+                                    <Table size="sm" variant="simple">
+                                        <Tbody fontSize="xs">
+                                            {request?.headers ? Object.entries(request.headers).map(([key, value]) => (
+                                                <Tr key={key} borderColor="gray.800">
+                                                    <Td color="gray.400" fontWeight="bold" borderBottom="1px solid" borderColor="#161b22" py={2} width="200px">{key}</Td>
+                                                    <Td color="gray.300" borderBottom="1px solid" borderColor="#161b22" py={2} wordBreak="break-all" fontFamily="monospace">{String(value)}</Td>
+                                                </Tr>
+                                            )) : (
+                                                <Tr><Td colSpan={2} color="gray.600" fontStyle="italic" py={4} textAlign="center">No request headers captured</Td></Tr>
+                                            )}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </Box>
+
+                            {/* Response Headers Section */}
+                            <Box>
+                                <Box bg="#161b22" px={4} py={2} borderBottom="1px solid" borderColor="gray.800">
+                                    <HStack spacing={2}>
+                                        <Icon as={Download} size={12} color="green.400" />
+                                        <Text fontSize="10px" fontWeight="black" color="green.300" letterSpacing="widest">RESPONSE HEADERS</Text>
+                                    </HStack>
+                                </Box>
+                                <Box overflowX="auto">
+                                    <Table size="sm" variant="simple">
+                                        <Tbody fontSize="xs">
+                                            {response?.headers ? Object.entries(response.headers).map(([key, value]) => (
+                                                <Tr key={key} borderColor="gray.800">
+                                                    <Td color="gray.400" fontWeight="bold" borderBottom="1px solid" borderColor="#161b22" py={2} width="200px">{key}</Td>
+                                                    <Td color="gray.300" borderBottom="1px solid" borderColor="#161b22" py={2} wordBreak="break-all" fontFamily="monospace">{String(value)}</Td>
+                                                </Tr>
+                                            )) : (
+                                                <Tr><Td colSpan={2} color="gray.600" fontStyle="italic" py={4} textAlign="center">No response headers available (Network Error or Filtered)</Td></Tr>
+                                            )}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </Box>
+                        </VStack>
                     </TabPanel>
 
                     {/* Request Details */}
-                    <TabPanel p={4}>
+                    <TabPanel p={0} pt={4}>
                         <VStack align="stretch" spacing={4}>
                             <Box>
-                                <Text fontSize="10px" color="gray.500" fontWeight="bold" mb={2} letterSpacing="1px">URL</Text>
-                                <Box bg="gray.50" p={2} borderRadius="md" border="1px solid" borderColor="gray.200">
-                                    <HStack mb={2}>
-                                        <Badge colorScheme="blue">{request?.method || 'GET'}</Badge>
-                                    </HStack>
-                                    <Text color="gray.700" fontSize="xs" wordBreak="break-all" fontWeight="bold" fontFamily="monospace">
-                                        {request?.url || 'URL Not Captured'}
+                                <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1} letterSpacing="1px">FULL REQUEST URL</Text>
+                                <Box p={3} borderRadius="md" bg="rgba(0,0,0,0.3)" border="1px solid" borderColor="whiteAlpha.100">
+                                    <Text color="blue.300" fontSize="xs" fontFamily="monospace" wordBreak="break-all">
+                                        {request?.url}
+                                        {request?.params && Object.keys(request.params).length > 0 && (
+                                            <Text as="span" color="gray.400">
+                                                ?{Object.entries(request.params).map(([k, v]) => `${k}=${v}`).join('&')}
+                                            </Text>
+                                        )}
                                     </Text>
                                 </Box>
                             </Box>
+                            
+                            {request?.params && Object.keys(request.params).length > 0 && (
+                                <Box>
+                                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1} letterSpacing="1px">QUERY PARAMETERS</Text>
+                                    <Code p={3} borderRadius="md" bg="rgba(0,0,0,0.3)" color="green.300" width="100%" fontSize="xs">
+                                        {JSON.stringify(request.params, null, 2)}
+                                    </Code>
+                                </Box>
+                            )}
+
                             {request?.data && (
                                 <Box>
-                                    <Text fontSize="10px" color="gray.500" fontWeight="bold" mb={2} letterSpacing="1px">PAYLOAD</Text>
-                                    <Code display="block" p={3} borderRadius="md" bg="gray.800" color="orange.200" fontSize="xs" whiteSpace="pre">
-                                        {JSON.stringify(request.data, null, 2)}
+                                    <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1} letterSpacing="1px">REQUEST BODY</Text>
+                                    <Code p={3} borderRadius="md" bg="rgba(0,0,0,0.3)" color="purple.300" width="100%" fontSize="xs">
+                                        {typeof request.data === 'string' ? request.data : JSON.stringify(request.data, null, 2)}
                                     </Code>
                                 </Box>
                             )}
@@ -1033,55 +1112,71 @@ const SystemConsolePage = () => {
         }
     });
 
-    const handleFileParamChange = async (e, ep, paramKey) => {
+    const handleFileParamChange = (e, ep, paramKey) => {
         const selectedFiles = ep.isMultiFile ? Array.from(e.target.files) : e.target.files[0];
         setParams(prev => ({ ...prev, [paramKey]: selectedFiles }));
+    };
 
-        // Specialized Logic: Auto-calculate rawChecksum for Firmware Uploads
-        if (ep.name === 'Upload Firmware (ZIP)' && ep.isMultiFile && e.target.files.length > 0) {
-            const filesArray = Array.from(e.target.files);
-            
-            const fileDetailsList = await Promise.all(filesArray.map(async (file) => {
-                const checksum = await TraxoApi.calculateSHA256(file);
-                const fileType = file.name.toLowerCase().endsWith('.ulp') ? 'mcu' : 'nad';
-                return {
-                    fileType,
-                    fileName: file.name,
-                    rawChecksum: checksum,
-                    installType: "full",
-                    softwareSize: String(file.size),
-                    isGolden: true
-                };
-            }));
+    const handleFirmwareSelection = async (file, fileType) => {
+        if (!file) return;
 
-            setParams(prev => {
-                let currentDetails = {};
-                try {
-                    currentDetails = typeof prev.fileDetails === 'string' ? JSON.parse(prev.fileDetails) : prev.fileDetails;
-                } catch (err) {
-                    currentDetails = { category: "BATCH", batches: { 
-                        compatibleNadVersion: "176.0", 
-                        compatibleMcuVersion: "176.0",
-                        nadVersion: "ND0_61_00",
-                        mcuVersion: "MD0_61_00",
-                        releaseVersion: "5314.0"
-                    } };
-                }
+        // 1. Calculate Checksum
+        const checksum = await TraxoApi.calculateSHA256(file);
+        
+        // 2. Extract Version (Pattern: ND0_66_00 or MD0_66_00)
+        const versionMatch = file.name.match(/(M|N)D0_[\d_]+/i);
+        const version = versionMatch ? versionMatch[0].toUpperCase() : '';
 
-                const updatedDetails = {
-                    ...currentDetails,
-                    batches: {
-                        ...(currentDetails.batches || {}),
-                        fileDetails: fileDetailsList
-                    }
-                };
+        // 3. Update JSON Metadata
+        setParams(prev => {
+            let details = {};
+            try {
+                details = typeof prev.fileDetails === 'string' ? JSON.parse(prev.fileDetails) : prev.fileDetails;
+            } catch (e) {
+                details = { category: "BATCH", batches: { fileDetails: [] } };
+            }
 
-                return {
-                    ...prev,
-                    fileDetails: JSON.stringify(updatedDetails, null, 2)
-                };
-            });
-        }
+            // Ensure structure exists
+            if (!details.batches) details.batches = {};
+            if (!details.batches.fileDetails) details.batches.fileDetails = [];
+
+            // Update version at top level
+            if (fileType === 'mcu') {
+                details.batches.mcuVersion = version;
+                details.batches.compatibleMcuVersion = "176.0"; // Default per collection
+            } else {
+                details.batches.nadVersion = version;
+                details.batches.compatibleNadVersion = "176.0"; // Default per collection
+            }
+
+            // Upsert file detail record
+            const fileEntry = {
+                fileType,
+                fileName: file.name,
+                rawChecksum: checksum,
+                installType: "full",
+                softwareSize: String(file.size),
+                isGolden: true
+            };
+
+            const existingIdx = details.batches.fileDetails.findIndex(f => f.fileType === fileType);
+            if (existingIdx >= 0) {
+                details.batches.fileDetails[existingIdx] = fileEntry;
+            } else {
+                details.batches.fileDetails.push(fileEntry);
+            }
+
+            // Sync release version from NAD if available
+            if (fileType === 'nad' && version) {
+                details.batches.releaseVersion = String(parseInt(version.split('_')[1]) * 10).split('.')[0] + ".0"; 
+            }
+
+            return {
+                ...prev,
+                [fileType === 'mcu' ? 'mcuFile' : 'nadFile']: file,
+                fileDetails: JSON.stringify(details, null, 2)
+            };
+        });
     };
 
     const lastRequestRef = useRef(null);
@@ -1092,11 +1187,21 @@ const SystemConsolePage = () => {
     useEffect(() => {
         const reqInterceptor = axios.interceptors.request.use((config) => {
             config.metadata = { startTime: new Date() };
+            // Capture a plain object version of headers to ensure reliable rendering
+            const capturedHeaders = {};
+            if (config.headers) {
+                Object.entries(config.headers).forEach(([k, v]) => {
+                    if (k !== 'common' && k !== 'post' && k !== 'get' && k !== 'put' && k !== 'delete' && k !== 'patch') {
+                        capturedHeaders[k] = v;
+                    }
+                });
+            }
+
             lastRequestRef.current = {
                 method: config.method.toUpperCase(),
                 url: config.url,
                 data: config.data,
-                headers: config.headers
+                headers: capturedHeaders
             };
             return config;
         });
@@ -1105,11 +1210,15 @@ const SystemConsolePage = () => {
             (response) => {
                 const duration = new Date() - response.config.metadata.startTime;
                 response.duration = duration;
+                
+                // Ensure headers are handled as a plain object
+                const resHeaders = response.headers instanceof Object ? { ...response.headers } : {};
+
                 lastResponseRef.current = {
                     status: response.status,
                     statusText: response.statusText,
                     data: response.data,
-                    headers: response.headers
+                    headers: resHeaders
                 };
                 return response;
             },
@@ -1117,12 +1226,16 @@ const SystemConsolePage = () => {
                 if (error.config?.metadata) {
                     error.duration = new Date() - error.config.metadata.startTime;
                 }
-                lastResponseRef.current = error.response ? {
-                    status: error.response.status,
-                    statusText: error.response.statusText,
-                    data: error.response.data,
-                    headers: error.response.headers
+                
+                // Capture headers even on error responses
+                const errRes = error.response;
+                lastResponseRef.current = errRes ? {
+                    status: errRes.status,
+                    statusText: errRes.statusText,
+                    data: errRes.data,
+                    headers: errRes.headers instanceof Object ? { ...errRes.headers } : {}
                 } : null;
+                
                 return Promise.reject(error);
             }
         );
@@ -1310,34 +1423,44 @@ const SystemConsolePage = () => {
                         </Flex>
 
                         {/* Input Group */}
-                        <Flex w="full" direction={{ base: "column", lg: "row" }} gap={4} align={{ base: "stretch", lg: "center" }}>
-                            <Input 
-                                placeholder="Enter Target VIN" 
-                                value={globalVin} 
-                                onChange={(e) => setGlobalVin(e.target.value)}
-                                size="lg"
-                                bg="gray.50"
-                                maxW={{ base: "full", lg: "500px" }}
-                                fontWeight="bold"
-                                variant="filled"
-                                _focus={{ borderColor: "blue.500", bg: "white", boxShadow: "0 0 0 1px #3182ce" }}
-                                borderRadius="xl"
-                            />
-                            <Button 
-                                colorScheme="blue" 
-                                size="lg" 
-                                px={10} 
-                                w={{ base: "full", lg: "auto" }}
-                                borderRadius="xl" 
-                                leftIcon={<Play size={16} />}
-                                onClick={handleFetchAll}
-                                boxShadow="0 4px 12px rgba(49, 130, 206, 0.3)"
-                                _hover={{ transform: "translateY(-1px)", boxShadow: "0 6px 16px rgba(49, 130, 206, 0.4)" }}
-                                _active={{ transform: "translateY(0)" }}
-                            >
-                                Submit
-                            </Button>
-                        </Flex>
+                        <VStack align="flex-start" w="full" spacing={2}>
+                            <Flex w="full" direction={{ base: "column", lg: "row" }} gap={4} align={{ base: "stretch", lg: "center" }}>
+                                <Input 
+                                    placeholder="Enter Target VIN (17 Alphanumeric)" 
+                                    value={globalVin} 
+                                    onChange={(e) => setGlobalVin(formatVin(e.target.value))}
+                                    size="lg"
+                                    bg="gray.50"
+                                    maxW={{ base: "full", lg: "500px" }}
+                                    fontWeight="bold"
+                                    variant="filled"
+                                    borderColor={globalVin.length > 0 && !isValidVin(globalVin) ? "red.400" : "blue.100"}
+                                    borderWidth={globalVin.length > 0 && !isValidVin(globalVin) ? "2px" : "1px"}
+                                    _focus={{ borderColor: "blue.500", bg: "white", boxShadow: "0 0 0 1px #3182ce" }}
+                                    borderRadius="xl"
+                                />
+                                <Button 
+                                    colorScheme="blue" 
+                                    size="lg" 
+                                    px={10} 
+                                    w={{ base: "full", lg: "auto" }}
+                                    borderRadius="xl" 
+                                    leftIcon={<Play size={16} />}
+                                    onClick={handleFetchAll}
+                                    isDisabled={!isValidVin(globalVin)}
+                                    boxShadow="0 4px 12px rgba(49, 130, 206, 0.3)"
+                                    _hover={{ transform: "translateY(-1px)", boxShadow: "0 6px 16px rgba(49, 130, 206, 0.4)" }}
+                                    _active={{ transform: "translateY(0)" }}
+                                >
+                                    Submit
+                                </Button>
+                            </Flex>
+                            {globalVin.length > 0 && !isValidVin(globalVin) && (
+                                <Text fontSize="xs" color="red.500" fontWeight="bold">
+                                    VIN must be exactly 17 alphanumeric characters ({globalVin.length}/17)
+                                </Text>
+                            )}
+                        </VStack>
                     </VStack>
                 </CardBody>
             </Card>
@@ -1487,7 +1610,7 @@ const SystemConsolePage = () => {
                                                                         params={params} 
                                                                         setParams={setParams} 
                                                                         ep={ep} 
-                                                                        handleFileParamChange={handleFileParamChange} 
+                                                                        handleFirmwareSelection={handleFirmwareSelection} 
                                                                     />
                                                                 ) : (
                                                                     <Wrap spacing={3} flex={1} py={2}>

@@ -2,6 +2,7 @@ import React from 'react';
 import { Box, Flex, HStack, Text, Button, Input, InputGroup, InputLeftElement, Select, IconButton, Spacer, Stack } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, Monitor, Search, RotateCcw, Download } from 'lucide-react';
+import { isValidVin, formatVin } from '../../utils/validation';
 
 export const DashboardHeader = ({
     viewMode, setViewMode, searchTerm, setSearchTerm, vin, setVin,
@@ -62,15 +63,16 @@ export const DashboardHeader = ({
                                 <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="0.5px">VIN</Text>
                                 <Input 
                                     value={vin} 
-                                    onChange={e => setVin(e.target.value)} 
+                                    onChange={e => setVin(formatVin(e.target.value))} 
                                     size="sm" 
                                     w={{ base: "full", xs: "140px", md: "155px" }} 
                                     borderRadius="lg" 
-                                    color="black" 
+                                    color={vin.length > 0 && !isValidVin(vin) ? "red.600" : "black"} 
                                     fontWeight="bold" 
                                     fontSize="11px" 
-                                    bg="gray.50" 
-                                    border="none" 
+                                    bg={vin.length > 0 && !isValidVin(vin) ? "red.50" : "gray.50"} 
+                                    border={vin.length > 0 && !isValidVin(vin) ? "1px solid" : "none"}
+                                    borderColor={vin.length > 0 && !isValidVin(vin) ? "red.200" : "transparent"}
                                 />
                             </HStack>
 
@@ -99,7 +101,15 @@ export const DashboardHeader = ({
                             </HStack>
 
                             <HStack spacing={1}>
-                                <IconButton icon={<RotateCcw size={14} />} aria-label="Refresh" size="sm" variant="ghost" onClick={handleRefresh} borderRadius="full" />
+                                <IconButton 
+                                    icon={<RotateCcw size={14} />} 
+                                    aria-label="Refresh" 
+                                    size="sm" 
+                                    variant="ghost" 
+                                    onClick={handleRefresh} 
+                                    borderRadius="full" 
+                                    isDisabled={!isValidVin(vin)}
+                                />
                                 <IconButton icon={<Download size={14} />} aria-label="Export JSON" size="sm" variant="ghost" onClick={handleExport} borderRadius="full" title="Export data as JSON" />
                             </HStack>
                         </HStack>

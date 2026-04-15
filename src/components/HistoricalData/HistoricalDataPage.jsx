@@ -56,6 +56,7 @@ import { History, Download, Activity, Filter, AlertCircle, FileText, Eye, Info, 
 import * as XLSX from 'xlsx';
 import { TraxoApi } from '../../utils/TraxoApi';
 import { processHistoricalData, prepareExcelData } from '../../utils/dataProcessing';
+import { isValidVin, formatVin } from '../../utils/validation';
 
 const HistoricalDataPage = () => {
     const toast = useToast();
@@ -225,9 +226,18 @@ const HistoricalDataPage = () => {
                 <Card variant="outline" borderRadius="xl" shadow="sm">
                     <CardBody>
                         <SimpleGrid columns={{ base: 1, md: 4 }} spacing={4} align="flex-end">
-                            <FormControl>
+                            <FormControl isInvalid={vin.length > 0 && !isValidVin(vin)}>
                                 <FormLabel fontSize="xs" fontWeight="800">Vehicle VIN</FormLabel>
-                                <Input value={vin} onChange={(e) => setVin(e.target.value)} bg="gray.50" />
+                                <Input 
+                                    value={vin} 
+                                    onChange={(e) => setVin(formatVin(e.target.value))} 
+                                    bg="gray.50" 
+                                    maxLength={17}
+                                    borderColor={vin.length > 0 && !isValidVin(vin) ? "red.400" : "gray.200"}
+                                />
+                                {vin.length > 0 && !isValidVin(vin) && (
+                                    <Text fontSize="10px" color="red.500" mt={1}>Must be 17 characters ({vin.length}/17)</Text>
+                                )}
                             </FormControl>
                             <FormControl>
                                 <FormLabel fontSize="xs" fontWeight="800">Start Range</FormLabel>
@@ -242,6 +252,7 @@ const HistoricalDataPage = () => {
                                 colorScheme="blue" 
                                 onClick={handleFetchHistory}
                                 isLoading={isLoading}
+                                isDisabled={!isValidVin(vin)}
                             >
                                 Analyze Exacts
                             </Button>

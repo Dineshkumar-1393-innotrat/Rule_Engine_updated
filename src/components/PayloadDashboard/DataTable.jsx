@@ -64,6 +64,17 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                         if (key.includes('timestamp')) { try { const dt = new Date(val); if (!isNaN(dt)) val = dt.toLocaleString(); } catch (e) { } }
                                         const isEV = ['details.eventValue', 'eventValue', 'signalValue'].includes(key);
                                         const isOn = ['RUN', 'START', 'ON'].includes(String(val || '').toUpperCase());
+                                        
+                                        if (typeof val === 'object' && val !== null) {
+                                            return (
+                                                <Td key={key} fontSize="10px" py={2} px={3}>
+                                                    <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                                        <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(val, null, 2)}</pre>
+                                                    </Box>
+                                                </Td>
+                                            );
+                                        }
+
                                         return <Td key={key} fontSize="11px" py={2} px={3} fontFamily="monospace" fontWeight={isEV ? '700' : '500'} color={isEV && isOn ? 'green.600' : 'gray.800'} bg={isEV && isOn ? 'green.50' : 'transparent'} whiteSpace="nowrap">{val !== null && val !== undefined ? String(val) : '-'}</Td>;
                                     })}
                                 </Tr>
