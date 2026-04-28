@@ -60,17 +60,17 @@ import {
     AlertDescription,
     Wrap,
 } from '@chakra-ui/react';
-import { 
-    Terminal, 
-    Play, 
-    ChevronDown, 
-    ChevronUp, 
-    Database, 
-    Wifi, 
-    Shield, 
-    Activity, 
-    Cloud, 
-    Map, 
+import {
+    Terminal,
+    Play,
+    ChevronDown,
+    ChevronUp,
+    Database,
+    Wifi,
+    Shield,
+    Activity,
+    Cloud,
+    Map,
     Bell,
     Settings,
     User,
@@ -108,15 +108,15 @@ const API_CATEGORIES = [
         color: 'cyan.500',
         endpoints: [
             { name: 'Login (PKI)', method: 'POST', handler: () => TraxoApi.login('PKI') },
-            { 
-                name: 'Create Common Certificate', 
-                method: 'POST', 
+            {
+                name: 'Create Common Certificate',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.createCommonCertificate(p.commonName, p.csr),
                 params: ['commonName', 'csr']
             },
-            { 
-                name: 'Create Tbox Certificate', 
-                method: 'POST', 
+            {
+                name: 'Create Tbox Certificate',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.createTboxCertificate(p.commonName, p.csr),
                 params: ['commonName', 'csr']
             },
@@ -130,27 +130,27 @@ const API_CATEGORIES = [
         endpoints: [
             { name: 'Login (JEEP)', method: 'POST', handler: () => TraxoApi.login('JEEP') },
             { name: 'Ongoing Trip', method: 'GET', handler: (vin) => TraxoApi.getOngoingTrip(vin) },
-            { 
-                name: 'Trip Summary', 
-                method: 'GET', 
+            {
+                name: 'Trip Summary',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getTripSummary(vin, p.startTime, p.endTime),
                 params: ['startTime', 'endTime']
             },
-            { 
-                name: 'Trip Details (Paginated)', 
-                method: 'GET', 
+            {
+                name: 'Trip Details (Paginated)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getTripDetailsPaginated(vin, p.pageNo),
                 params: ['pageNo']
             },
-            { 
-                name: 'Trip by ID', 
-                method: 'GET', 
+            {
+                name: 'Trip by ID',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getTripById(vin, p.tripId),
                 params: ['tripId']
             },
-            { 
-                name: 'Trip Audit (States)', 
-                method: 'GET', 
+            {
+                name: 'Trip Audit (States)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getTripAudit(vin, p.subcategory || 'tripCurrent'),
                 params: ['subcategory']
             },
@@ -164,23 +164,23 @@ const API_CATEGORIES = [
         color: 'pink.500',
         endpoints: [
             { name: 'Login (BULK)', method: 'POST', handler: () => TraxoApi.login('BULK') },
-            { 
-                name: 'Bulk IMEI Upload', 
-                method: 'POST', 
+            {
+                name: 'Bulk IMEI Upload',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.bulkImeiUpload(p.file),
                 params: ['file'],
                 isFile: true
             },
-            { 
-                name: 'Bulk Supplier Feed', 
-                method: 'POST', 
+            {
+                name: 'Bulk Supplier Feed',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.bulkSupplierFeed(p.file),
                 params: ['file'],
                 isFile: true
             },
-            { 
-                name: 'Bulk IMEI Upload (Editor)', 
-                method: 'POST', 
+            {
+                name: 'Bulk IMEI Upload (Editor)',
+                method: 'POST',
                 handler: (vin, p) => {
                     const blob = new Blob([p.imeiCsvContent], { type: 'text/csv' });
                     const file = new File([blob], 'imei.csv', { type: 'text/csv' });
@@ -189,9 +189,9 @@ const API_CATEGORIES = [
                 params: ['imeiCsvContent'],
                 isJSON: true
             },
-            { 
-                name: 'Bulk Supplier Feed (Editor)', 
-                method: 'POST', 
+            {
+                name: 'Bulk Supplier Feed (Editor)',
+                method: 'POST',
                 handler: (vin, p) => {
                     const blob = new Blob([p.tboxCsvContent], { type: 'text/csv' });
                     const file = new File([blob], 'Tbox.csv', { type: 'text/csv' });
@@ -213,9 +213,9 @@ const API_CATEGORIES = [
             { name: 'Honk', method: 'POST', handler: (vin) => TraxoApi.remoteHonk(vin) },
             { name: 'Blinker ON', method: 'POST', handler: (vin) => TraxoApi.remoteBlinkerControl(vin, 'ON') },
             { name: 'Blinker OFF', method: 'POST', handler: (vin) => TraxoApi.remoteBlinkerControl(vin, 'OFF') },
-            { 
-                name: 'Command Status (JEEP)', 
-                method: 'GET', 
+            {
+                name: 'Command Status (JEEP)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getCommandStatus(vin, p.commandId),
                 params: ['commandId']
             },
@@ -228,9 +228,9 @@ const API_CATEGORIES = [
         color: 'green.500',
         endpoints: [
             { name: 'Ongoing Trip', method: 'GET', handler: (vin) => TraxoApi.getOngoingTrip(vin) },
-            { 
-                name: 'Trip History (Paginated)', 
-                method: 'GET', 
+            {
+                name: 'Trip History (Paginated)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getTripDetailsWithPagination(vin, p.pageIndex),
                 params: ['pageIndex']
             },
@@ -243,15 +243,15 @@ const API_CATEGORIES = [
         color: 'purple.600',
         endpoints: [
             { name: 'Login (FOTA_UPLOAD)', method: 'POST', handler: () => TraxoApi.login('FOTA_UPLOAD') },
-            { 
-                name: 'Check Inventory (4.0)', 
-                method: 'GET', 
+            {
+                name: 'Check Inventory (4.0)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.checkUploadedFirmware(p.version),
                 params: ['version']
             },
-            { 
-                name: 'Upload Firmware (ZIP)', 
-                method: 'POST', 
+            {
+                name: 'Upload Firmware (ZIP)',
+                method: 'POST',
                 handler: (vin, p) => {
                     try {
                         const details = typeof p.fileDetails === 'string' ? JSON.parse(p.fileDetails) : p.fileDetails;
@@ -267,24 +267,24 @@ const API_CATEGORIES = [
                 isJSON: true,
                 isMultiFile: true
             },
-            { 
-                name: 'Download to Laptop', 
-                method: 'GET', 
+            {
+                name: 'Download to Laptop',
+                method: 'GET',
                 // fotaId is OPTIONAL â€” leave blank to auto-detect from versions API,
                 // or paste it manually from the Postman collection / Check Inventory response
-                handler: (vin, p) => TraxoApi.downloadFirmwareFromRepo(p.category, p.version, p.fotaId || null), 
+                handler: (vin, p) => TraxoApi.downloadFirmwareFromRepo(p.category, p.version, p.fotaId || null),
                 isBlob: false,
                 params: ['category', 'version', 'fotaId']
             },
-            { 
-                name: 'Delete Firmware (4.0)', 
-                method: 'DELETE', 
+            {
+                name: 'Delete Firmware (4.0)',
+                method: 'DELETE',
                 handler: (vin, p) => TraxoApi.deleteFirmware(p.category || 'BATCH', p.releaseVersion),
                 params: ['category', 'releaseVersion']
             },
-            { 
-                name: 'Download from DEVICE (4.0)', 
-                method: 'GET', 
+            {
+                name: 'Download from DEVICE (4.0)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.downloadFirmwareFile(p.filename, p.releaseVersion, p.fileType, p.category || 'BATCH', p.fotaId),
                 params: ['filename', 'releaseVersion', 'fileType', 'category', 'fotaId']
             },
@@ -296,27 +296,27 @@ const API_CATEGORIES = [
         icon: Cloud,
         color: 'purple.400',
         endpoints: [
-            { 
-                name: 'FOTA Trigger (Download)', 
-                method: 'POST', 
+            {
+                name: 'FOTA Trigger (Download)',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.triggerFotaDownload(vin, p.version),
                 params: ['version']
             },
-            { 
-                name: 'FOTA Update (Execute)', 
-                method: 'POST', 
+            {
+                name: 'FOTA Update (Execute)',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.triggerFotaExecution(vin, p.version),
                 params: ['version']
             },
-            { 
-                name: 'Check Command Status (VALIDITY)', 
-                method: 'GET', 
-                handler: (vin, p) => TraxoApi.getFotaCommandValidity(vin, p.commandId),
+            {
+                name: 'Check Command Status (VALIDITY)',
+                method: 'GET',
+                handler: (vin, p) => TraxoApi.getFotaCommandStatus(vin, p.commandId),
                 params: ['commandId']
             },
-            { 
-                name: 'Reset FOTA State (4.0)', 
-                method: 'PUT', 
+            {
+                name: 'Reset FOTA State (4.0)',
+                method: 'PUT',
                 handler: (vin, p) => TraxoApi.resetFotaState(vin, p.commandName || 'firmwaredownloadcommand'),
                 params: ['commandName']
             },
@@ -328,9 +328,9 @@ const API_CATEGORIES = [
         icon: Settings,
         color: 'red.500',
         endpoints: [
-            { 
-                name: 'Initiation Command', 
-                method: 'POST', 
+            {
+                name: 'Initiation Command',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.updateTboxState(vin, p.tboxState),
                 params: ['tboxState']
             },
@@ -349,9 +349,9 @@ const API_CATEGORIES = [
             { name: 'List All Devices', method: 'GET', handler: () => TraxoApi.getDevices() },
             { name: 'Retrieve Specific VIN Details', method: 'GET', handler: (vin) => TraxoApi.getPortalDeviceState(vin) },
             { name: 'Vehicle Status (JEEP)', method: 'GET', handler: (vin) => TraxoApi.getVehicleStatus(vin) },
-            { 
-                name: 'Portal Search (Advanced)', 
-                method: 'GET', 
+            {
+                name: 'Portal Search (Advanced)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.portalSearch(p.searchPattern || vin, p.searchKey || 'vin'),
                 params: ['searchPattern', 'searchKey']
             },
@@ -365,38 +365,38 @@ const API_CATEGORIES = [
         color: 'yellow.500',
         endpoints: [
             { name: 'Login (RUN)', method: 'POST', handler: () => TraxoApi.login('RUN') },
-            { 
-                name: 'Vehicle Telemetry (Step 1)', 
-                method: 'GET', 
+            {
+                name: 'Vehicle Telemetry (Step 1)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getCanMessages(p.deviceType || 'jeep'),
                 params: ['deviceType']
             },
-            { 
-                name: 'Vehicle Telemetry (Step 2)', 
-                method: 'GET', 
+            {
+                name: 'Vehicle Telemetry (Step 2)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getCanSignals(p.messageId || '356'),
                 params: ['messageId']
             },
-            { 
-                name: 'Get Telemetry Data', 
-                method: 'GET', 
+            {
+                name: 'Get Telemetry Data',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getVehicleTelemetryData(vin, p.telemetrySignal || 'FuelLevel'),
                 params: ['telemetrySignal']
             },
-            { 
-                name: 'Location Telemetry (RAW)', 
-                method: 'GET', 
-                handler: (vin) => TraxoApi.getLocationTelemetryArray(vin) 
+            {
+                name: 'Location Telemetry (RAW)',
+                method: 'GET',
+                handler: (vin) => TraxoApi.getLocationTelemetryArray(vin)
             },
-            { 
-                name: 'Location Telemetry (Time Range)', 
-                method: 'GET', 
+            {
+                name: 'Location Telemetry (Time Range)',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getHistoricalTelemetry(vin, p.startTime, p.endTime, p.count || 1000, 'LocationTelemetry'),
                 params: ['startTime', 'endTime', 'count']
             },
-            { 
-                name: 'Set Speed Alert', 
-                method: 'POST', 
+            {
+                name: 'Set Speed Alert',
+                method: 'POST',
                 handler: (vin, p) => TraxoApi.setSpeedAlert(vin, p.speedLimit),
                 params: ['speedLimit']
             },
@@ -416,22 +416,29 @@ const API_CATEGORIES = [
             { name: 'Alert Ingestion Audit', method: 'GET', handler: (vin) => TraxoApi.getAlertIngestion(vin) },
             { name: 'List Log Files', method: 'GET', handler: (vin) => TraxoApi.listLogFiles(vin) },
             { name: 'Trigger Log Fetch', method: 'POST', handler: (vin) => TraxoApi.fetchDeviceLogs(vin) },
-            { 
-                name: 'Delete Log File', 
-                method: 'DELETE', 
+            {
+                name: 'Delete Log File',
+                method: 'DELETE',
                 handler: (vin, p) => TraxoApi.deleteLogFile(vin, p.filename),
                 params: ['filename']
             },
-            { 
-                name: 'Available Logs (Portal)', 
-                method: 'GET', 
-                handler: (vin) => TraxoApi.listAvailableLogs(vin) 
+            {
+                name: 'Available Logs (Portal)',
+                method: 'GET',
+                handler: (vin) => TraxoApi.listAvailableLogs(vin)
             },
-            { 
-                name: 'Concurrent Command Status', 
-                method: 'GET', 
+            {
+                name: 'Concurrent Command Status',
+                method: 'GET',
                 handler: (vin, p) => TraxoApi.getConcurrentCommandStatus(vin, p.commandId),
                 params: ['commandId']
+            },
+            {
+                name: 'Simulate Log Upload (TBOX)',
+                method: 'POST',
+                handler: (vin, p) => TraxoApi.simulateLogUpload(vin, p.file),
+                params: ['file'],
+                isFile: true
             },
         ]
     },
@@ -442,22 +449,22 @@ const API_CATEGORIES = [
         color: 'pink.400',
         endpoints: [
             { name: 'Device Join Status', method: 'GET', handler: (vin) => TraxoApi.getDeviceJoinStatus(vin) },
-            { 
-                name: 'Mark as Read', 
-                method: 'PUT', 
+            {
+                name: 'Mark as Read',
+                method: 'PUT',
                 handler: (vin, p) => TraxoApi.updateNotificationStatus(p.notificationId),
                 params: ['notificationId']
             },
-            { 
-                name: 'Delete Notification', 
-                method: 'DELETE', 
+            {
+                name: 'Delete Notification',
+                method: 'DELETE',
                 handler: (vin, p) => TraxoApi.deleteNotification(p.notificationId),
                 params: ['notificationId']
             },
         ]
     }
 ];
- 
+
 const PROCEDURAL_DOCS = {
     auth: {
         title: "Authentication Guide",
@@ -619,7 +626,7 @@ const HelpModal = ({ isOpen, onClose, categoryId }) => {
                                 </HStack>
                             ))}
                         </VStack>
-                        
+
                         {doc.tips && (
                             <Box w="full" p={4} borderRadius="xl" bg="blue.50" border="1px solid" borderColor="blue.200" mt={2}>
                                 <HStack spacing={2} mb={1}>
@@ -644,7 +651,7 @@ const HelpModal = ({ isOpen, onClose, categoryId }) => {
 
 const ApiPreview = ({ epKey, result }) => {
     if (!result || (!result.response && !result.error)) return null;
-    
+
     const { response, error } = result;
     const data = response?.data;
     const status = response?.status;
@@ -731,6 +738,58 @@ const ApiPreview = ({ epKey, result }) => {
         );
     }
 
+    // Specialized Renderer: FOTA File Details (Check Inventory)
+    const fotaData = Array.isArray(data) ? data[0] : data;
+    if (fotaData && fotaData.fileDetails && Array.isArray(fotaData.fileDetails)) {
+        const fileDetails = fotaData.fileDetails;
+        const headers = ['fileName', 'fileType', 'releaseVersion', 'mcuVersion', 'nadVersion', 'filesize', 'rawChecksum'];
+        return (
+            <VStack align="stretch" spacing={4} p={2}>
+                <HStack justify="space-between">
+                    <Badge colorScheme="purple" p={2} borderRadius="md" variant="subtle" fontWeight="bold">
+                        FOTA REPOSITORY INVENTORY
+                    </Badge>
+                    <Text fontSize="10px" color="gray.500" fontWeight="bold">TOTAL FILES: {fileDetails.length}</Text>
+                </HStack>
+                <Box overflowX="auto" border="1px solid" borderColor="gray.100" borderRadius="xl" shadow="sm">
+                    <Table size="sm" variant="simple">
+                        <Thead bg="gray.50">
+                            <Tr>
+                                {headers.map(h => (
+                                    <Th key={h} fontSize="10px" color="gray.500" py={3}>{h.toUpperCase()}</Th>
+                                ))}
+                            </Tr>
+                        </Thead>
+                        <Tbody>
+                            {fileDetails.map((file, i) => (
+                                <Tr key={i} _hover={{ bg: "purple.50" }}>
+                                    {headers.map(h => (
+                                        <Td key={h} fontSize="11px" color="gray.700" py={3}>
+                                            {h === 'filesize' ? `${(file[h] / 1024).toFixed(2)} KB` :
+                                                h === 'rawChecksum' ? (
+                                                    <Tooltip label={file[h]} hasArrow>
+                                                        <Text isTruncated maxW="100px" fontFamily="mono" fontSize="10px" cursor="help">
+                                                            {file[h]}
+                                                        </Text>
+                                                    </Tooltip>
+                                                ) :
+                                                    h === 'fileType' ? (
+                                                        <Badge size="xs" colorScheme={file[h] === 'mcu' ? 'orange' : 'teal'}>
+                                                            {String(file[h]).toUpperCase()}
+                                                        </Badge>
+                                                    ) :
+                                                        String(file[h] || 'N/A')}
+                                        </Td>
+                                    ))}
+                                </Tr>
+                            ))}
+                        </Tbody>
+                    </Table>
+                </Box>
+            </VStack>
+        );
+    }
+
     // Regular Object Rendering (Property Table)
     if (typeof data === 'object' && data !== null) {
         return (
@@ -779,11 +838,11 @@ const FotaParameterManager = ({ params, setParams, ep, handleFirmwareSelection }
                     bg={currentFile ? "purple.50" : "white"}
                     _hover={{ borderColor: 'purple.500', bg: 'purple.50' }}
                 >
-                    <Input 
-                        type="file" 
+                    <Input
+                        type="file"
                         accept={accept}
-                        opacity={0} 
-                        position="absolute" 
+                        opacity={0}
+                        position="absolute"
                         top={0} left={0} width="100%" height="100%" zIndex={2} cursor="pointer"
                         onChange={(e) => handleFirmwareSelection(e.target.files[0], type)}
                     />
@@ -808,7 +867,7 @@ const FotaParameterManager = ({ params, setParams, ep, handleFirmwareSelection }
                         <HStack spacing={2}><FileJson size={14} /><Text>METADATA JSON</Text></HStack>
                     </Tab>
                 </TabList>
-                
+
                 <TabPanels mt={4}>
                     <TabPanel p={0}>
                         <VStack align="stretch" spacing={4}>
@@ -816,7 +875,7 @@ const FotaParameterManager = ({ params, setParams, ep, handleFirmwareSelection }
                                 {renderDropzone('mcu', 'MCU File (.ulp, .zip)', '.ulp,.zip')}
                                 {renderDropzone('nad', 'NAD File (.zip)', '.zip')}
                             </Flex>
-                            
+
                             {(params.mcuFile || params.nadFile) && (
                                 <Alert status="success" size="sm" borderRadius="xl" variant="subtle" border="1px solid" borderColor="green.100">
                                     <AlertIcon />
@@ -836,7 +895,7 @@ const FotaParameterManager = ({ params, setParams, ep, handleFirmwareSelection }
                                 <Badge colorScheme="green" variant="solid" fontSize="9px">AUTO-SYNC ENABLED</Badge>
                             </HStack>
                             <Box borderRadius="2xl" overflow="hidden" border="1px solid" borderColor="gray.700" bg="gray.900" p={1}>
-                                <Textarea 
+                                <Textarea
                                     value={params.fileDetails || ''}
                                     onChange={(e) => setParams(prev => ({ ...prev, fileDetails: e.target.value }))}
                                     size="xs" width="full" minH="380px" bg="transparent" color="green.300" border="none" fontSize="12px" fontFamily="monospace" p={4} className="custom-scrollbar"
@@ -882,24 +941,24 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
                 </Flex>
                 <HStack>
                     <Tooltip label="Copy Response" placement="top">
-                        <IconButton 
-                            icon={<FileJson size={14} />} 
-                            size="xs" 
-                            variant="ghost" 
-                            color="gray.500" 
+                        <IconButton
+                            icon={<FileJson size={14} />}
+                            size="xs"
+                            variant="ghost"
+                            color="gray.500"
                             _hover={{ color: "white", bg: "gray.700" }}
                             onClick={() => {
                                 navigator.clipboard.writeText(JSON.stringify(response?.data, null, 2));
                                 // Could add a small "Copied" toast here if needed
-                            }} 
+                            }}
                         />
                     </Tooltip>
                     <Divider orientation="vertical" h="15px" borderColor="gray.700" />
-                    <IconButton 
-                        icon={<Trash2 size={14} />} 
-                        size="xs" 
-                        colorScheme="red" 
-                        variant="ghost" 
+                    <IconButton
+                        icon={<Trash2 size={14} />}
+                        size="xs"
+                        colorScheme="red"
+                        variant="ghost"
                         onClick={onClear}
                         title="Clear Result"
                     />
@@ -1001,7 +1060,7 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
                                     </Text>
                                 </Box>
                             </Box>
-                            
+
                             {request?.params && Object.keys(request.params).length > 0 && (
                                 <Box>
                                     <Text fontSize="xs" fontWeight="bold" color="gray.500" mb={1} letterSpacing="1px">QUERY PARAMETERS</Text>
@@ -1035,9 +1094,9 @@ const ResultExplorer = ({ result, epKey, onClear }) => {
 const SystemConsolePage = () => {
     const { vin: urlVin } = useParams();
     const [globalVin, setGlobalVin] = useState(urlVin || '');
-    const [params, setParams] = useState({ 
-        version: '2314.0', 
-        category: 'BATCH', 
+    const [params, setParams] = useState({
+        version: '2314.0',
+        category: 'BATCH',
         commandId: '',
         notificationId: '',
         imeiCsvContent: '356769705035673',
@@ -1100,7 +1159,7 @@ const SystemConsolePage = () => {
     const [apiResults, setApiResults] = useState({});
     const [loadingMap, setLoadingMap] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
-    
+
     // Help Modal Management
     const { isOpen: isHelpOpen, onOpen: onHelpOpen, onClose: onHelpClose } = useDisclosure();
     const [activeHelpCategory, setActiveHelpCategory] = useState(null);
@@ -1122,10 +1181,11 @@ const SystemConsolePage = () => {
 
         // 1. Calculate Checksum
         const checksum = await TraxoApi.calculateSHA256(file);
-        
-        // 2. Extract Version (Pattern: ND0_66_00 or MD0_66_00)
-        const versionMatch = file.name.match(/(M|N)D0_[\d_]+/i);
-        const version = versionMatch ? versionMatch[0].toUpperCase() : '';
+
+        // 2. Extract Version (Pattern: ND0.01.07 or ND0_66_00)
+        // Supports both underscore and dot notation
+        const versionMatch = file.name.match(/(M|N)D[\d._]+/i);
+        const version = versionMatch ? versionMatch[0].toUpperCase().replace(/[._]$/, '') : '';
 
         // 3. Update JSON Metadata
         setParams(prev => {
@@ -1166,9 +1226,16 @@ const SystemConsolePage = () => {
                 details.batches.fileDetails.push(fileEntry);
             }
 
-            // Sync release version from NAD if available
-            if (fileType === 'nad' && version) {
-                details.batches.releaseVersion = String(parseInt(version.split('_')[1]) * 10).split('.')[0] + ".0"; 
+            // Sync release version
+            // Priority: 1. Four-digit number in filename (e.g. 8324) 2. Existing version variable 3. Derived from filename
+            const releaseMatch = file.name.match(/\b\d{4}\b/);
+            if (releaseMatch) {
+                details.batches.releaseVersion = releaseMatch[0] + ".0";
+            } else if (prev.version) {
+                details.batches.releaseVersion = prev.version;
+            } else if (fileType === 'nad' && version && version.includes('_')) {
+                // Legacy fallback for ND0_66_00 pattern
+                details.batches.releaseVersion = String(parseInt(version.split('_')[1]) * 10).split('.')[0] + ".0";
             }
 
             return {
@@ -1210,7 +1277,7 @@ const SystemConsolePage = () => {
             (response) => {
                 const duration = new Date() - response.config.metadata.startTime;
                 response.duration = duration;
-                
+
                 // Ensure headers are handled as a plain object
                 const resHeaders = response.headers instanceof Object ? { ...response.headers } : {};
 
@@ -1226,7 +1293,7 @@ const SystemConsolePage = () => {
                 if (error.config?.metadata) {
                     error.duration = new Date() - error.config.metadata.startTime;
                 }
-                
+
                 // Capture headers even on error responses
                 const errRes = error.response;
                 lastResponseRef.current = errRes ? {
@@ -1235,7 +1302,7 @@ const SystemConsolePage = () => {
                     data: errRes.data,
                     headers: errRes.headers instanceof Object ? { ...errRes.headers } : {}
                 } : null;
-                
+
                 return Promise.reject(error);
             }
         );
@@ -1256,8 +1323,8 @@ const SystemConsolePage = () => {
 
     const toggleCard = (id) => {
         const isOpening = !expandedCards.includes(id);
-        
-        setExpandedCards(prev => 
+
+        setExpandedCards(prev =>
             prev.includes(id) ? prev.filter(c => c !== id) : [...prev, id]
         );
 
@@ -1375,13 +1442,13 @@ const SystemConsolePage = () => {
             toast({ title: 'Please enter a VIN', status: 'warning' });
             return;
         }
-        
+
         // Just save and confirm, don't execute everything automatically
         localStorage.setItem('last_vin', globalVin);
-        toast({ 
-            title: 'VIN Updated', 
-            description: `Ready to run diagnostics for ${globalVin}`, 
-            status: 'success', 
+        toast({
+            title: 'VIN Updated',
+            description: `Ready to run diagnostics for ${globalVin}`,
+            status: 'success',
             duration: 2000,
             position: 'top'
         });
@@ -1389,7 +1456,7 @@ const SystemConsolePage = () => {
 
     const filteredCategories = API_CATEGORIES.map(cat => ({
         ...cat,
-        endpoints: cat.endpoints.filter(ep => 
+        endpoints: cat.endpoints.filter(ep =>
             ep.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             cat.name.toLowerCase().includes(searchTerm.toLowerCase())
         )
@@ -1431,9 +1498,9 @@ const SystemConsolePage = () => {
                         {/* Input Group */}
                         <VStack align="flex-start" w="full" spacing={2}>
                             <Flex w="full" direction={{ base: "column", lg: "row" }} gap={4} align={{ base: "stretch", lg: "center" }}>
-                                <Input 
-                                    placeholder="Enter Target VIN (17 Alphanumeric)" 
-                                    value={globalVin} 
+                                <Input
+                                    placeholder="Enter Target VIN (17 Alphanumeric)"
+                                    value={globalVin}
                                     onChange={(e) => setGlobalVin(formatVin(e.target.value))}
                                     size="lg"
                                     bg="gray.50"
@@ -1445,12 +1512,12 @@ const SystemConsolePage = () => {
                                     _focus={{ borderColor: "blue.500", bg: "white", boxShadow: "0 0 0 1px #3182ce" }}
                                     borderRadius="xl"
                                 />
-                                <Button 
-                                    colorScheme="blue" 
-                                    size="lg" 
-                                    px={10} 
+                                <Button
+                                    colorScheme="blue"
+                                    size="lg"
+                                    px={10}
                                     w={{ base: "full", lg: "auto" }}
-                                    borderRadius="xl" 
+                                    borderRadius="xl"
                                     leftIcon={<Play size={16} />}
                                     onClick={handleFetchAll}
                                     isDisabled={!isValidVin(globalVin)}
@@ -1476,7 +1543,7 @@ const SystemConsolePage = () => {
                 <Card mb={8} shadow="lg" borderRadius="2xl" border="1px solid" borderColor="purple.100" bg="#0d1117">
                     <CardHeader py={4} px={6} borderBottom="1px solid" borderColor="gray.700">
                         <HStack justify="space-between">
-                            <HStack><Icon as={Settings} color="purple.400" /><Text fontWeight="black" fontSize="xs" color="gray.400" letterSpacing="widest">ENVIRONMENT VARIABLES</Text></HStack>
+                            <HStack><Icon as={Settings} color="purple.400" /></HStack>
                             <Badge colorScheme="purple" variant="subtle">STAGING_PREPROD</Badge>
                         </HStack>
                     </CardHeader>
@@ -1485,7 +1552,7 @@ const SystemConsolePage = () => {
                             {Object.entries(params).filter(([k]) => k !== 'file').map(([key, value]) => (
                                 <VStack key={key} align="flex-start" spacing={1}>
                                     <Text fontSize="10px" color="gray.500" fontWeight="bold" letterSpacing="1px">{key.replace(/([A-Z])/g, ' $1').toUpperCase()}</Text>
-                                    <Input 
+                                    <Input
                                         value={value}
                                         onChange={(e) => setParams(prev => ({ ...prev, [key]: e.target.value }))}
                                         size="sm"
@@ -1503,28 +1570,29 @@ const SystemConsolePage = () => {
                 </Card>
             </Collapse>
 
-            <Button 
-                position="fixed" 
-                bottom={{ base: "20px", md: "30px" }} 
-                right={{ base: "20px", md: "30px" }} 
-                colorScheme="purple" 
-                borderRadius="full" 
-                size={{ base: "md", md: "lg" }} 
+            <IconButton
+                position="fixed"
+                bottom={{ base: "20px", md: "30px" }}
+                right={{ base: "10px", md: "18px" }}
+                colorScheme="purple"
+                borderRadius="full"
+                size="lg"
+                icon={<Settings size={24} />}
                 shadow="2xl"
-                leftIcon={<Icon as={Settings} />}
                 onClick={() => setIsEnvPanelOpen(!isEnvPanelOpen)}
                 zIndex={100}
                 boxShadow="0 8px 32px rgba(128, 90, 213, 0.4)"
-            >
-                {isEnvPanelOpen ? 'Close' : 'Variables'}
-            </Button>
+                aria-label="Toggle Variables"
+                _hover={{ transform: "rotate(30deg) scale(1.1)" }}
+                transition="all 0.2s ease"
+            />
 
             <InputGroup mb={6} size="lg">
                 <InputLeftElement pointerEvents="none">
                     <Icon as={Search} color="gray.400" />
                 </InputLeftElement>
-                <Input 
-                    placeholder="Search APIs by name or category..." 
+                <Input
+                    placeholder="Search APIs by name or category..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     bg="white"
@@ -1535,14 +1603,14 @@ const SystemConsolePage = () => {
                     _focus={{ borderColor: "blue.500", boxShadow: "0 0 0 1px #3182ce" }}
                 />
             </InputGroup>
-            
+
             <VStack spacing={6} align="stretch">
                 {filteredCategories.map((cat) => (
                     <Card key={cat.id} variant="outline" shadow="sm" borderRadius="xl" overflow="hidden">
-                        <CardHeader 
-                            bg="white" 
-                            py={3} 
-                            px={5} 
+                        <CardHeader
+                            bg="white"
+                            py={3}
+                            px={5}
                             cursor="pointer"
                             onClick={() => toggleCard(cat.id)}
                             borderBottom="1px solid"
@@ -1558,12 +1626,12 @@ const SystemConsolePage = () => {
                                             <Heading size="sm" fontSize={{ base: "sm", md: "md" }}>{cat.name}</Heading>
                                             {PROCEDURAL_DOCS[cat.id] && (
                                                 <Tooltip label="How to use this category" placement="right">
-                                                    <IconButton 
-                                                        icon={<HelpCircle size={14} />} 
-                                                        size="xs" 
-                                                        variant="ghost" 
-                                                        color="gray.400" 
-                                                        _hover={{ color: "blue.500", bg: "blue.50" }} 
+                                                    <IconButton
+                                                        icon={<HelpCircle size={14} />}
+                                                        size="xs"
+                                                        variant="ghost"
+                                                        color="gray.400"
+                                                        _hover={{ color: "blue.500", bg: "blue.50" }}
                                                         onClick={(e) => handleManualHelp(e, cat.id)}
                                                         aria-label="Help"
                                                         borderRadius="full"
@@ -1574,9 +1642,9 @@ const SystemConsolePage = () => {
                                         <Text fontSize="2xs" color="gray.400" fontWeight="bold">{cat.endpoints.length} Endpoints Integrated</Text>
                                     </VStack>
                                 </Flex>
-                                <IconButton 
-                                    icon={expandedCards.includes(cat.id) ? <ChevronUp /> : <ChevronDown />} 
-                                    size="sm" 
+                                <IconButton
+                                    icon={expandedCards.includes(cat.id) ? <ChevronUp /> : <ChevronDown />}
+                                    size="sm"
                                     variant="ghost"
                                     aria-label="Toggle"
                                     display={{ base: "none", sm: "flex" }}
@@ -1587,177 +1655,182 @@ const SystemConsolePage = () => {
                             <CardBody p={0} bg="white">
                                 <Box overflowX="auto">
                                     <Table variant="simple" size="sm">
-                                    <Tbody>
-                                        {cat.endpoints.map((ep, idx) => {
-                                            const epKey = `${cat.id}-${ep.name}`;
-                                            const hasResult = apiResults[epKey];
-                                            const isLoading = loadingMap[epKey];
-                                            
-                                            return (
-                                                <React.Fragment key={idx}>
-                                                    <Tr _hover={{ bg: "gray.50" }} transition="all 0.2s">
-                                                        <Td minW="200px">
-                                                            <HStack>
-                                                                <Badge 
-                                                                    colorScheme={
-                                                                        ep.method === 'POST' ? 'orange' : 
-                                                                        ep.method === 'GET' ? 'blue' : 'red'
-                                                                    } 
-                                                                    fontSize="9px"
-                                                                >
-                                                                    {ep.method}
-                                                                </Badge>
-                                                                <Text fontSize="sm" fontWeight="600">{ep.name}</Text>
-                                                            </HStack>
-                                                        </Td>
-                                                        <Td>
-                                                                {ep.name === 'Upload Firmware (ZIP)' ? (
-                                                                    <FotaParameterManager 
-                                                                        params={params} 
-                                                                        setParams={setParams} 
-                                                                        ep={ep} 
-                                                                        handleFirmwareSelection={handleFirmwareSelection} 
-                                                                    />
-                                                                ) : (
-                                                                    <Wrap spacing={3} flex={1} py={2}>
-                                                                    {ep.params?.map(paramKey => (
-                                                                        <Tooltip key={paramKey} label={`Edit ${paramKey}`} placement="top">
-                                                                            <VStack align="flex-start" spacing={0}>
-                                                                                <Text fontSize="9px" color="gray.400" fontWeight="bold" ml={1} mb={1}>{paramKey.toUpperCase()}</Text>
-                                                                                {((ep.isJSON && (paramKey === 'fileDetails' || paramKey === 'payload' || paramKey === 'data')) || paramKey.toLowerCase().includes('json')) ? (
-                                                                                    <Textarea 
-                                                                                        placeholder={paramKey}
-                                                                                        value={params[paramKey] || ''}
-                                                                                        onChange={(e) => setParams(prev => ({ ...prev, [paramKey]: e.target.value }))}
-                                                                                        size="xs"
-                                                                                        width={{ base: "full", md: "400px" }}
-                                                                                        minW={{ base: "250px", md: "400px" }}
-                                                                                        minH="150px"
-                                                                                        bg="white"
-                                                                                        borderColor="gray.200"
-                                                                                        _focus={{ borderColor: "purple.400" }}
-                                                                                        fontSize="10px"
-                                                                                        fontFamily="monospace"
-                                                                                    />
-                                                                                ) : (ep.isFile || ep.isMultiFile || paramKey === 'files' || paramKey === 'file') ? (
-                                                                                    <VStack align="flex-start" spacing={1}>
-                                                                                        <Box position="relative" width="200px">
-                                                                                            <Input 
-                                                                                                type="file"
-                                                                                                multiple={ep.isMultiFile}
-                                                                                                opacity={0}
-                                                                                                position="absolute"
-                                                                                                top={0}
-                                                                                                left={0}
-                                                                                                width="100%"
-                                                                                                height="100%"
-                                                                                                zIndex={2}
-                                                                                                cursor="pointer"
-                                                                                                onChange={(e) => handleFileParamChange(e, ep, paramKey)}
+                                        <Tbody>
+                                            {cat.endpoints.map((ep, idx) => {
+                                                const epKey = `${cat.id}-${ep.name}`;
+                                                const hasResult = apiResults[epKey];
+                                                const isLoading = loadingMap[epKey];
+
+                                                return (
+                                                    <React.Fragment key={idx}>
+                                                        <Tr _hover={{ bg: "gray.50" }} transition="all 0.2s">
+                                                            <Td minW="200px">
+                                                                <HStack>
+                                                                    <Badge
+                                                                        colorScheme={
+                                                                            ep.method === 'POST' ? 'orange' :
+                                                                                ep.method === 'GET' ? 'blue' : 'red'
+                                                                        }
+                                                                        fontSize="9px"
+                                                                    >
+                                                                        {ep.method}
+                                                                    </Badge>
+                                                                    <Text fontSize="sm" fontWeight="600">{ep.name}</Text>
+                                                                </HStack>
+                                                            </Td>
+                                                            <Td>
+                                                                <Flex align="center" gap={4}>
+                                                                    {ep.name === 'Upload Firmware (ZIP)' ? (
+                                                                        <FotaParameterManager
+                                                                            params={params}
+                                                                            setParams={setParams}
+                                                                            ep={ep}
+                                                                            handleFirmwareSelection={handleFirmwareSelection}
+                                                                        />
+                                                                    ) : (
+                                                                        <Wrap spacing={3} flex={1} py={2}>
+                                                                            {ep.params?.map(paramKey => (
+                                                                                <Tooltip key={paramKey} label={`Edit ${paramKey}`} placement="top">
+                                                                                    <VStack align="flex-start" spacing={0}>
+                                                                                        <Text fontSize="9px" color="gray.400" fontWeight="bold" ml={1} mb={1}>{paramKey.toUpperCase()}</Text>
+                                                                                        {((ep.isJSON && (paramKey === 'fileDetails' || paramKey === 'payload' || paramKey === 'data')) || paramKey.toLowerCase().includes('json')) ? (
+                                                                                            <Textarea
+                                                                                                placeholder={paramKey}
+                                                                                                value={params[paramKey] || ''}
+                                                                                                onChange={(e) => setParams(prev => ({ ...prev, [paramKey]: e.target.value }))}
+                                                                                                size="xs"
+                                                                                                width={{ base: "full", md: "400px" }}
+                                                                                                minW={{ base: "250px", md: "400px" }}
+                                                                                                minH="150px"
+                                                                                                bg="white"
+                                                                                                borderColor="gray.200"
+                                                                                                _focus={{ borderColor: "purple.400" }}
+                                                                                                fontSize="10px"
+                                                                                                fontFamily="monospace"
                                                                                             />
-                                                                                            <Button 
-                                                                                                size="xs" 
-                                                                                                width="full" 
-                                                                                                variant="outline" 
-                                                                                                leftIcon={<UploadCloud size={14} />}
-                                                                                                borderColor="gray.300"
-                                                                                                color="gray.600"
-                                                                                                _hover={{ bg: "gray.50" }}
-                                                                                            >
-                                                                                                {params[paramKey] 
-                                                                                                    ? (ep.isMultiFile 
-                                                                                                        ? `${params[paramKey].length} files selected` 
-                                                                                                        : params[paramKey].name.substring(0, 15) + '...') 
-                                                                                                    : 'Choose File(s)'}
-                                                                                            </Button>
-                                                                                        </Box>
-                                                                                        {params[paramKey] && !ep.isMultiFile && (
-                                                                                            <Text fontSize="10px" color="blue.500" fontWeight="bold">
-                                                                                                {params[paramKey].name}
-                                                                                            </Text>
+                                                                                        ) : (ep.isFile || ep.isMultiFile || paramKey === 'files' || paramKey === 'file') ? (
+                                                                                            <VStack align="flex-start" spacing={1}>
+                                                                                                <Box position="relative" width="200px">
+                                                                                                    <Input
+                                                                                                        type="file"
+                                                                                                        multiple={ep.isMultiFile}
+                                                                                                        opacity={0}
+                                                                                                        position="absolute"
+                                                                                                        top={0}
+                                                                                                        left={0}
+                                                                                                        width="100%"
+                                                                                                        height="100%"
+                                                                                                        zIndex={2}
+                                                                                                        cursor="pointer"
+                                                                                                        onChange={(e) => handleFileParamChange(e, ep, paramKey)}
+                                                                                                    />
+                                                                                                    <Button
+                                                                                                        size="xs"
+                                                                                                        width="full"
+                                                                                                        variant="outline"
+                                                                                                        leftIcon={<UploadCloud size={14} />}
+                                                                                                        borderColor="gray.300"
+                                                                                                        color="gray.600"
+                                                                                                        _hover={{ bg: "gray.50" }}
+                                                                                                    >
+                                                                                                        {params[paramKey]
+                                                                                                            ? (ep.isMultiFile
+                                                                                                                ? `${params[paramKey].length} files selected`
+                                                                                                                : params[paramKey].name.substring(0, 15) + '...')
+                                                                                                            : 'Choose File(s)'}
+                                                                                                    </Button>
+                                                                                                </Box>
+                                                                                                {params[paramKey] && !ep.isMultiFile && (
+                                                                                                    <Text fontSize="10px" color="blue.500" fontWeight="bold">
+                                                                                                        {params[paramKey].name}
+                                                                                                    </Text>
+                                                                                                )}
+                                                                                            </VStack>
+                                                                                        ) : (
+                                                                                            <Input
+                                                                                                placeholder={paramKey}
+                                                                                                value={params[paramKey] || ''}
+                                                                                                onChange={(e) => setParams(prev => ({ ...prev, [paramKey]: e.target.value }))}
+                                                                                                size="xs"
+                                                                                                width={paramKey === 'commandName' || paramKey === 'csr' ? "250px" : "120px"}
+                                                                                                bg="white"
+                                                                                                borderRadius="md"
+                                                                                                borderColor="gray.200"
+                                                                                                _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px #4299e1" }}
+                                                                                                fontSize="10px"
+                                                                                            />
                                                                                         )}
                                                                                     </VStack>
-                                                                                ) : (
-                                                                                    <Input 
-                                                                                        placeholder={paramKey}
-                                                                                        value={params[paramKey] || ''}
-                                                                                        onChange={(e) => setParams(prev => ({ ...prev, [paramKey]: e.target.value }))}
-                                                                                        size="xs"
-                                                                                        width={paramKey === 'commandName' || paramKey === 'csr' ? "250px" : "120px"}
-                                                                                        bg="white"
-                                                                                        borderRadius="md"
-                                                                                        borderColor="gray.200"
-                                                                                        _focus={{ borderColor: "blue.400", boxShadow: "0 0 0 1px #4299e1" }}
-                                                                                        fontSize="10px"
-                                                                                    />
-                                                                                )}
-                                                                            </VStack>
-                                                                        </Tooltip>
-                                                                    ))}
-                                                                    <Button 
-                                                                        onClick={() => handleExecute(cat, ep)}
-                                                                        isLoading={isLoading}
-                                                                        loadingText="Executing"
-                                                                        leftIcon={<Play size={10} />}
-                                                                        size="xs"
-                                                                        colorScheme="blue"
-                                                                        variant="solid"
-                                                                        minW="80px"
-                                                                        borderRadius="md"
-                                                                        ml="auto"
-                                                                        transition="all 0.2s"
-                                                                        _hover={{ transform: "scale(1.05)", shadow: "md" }}
-                                                                    >
-                                                                        Execute
-                                                                    </Button>
-                                                                    </Wrap>
-                                                                )}
-                                                                {hasResult && (
-                                                                    <Badge 
-                                                                        colorScheme={hasResult.error ? 'red' : 'green'} 
-                                                                        variant="outline"
-                                                                        fontSize="9px"
-                                                                        ml={2}
-                                                                    >
-                                                                        {hasResult.error ? 'FAILED' : 'SUCCESS'}
-                                                                    </Badge>
-                                                                )}
-                                                        </Td>
-                                                    </Tr>
-                                                    {hasResult && (
-                                                        <Tr bg="gray.900">
-                                                            <Td colSpan={2} p={0}>
-                                                                <ResultExplorer 
-                                                                    result={hasResult} 
-                                                                    epKey={epKey} 
-                                                                    onClear={() => {
-                                                                        const newResults = {...apiResults};
-                                                                        delete newResults[epKey];
-                                                                        setApiResults(newResults);
-                                                                    }} 
-                                                                />
+                                                                                </Tooltip>
+                                                                            ))}
+                                                                        </Wrap>
+                                                                    )}
+
+                                                                    <VStack spacing={2} ml="auto">
+                                                                        <Button
+                                                                            onClick={() => handleExecute(cat, ep)}
+                                                                            isLoading={isLoading}
+                                                                            loadingText="Executing"
+                                                                            leftIcon={<Play size={10} />}
+                                                                            size="xs"
+                                                                            colorScheme="blue"
+                                                                            variant="solid"
+                                                                            minW="100px"
+                                                                            borderRadius="md"
+                                                                            transition="all 0.2s"
+                                                                            _hover={{ transform: "scale(1.05)", shadow: "md" }}
+                                                                        >
+                                                                            Execute
+                                                                        </Button>
+                                                                        {hasResult && (
+                                                                            <Badge
+                                                                                colorScheme={hasResult.error ? 'red' : 'green'}
+                                                                                variant="outline"
+                                                                                fontSize="9px"
+                                                                                w="full"
+                                                                                textAlign="center"
+                                                                            >
+                                                                                {hasResult.error ? 'FAILED' : 'SUCCESS'}
+                                                                            </Badge>
+                                                                        )}
+                                                                    </VStack>
+                                                                </Flex>
                                                             </Td>
                                                         </Tr>
-                                                    )}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                    </Tbody>
-                                </Table>
-                            </Box>
-                        </CardBody>
+                                                        {hasResult && (
+                                                            <Tr bg="gray.900">
+                                                                <Td colSpan={2} p={0}>
+                                                                    <ResultExplorer
+                                                                        result={hasResult}
+                                                                        epKey={epKey}
+                                                                        onClear={() => {
+                                                                            const newResults = { ...apiResults };
+                                                                            delete newResults[epKey];
+                                                                            setApiResults(newResults);
+                                                                        }}
+                                                                    />
+                                                                </Td>
+                                                            </Tr>
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </Tbody>
+                                    </Table>
+                                </Box>
+                            </CardBody>
                         </Collapse>
                     </Card>
                 ))}
             </VStack>
-            
+
             <Box h="100px" />
 
             {/* Contextual Help Modal */}
-            <HelpModal 
-                isOpen={isHelpOpen} 
-                onClose={onHelpClose} 
-                categoryId={activeHelpCategory} 
+            <HelpModal
+                isOpen={isHelpOpen}
+                onClose={onHelpClose}
+                categoryId={activeHelpCategory}
             />
         </Box>
     );

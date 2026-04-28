@@ -103,6 +103,15 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                             <Tr key={idx} _hover={{ bg: 'gray.50' }}>
                                 {keys.map(k => {
                                     let v = file[k];
+                                    if (typeof v === 'object' && v !== null) {
+                                        return (
+                                            <Td key={k} fontSize="10px" py={2} px={3}>
+                                                <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                                    <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(v, null, 2)}</pre>
+                                                </Box>
+                                            </Td>
+                                        );
+                                    }
                                     if (k === 'fileSize' && v) v = (v / 1024).toFixed(1) + ' KB';
                                     if (k === 'createdTime' && v) v = formatFullDate(v);
                                     return <Td key={k} fontSize="11px" py={2} px={3} fontFamily="monospace" color="gray.800">{v !== null && v !== undefined ? String(v) : '-'}</Td>;

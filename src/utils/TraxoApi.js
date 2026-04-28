@@ -1275,14 +1275,14 @@ export const TraxoApi = {
 
     resetFotaState: async (vin, commandName = 'firmwaredownloadcommand') => {
         return withRetry(async () => {
-            if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
             const response = await axios.put(`${FOTA_FCA_BASE_URL}/jeep/ota/resetfotastate`, null, {
                 params: { vinNo: vin, commandName },
-                headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'FOTA_UPLOAD');
+        }, 'FOTA');
     },
 
     updateNotificationStatus: async (notificationId) => withRetry(async () => {

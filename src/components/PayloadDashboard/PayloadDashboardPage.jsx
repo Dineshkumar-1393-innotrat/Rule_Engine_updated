@@ -261,6 +261,7 @@ const PayloadDashboardPage = () => {
                             else if (Array.isArray(arr[0].alerts)) arr = arr[0].alerts;
                             else if (Array.isArray(arr[0].events)) arr = arr[0].events;
                             else if (Array.isArray(arr[0].logFiles)) arr = arr[0].logFiles;
+                            else if (Array.isArray(arr[0].fileDetails)) arr = arr[0].fileDetails;
                             else if (Array.isArray(arr[0].items)) arr = arr[0].items;
                         }
 
@@ -605,15 +606,20 @@ const PayloadDashboardPage = () => {
                             </HStack>
                             <Text fontSize="10px" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px">{filteredSignalsCount} signals shown</Text>
                         </Flex>
-                        <SimpleGrid columns={{ base: 1, md: 2, xl: 3, "2xl": 4 }} spacing={6}>
+                        <SimpleGrid 
+                            columns={filteredSignals.length === 1 && searchTerm ? 1 : { base: 1, md: 2, xl: 3, "2xl": 4 }} 
+                            spacing={6}
+                        >
                             {filteredSignals.map((signal, index) => (
-                                <SignalCard
-                                    key={signal.id + index}
-                                    signal={signal}
-                                    searchTerm={searchTerm}
-                                    onRefresh={handleRefresh}
-                                    handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }}
-                                />
+                                <Box key={signal.id + index} gridColumn={filteredSignals.length === 1 && searchTerm ? "span 1" : "auto"}>
+                                    <SignalCard
+                                        signal={signal}
+                                        searchTerm={searchTerm}
+                                        onRefresh={handleRefresh}
+                                        handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }}
+                                        isFullScreen={filteredSignals.length === 1 && searchTerm}
+                                    />
+                                </Box>
                             ))}
                         </SimpleGrid>
                     </Box>
