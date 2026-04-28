@@ -31,7 +31,7 @@ const ACCOUNTS = {
     },
     JEEP: {
         countryCode: "+91",
-        mobileNum: "9629929028",
+        mobileNum: "9629457592",
         password: "Password@123"
     },
     FOTA: {
