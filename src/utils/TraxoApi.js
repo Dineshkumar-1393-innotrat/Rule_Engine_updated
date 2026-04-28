@@ -1,9 +1,10 @@
 import axios from 'axios';
 
 const BASE_URL = '/api/traxo';
+const PLATFORM_BASE_URL = '/api/platform'; // For lb2 endpoints
 const JEEP_BASE_URL = '/api/jeep'; // For trip and JEEP-specific APIs
 const FOTA_FCA_BASE_URL = '/api/fota-fca'; // For new FOTA download & lb1 endpoints
-const AWS_BASE_URL = 'https://gp98o9kt3c.execute-api.ap-south-1.amazonaws.com/jeep';
+const AWS_BASE_URL = '/api/aws/jeep';
 console.warn("TraxoApi Loaded - MultiAccount Version - If you do not see this, restart the server");
 
 const ACCOUNTS = {
@@ -18,8 +19,8 @@ const ACCOUNTS = {
         userName: "admin",
         password: "admin",
         accountId: "primary",
-        clientId: "BQESzZvwPTCY5v7uekXU_h8EEXka",
-        clientSecret: "XhwlaKfa4dk9zCFjpGZuHzmYluka"
+        clientId: "9iUsFkqpnxgu_AIrNG2dcgN4MoAa",
+        clientSecret: "ytRzDFAWFMfvnhJwVIv6NacfLmAa"
     },
     FACTORY: {
         userName: "admin",
@@ -37,29 +38,29 @@ const ACCOUNTS = {
         userName: "admin",
         password: "V6PS0EWwF5V&",
         accountId: "fotatenant",
-        clientId: "K4dcMP30mQbE9POIwqfFSHccfAIa",
-        clientSecret: "94ZhjPBKffxaODNfwFKdliRoO4Aa"
+        clientId: "AhCJBKe9xP94qT22KYsHHy5yYqka",
+        clientSecret: "b3cnLRonvsEMYQQKzFdTXNywYQUa"
     },
     FOTA_UPLOAD: {
         userName: "admin",
         password: "V6PS0EWwF5V&",
         accountId: "fotatenant",
-        clientId: "HLzVgxYxPbzLOD3rzoWh6Gsv7Twa",
-        clientSecret: "8OoOUy5Ny7spvefvSfXssvddeLEa"
+        clientId: "1cwEgOCf1By1V8Qs_MjKVxcRCfka",
+        clientSecret: "xrl3FGuoyfrq8_j8E0HL2GKHL8Aa"
     },
     BULK: {
         userName: "admin",
         password: "admin",
         accountId: "primary",
-        clientId: "BQESzZvwPTCY5v7uekXU_h8EEXka",
-        clientSecret: "XhwlaKfa4dk9zCFjpGZuHzmYluka"
+        clientId: "9iUsFkqpnxgu_AIrNG2dcgN4MoAa",
+        clientSecret: "ytRzDFAWFMfvnhJwVIv6NacfLmAa"
     },
     PKI: {
         userName: "admin",
         password: "0[%62&Db$Z:J",
         accountId: "pkijeeptenant",
-        clientId: "oWXMoTG9yKyaTjZjuFin8kJmPXUa",
-        clientSecret: "XF3Cdm5NlkJr0NVRQ0vOZWkqmxEa"
+        clientId: "UGTtoib0yvQ8vnfv3CoXLahqfAMa",
+        clientSecret: "NqxJBwd236LrlXuVPb4afQBIRfka"
     },
     RUN: {
         userName: "admin",
@@ -147,9 +148,15 @@ export const TraxoApi = {
     login: async (accountType = 'PRIMARY') => {
         const credentials = ACCOUNTS[accountType];
         try {
-            const url = accountType === 'JEEP'
-                ? `${JEEP_BASE_URL}/users/login`
-                : `${BASE_URL}/authentication/login`;
+            let url;
+            if (accountType === 'JEEP') {
+                url = `${JEEP_BASE_URL}/users/login`;
+            } else if (['PRIMARY', 'RUN', 'FACTORY'].includes(accountType)) {
+                url = `${PLATFORM_BASE_URL}/authentication/login`;
+            } else {
+                // BULK, PKI, FOTA_UPLOAD, JEEP_PRIMARY
+                url = `${BASE_URL}/authentication/login`;
+            }
 
             const response = await axios.post(url, credentials, {
                 headers: { 'Content-Type': 'application/json' },
@@ -324,7 +331,7 @@ export const TraxoApi = {
 
             // Fallback to specific states endpoint
             try {
-                const response = await axios.get(`${BASE_URL}/jeep/devices/vin/${vin}/states`, {
+                const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/devices/vin/${vin}/states`, {
                     params: { subcategory: 'LocationTelemetry' },
                     headers: {
                         'Authorization': `Bearer ${authTokens.FACTORY}`,
@@ -347,7 +354,7 @@ export const TraxoApi = {
     getHistoricalTelemetry: async (vin, startTime, endTime, count = 1000, subcategory = 'LocationTelemetry') => {
         return withRetry(async () => {
             if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
-            const response = await axios.get(`${BASE_URL}/jeep/devices/vin/${vin}/states`, {
+            const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/devices/vin/${vin}/states`, {
                 params: {
                     subcategory,
                     startTime,
@@ -370,7 +377,7 @@ export const TraxoApi = {
             if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
 
             try {
-                const response = await axios.get(`${BASE_URL}/jeep/devices/vin/${vin}/states`, {
+                const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/devices/vin/${vin}/states`, {
                     params: { subcategory: 'LocationTelemetry' },
                     headers: {
                         'Authorization': `Bearer ${authTokens.FACTORY}`,
@@ -401,7 +408,7 @@ export const TraxoApi = {
         return withRetry(async () => {
             if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
             try {
-                const response = await axios.get(`${BASE_URL}/jeep/alerts/${vin}/`, {
+                const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/alerts/${vin}/`, {
                     headers: {
                         'Authorization': `Bearer ${authTokens.PRIMARY}`,
                         'Accept': 'application/json'
@@ -472,7 +479,7 @@ export const TraxoApi = {
         return withRetry(async () => {
             if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
             try {
-                const response = await axios.get(`${BASE_URL}/jeep/alerts/${vin}/`, {
+                const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/alerts/${vin}/`, {
                     headers: {
                         'Authorization': `Bearer ${authTokens.PRIMARY}`,
                         'Accept': 'application/json'
@@ -496,7 +503,7 @@ export const TraxoApi = {
     getDevices: async () => {
         return withRetry(async () => {
             if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
-            const response = await axios.get(`${BASE_URL}/devices`, {
+            const response = await axios.get(`${PLATFORM_BASE_URL}/devices`, {
                 headers: {
                     'Authorization': `Bearer ${authTokens.FACTORY}`,
                     'Accept': 'application/json'
@@ -513,7 +520,7 @@ export const TraxoApi = {
 
             // 1. Direct portal endpoint
             try {
-                const response = await axios.get(`${BASE_URL}/portal/vin/${vin}`, {
+                const response = await axios.get(`${PLATFORM_BASE_URL}/portal/vin/${vin}`, {
                     headers: {
                         'Authorization': `Bearer ${authTokens.FACTORY}`,
                         'Accept': 'application/json'
@@ -639,16 +646,16 @@ export const TraxoApi = {
     }, 'JEEP'),
 
     resetFotaState: async (vin, commandName = "firmwaredownloadcommand") => withRetry(async () => {
-        if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
         return (await axios.put(`${FOTA_FCA_BASE_URL}/jeep/ota/resetfotastate`, null, {
             params: { vinNo: vin, commandName: commandName },
-            headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
             timeout: 30000
         })).data;
-    }, 'FOTA_UPLOAD'),
+    }, 'FOTA'),
 
     downloadFirmwareFile: async (filename, releaseVersion, fileType, category, fotaId) => withRetry(async () => {
-        if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+        if (!authTokens.FOTA) await TraxoApi.login('FOTA');
         // Collection 4.0 Path: /jeep/files/device/downloadfirmware
         return (await axios.get(`${FOTA_FCA_BASE_URL}/jeep/files/device/downloadfirmware`, {
             params: { 
@@ -658,11 +665,11 @@ export const TraxoApi = {
                 category, 
                 fotaid: fotaId 
             },
-            headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
             responseType: 'blob',
             timeout: 120000
         })).data;
-    }, 'FOTA_UPLOAD'),
+    }, 'FOTA'),
 
     downloadFirmwareFromRepo: async (category, releaseVersion, fotaIdOverride = null) => {
         return withRetry(async () => {
@@ -861,7 +868,7 @@ export const TraxoApi = {
                 headers: { 'Authorization': `Bearer ${authTokens.JEEP_PRIMARY}` },
                 timeout: 30000
             });
-            return response.data;
+            return flattenStates(response.data);
         }, 'JEEP_PRIMARY');
     },
 
@@ -963,7 +970,7 @@ export const TraxoApi = {
     getPortalDeviceState: async (vin) => {
         return withRetry(async () => {
             if (!authTokens.RUN) await TraxoApi.login('RUN');
-            const response = await axios.get(`${BASE_URL}/portal/vin/${vin}`, {
+            const response = await axios.get(`${PLATFORM_BASE_URL}/portal/vin/${vin}`, {
                 headers: {
                     'Authorization': `Bearer ${authTokens.RUN}`,
                     'Accept': 'application/json'
@@ -1100,7 +1107,7 @@ export const TraxoApi = {
 
     portalSearch: async (pattern, key = 'vin') => withRetry(async () => {
         if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
-        return (await axios.get(`${BASE_URL}/portal/search`, {
+        return (await axios.get(`${PLATFORM_BASE_URL}/portal/search`, {
             params: { searchPattern: pattern, searchKey: key },
             headers: { 'Authorization': `Bearer ${authTokens.FACTORY}` },
             timeout: 30000
@@ -1110,49 +1117,57 @@ export const TraxoApi = {
     // ========== TELEMETRY DECODING APIs ==========
     getCanMessages: async (deviceType = 'jeep') => {
         return withRetry(async () => {
-            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
-            const response = await axios.get(`${BASE_URL}/jeep/can/decoder/messagelist/${deviceType}/vehicleTelemetry`, {
-                headers: { 'Authorization': `Bearer ${authTokens.PRIMARY}` },
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/can/decoder/messagelist/${deviceType}/vehicleTelemetry`, {
+                headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'PRIMARY');
+        }, 'RUN');
     },
 
     getCanSignals: async (messageId = '356') => {
         return withRetry(async () => {
-            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
-            const response = await axios.get(`${BASE_URL}/jeep/can/decoder/signallist/${messageId}`, {
-                headers: { 'Authorization': `Bearer ${authTokens.PRIMARY}` },
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/can/decoder/signallist/${messageId}`, {
+                headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'PRIMARY');
+        }, 'RUN');
     },
 
     getVehicleTelemetryData: async (vin, signalName = 'FuelLevel') => {
         return withRetry(async () => {
-            if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
-            // Collection 4.0: /jeep/can/decoder/{vin}/vehicleTelemetry/signalname/{signalName}
-            const response = await axios.get(`${BASE_URL}/jeep/can/decoder/${vin}/vehicleTelemetry/signalname/${signalName}`, {
-                headers: { 'Authorization': `Bearer ${authTokens.PRIMARY}` },
-                timeout: 30000
-            });
-            return response.data;
-        }, 'PRIMARY');
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            try {
+                // Collection 4.0: /jeep/can/decoder/{vin}/vehicleTelemetry/signalname/{signalName}
+                const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/can/decoder/${vin}/vehicleTelemetry/signalname/${signalName}`, {
+                    headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
+                    timeout: 30000
+                });
+                return response.data;
+            } catch (error) {
+                if (error.response && error.response.status === 400) {
+                    console.warn(`🚗 [getVehicleTelemetryData] 400 Bad Request for signal ${signalName} on VIN ${vin}`);
+                    return [];
+                }
+                throw error;
+            }
+        }, 'RUN');
     },
 
     // ========== FOTA COMMAND STATUS (4.0) ==========
     getFotaCommandValidity: async (vin, commandId) => {
         return withRetry(async () => {
-            if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
             const response = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/ota/commandvalidity`, {
-                params: { commandid: commandId, username: ACCOUNTS.FOTA_UPLOAD.userName },
-                headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+                params: { commandid: commandId, username: ACCOUNTS.FOTA.userName },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'FOTA_UPLOAD');
+        }, 'FOTA');
     },
 
     // ========== FOTA UPLOAD & FIRMWARE MANAGEMENT APIs ==========
@@ -1221,30 +1236,30 @@ export const TraxoApi = {
 
     triggerFotaDownload: async (vin, releaseVersion) => {
         return withRetry(async () => {
-            if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
             const response = await axios.post(`${FOTA_FCA_BASE_URL}/jeep/ota/downloadfirmware`, {
                 category: "VIN",
                 devices: [{ vin, releaseVersion }]
             }, {
-                headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'FOTA_UPLOAD');
+        }, 'FOTA');
     },
 
     triggerFotaExecution: async (vin, releaseVersion) => {
         return withRetry(async () => {
-            if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
             const response = await axios.post(`${FOTA_FCA_BASE_URL}/jeep/ota/executefirmware`, {
                 category: "VIN",
                 devices: [{ vin, releaseVersion }]
             }, {
-                headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
                 timeout: 30000
             });
             return response.data;
-        }, 'FOTA_UPLOAD');
+        }, 'FOTA');
     },
 
     getFotaCommandStatus: async (vin, commandId) => {

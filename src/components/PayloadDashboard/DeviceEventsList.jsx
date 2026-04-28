@@ -18,7 +18,14 @@ export const DeviceEventsList = ({ events }) => {
             <VStack spacing={2} align="stretch">
                 {recentEvents.map((evt, i) => {
                     let details = {};
-                    try { details = JSON.parse(evt.eventdetails || '{}'); } catch (e) { }
+                    if (typeof evt.eventdetails === 'string') {
+                        try { details = JSON.parse(evt.eventdetails); } catch (e) { details = {}; }
+                    } else if (typeof evt.eventdetails === 'object' && evt.eventdetails !== null) {
+                        details = evt.eventdetails;
+                    } else {
+                        // Fallback: if data is already flattened/simulated, properties might be on the object itself
+                        details = evt;
+                    }
                     const type = evt.eventtype || 'Event';
                     const time = evt.sourcetimestamp ? new Date(evt.sourcetimestamp).toLocaleTimeString() : '';
 

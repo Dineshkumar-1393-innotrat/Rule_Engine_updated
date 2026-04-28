@@ -1,0 +1,2536 @@
+{
+	"info": {
+		"_postman_id": "f40e0fd3-a03c-4ac0-97be-cb5296d58744",
+		"name": "Jeep APIs Collection 4.0_SB_Preprod",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "BulkProvision",
+			"item": [
+				{
+					"name": "Bulk Token API",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"admin\",\r\n    \"accountId\": \"primary\",\r\n    \"clientId\": \"BQESzZvwPTCY5v7uekXU_h8EEXka\",\r\n    \"clientSecret\": \"XhwlaKfa4dk9zCFjpGZuHzmYluka\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk IMEI Upload",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "b0ead3b7-e156-392c-a5ab-8421aa84e4bf",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/D:/01_Projects/Jeep _Connectivity/Testing/IMEI 1.csv"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/bulkprovision/imei",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"bulkprovision",
+								"imei"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Bulk Supplier Feed",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "b0ead3b7-e156-392c-a5ab-8421aa84e4bf",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": "/D:/01_Projects/Jeep _Connectivity/Testing/SupplierFeedupload.csv"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/bulkprovision/dongle",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"bulkprovision",
+								"dongle"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "PKI",
+			"item": [
+				{
+					"name": "PKI Token for CommonCertificate",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"0[%62&Db$Z:J\",\r\n    \"accountId\": \"pkijeeptenant\",\r\n    \"clientId\": \"oWXMoTG9yKyaTjZjuFin8kJmPXUa\",\r\n    \"clientSecret\": \"XF3Cdm5NlkJr0NVRQ0vOZWkqmxEa\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "CreateCertificate API for CommonCertificate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "1ae07857-f2d5-3e6f-a3c4-cea2e3c8fb11",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"commonName\": \"CVIP-STLA-JEEP-PingVerification\",\r\n    \"timeStamp\": 1767085318,\r\n    \"csr\": \"MIICgDCCAWgCAQAwOzELMAkGA1UEBhMCSU4xEjAQBgNVBAoMCVRib3hfY2VydDEYMBYGA1UEAwwPRHVtbXktVGJveC1DZXJ0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyVxTdOCkKyxuVgDhBTjEHhs6dfMLktpy5pn0S07sT6SQnBr9LDUrj5PYwA1py07MVdVJdVev0TQxddSzCPFEzek0IwS2rMHtAyTrCbc5xjLBEMJdSHHVZKLfbDd4bxgjonTsXN2PQj2SbnFLqmHg3pdMJFPMz9cVb6F+fhY+5mUBYBv1R5HrMGsuvJUzKLj7A0flko0jzDGbl95oAdGLATvB8vtbwkwbdKmNrqUdeWGbEI5wxTgU1Rcfu3PlH8FNHuMXo1mcyiL9rur4YpBL03xWW2ZC/IXKHDwKqBEvlTL7b+4FLFSFFj/9UjnecivGUYnBsSxIAY4xIHXOR+9PBQIDAQABoAAwDQYJKoZIhvcNAQELBQADggEBAARtPVwzVBvBkhW8FF4XY1gkUxz4fIhDyanBd3nWPsVeuH4ZoVIDTwha+PVGE9tCUtGyHT34XR9ltEsxyie+6BjW+heLNZE8RWDSt+PeqUxwtgHedXk1BXpHy4W/HWU2Uoy/q/J+O1TOXoBV+qez/Rq150nX1y7PhgaIgb5RlRmzGwNyr5NeXvHhLEs7FfxMyE0sS7jSwzIeK446Cz1uGDqRM6tk7RAwDImLAjxnJHESIx4VRAMVLRE0sbG83xtkPzvTJmeZJ2ZKFymZyNqEkIXmqG5qmVnvEhNsADBjOgaTP+EShXeiEgTh7dpDGmxZ8el2Wd2KySbWG7VVHlSJIpQ=\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/csr/createCertificate",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"csr",
+								"createCertificate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "PKI Token for tbox certificate",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"0[%62&Db$Z:J\",\r\n    \"accountId\": \"pkijeeptenant\",\r\n    \"clientId\": \"oWXMoTG9yKyaTjZjuFin8kJmPXUa\",\r\n    \"clientSecret\": \"XF3Cdm5NlkJr0NVRQ0vOZWkqmxEa\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "CreateCertificate API for TBOX certificate",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "c1567aec-2f17-389b-8bd3-7ff96d47ad50",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"commonName\": \"356741360393709-MZZCT0000000997995\",\r\n    \"timeStamp\": 1659597317,\r\n    \"csr\": \"MIICgDCCAWgCAQAwOzELMAkGA1UEBhMCSU4xEjAQBgNVBAoMCVRib3hfY2VydDEYMBYGA1UEAwwPRHVtbXktVGJveC1DZXJ0MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyVxTdOCkKyxuVgDhBTjEHhs6dfMLktpy5pn0S07sT6SQnBr9LDUrj5PYwA1py07MVdVJdVev0TQxddSzCPFEzek0IwS2rMHtAyTrCbc5xjLBEMJdSHHVZKLfbDd4bxgjonTsXN2PQj2SbnFLqmHg3pdMJFPMz9cVb6F+fhY+5mUBYBv1R5HrMGsuvJUzKLj7A0flko0jzDGbl95oAdGLATvB8vtbwkwbdKmNrqUdeWGbEI5wxTgU1Rcfu3PlH8FNHuMXo1mcyiL9rur4YpBL03xWW2ZC/IXKHDwKqBEvlTL7b+4FLFSFFj/9UjnecivGUYnBsSxIAY4xIHXOR+9PBQIDAQABoAAwDQYJKoZIhvcNAQELBQADggEBAARtPVwzVBvBkhW8FF4XY1gkUxz4fIhDyanBd3nWPsVeuH4ZoVIDTwha+PVGE9tCUtGyHT34XR9ltEsxyie+6BjW+heLNZE8RWDSt+PeqUxwtgHedXk1BXpHy4W/HWU2Uoy/q/J+O1TOXoBV+qez/Rq150nX1y7PhgaIgb5RlRmzGwNyr5NeXvHhLEs7FfxMyE0sS7jSwzIeK446Cz1uGDqRM6tk7RAwDImLAjxnJHESIx4VRAMVLRE0sbG83xtkPzvTJmeZJ2ZKFymZyNqEkIXmqG5qmVnvEhNsADBjOgaTP+EShXeiEgTh7dpDGmxZ8el2Wd2KySbWG7VVHlSJIpQ=\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/csr/createCertificate",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"csr",
+								"createCertificate"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Device state update & check",
+			"item": [
+				{
+					"name": "GetToken_run",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"runpp\", jsonData.access_token);"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"runmanagementtenant\",\r\n    \"clientId\": \"Y1sfx4ViAPPre1JX0J1VMQPiX8Ua\",\r\n    \"clientSecret\": \"YFTYLtflmEPEuJvtLJfeU9kftDsa\"\r\n} "
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "tbox state update API",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "ab7c64d4-62f5-3c37-8a5f-fd954aa54a13",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"deviceVinno\": \"MCANJREB1MFA76734\",\r\n    \"actionType\": \"tboxstateupdate\",\r\n    \"command\": {\r\n        \"status\":\"CUSTOMER\"\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/concurrentcommands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"concurrentcommands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get device state API",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "ab7c64d4-62f5-3c37-8a5f-fd954aa54a13",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/portal/vin/MCANJPCY9RFB06405",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"portal",
+								"vin",
+								"MCANJPCY9RFB06405"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "reset-state",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\"vin\": \"MCANJREB1MFA76734\"}"
+						},
+						"url": {
+							"raw": "https://gp98o9kt3c.execute-api.ap-south-1.amazonaws.com/jeep/reset-device-state",
+							"protocol": "https",
+							"host": [
+								"gp98o9kt3c",
+								"execute-api",
+								"ap-south-1",
+								"amazonaws",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"reset-device-state"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Devices Details",
+			"item": [
+				{
+					"name": "GetToken_Factorytenant",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"factorypre\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "d61bc77c-9d5e-3fbe-847d-fccd23384300",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"Factorytenant\",\r\n    \"clientId\": \"0gf3yAv29550GxrNVN4hDEUGYmEa\",\r\n    \"clientSecret\": \"0K1S1VQ9u1Cc0z2Pptr6ZtzRviAa\"\r\n} "
+						},
+						"url": {
+							"raw": "https://{{url_preprod}}/authentication/login",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List All Devices",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "c49e127b-8d94-3993-b147-a44d7f08dc54",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://{{url_preprod}}/devices",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"devices"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetToken_run",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"runpre\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"runmanagementtenant\",\r\n    \"clientId\": \"Y1sfx4ViAPPre1JX0J1VMQPiX8Ua\",\r\n    \"clientSecret\": \"YFTYLtflmEPEuJvtLJfeU9kftDsa\"\r\n} "
+						},
+						"url": {
+							"raw": "https://{{url_preprod}}/authentication/login",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Retrieve Specific Vin details ",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{runpre}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://{{url_preprod}}/portal/vin/A234ZTZT000000491",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"portal",
+								"vin",
+								"A234ZTZT000000491"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Events",
+			"item": [
+				{
+					"name": "GetToken Platform Management Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"platformpreprod\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"admin\",\r\n    \"accountId\": \"primary\",\r\n    \"clientId\": \"doFBMiLMdcqaSYxbo_68NmmHgkYa\",\r\n    \"clientSecret\": \"JmMwN6yEZb3jbtSWMq2hwEOCjP8a\"\r\n}"
+						},
+						"url": {
+							"raw": "https://{{url_preprod}}/authentication/login",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get events audit ",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "3e6a6c86-72ed-365a-bc87-68e173decfce",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/events/MCANJREB1MFA65412/DEVICE",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"events",
+								"MCANJREB1MFA65412",
+								"DEVICE"
+							],
+							"query": [
+								{
+									"key": "limit",
+									"value": "500",
+									"disabled": true
+								},
+								{
+									"key": "starttime",
+									"value": "2022-11-07 00:00:00",
+									"disabled": true
+								},
+								{
+									"key": "endtime",
+									"value": "2022-11-10 12:00:00",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Telemetry -Jeep",
+			"item": [
+				{
+					"name": "Vehicle Telemetry",
+					"item": [
+						{
+							"name": "GetToken Platform Management Token",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = JSON.parse(responseBody);\r",
+											"postman.setEnvironmentVariable(\"platformpp\", jsonData.access_token);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"runmanagementtenant\",\r\n    \"clientId\": \"Y1sfx4ViAPPre1JX0J1VMQPiX8Ua\",\r\n    \"clientSecret\": \"YFTYLtflmEPEuJvtLJfeU9kftDsa\"\r\n}"
+								},
+								"url": {
+									"raw": "https://{{url_preprod}}/authentication/login",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"authentication",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Telemetry Step1",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "2dfaf486-2833-3d02-9f7f-dbbb89d2d59c",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://{{url_preprod}}/jeep/can/decoder/messagelist/jeep/vehicleTelemetry",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"jeep",
+										"can",
+										"decoder",
+										"messagelist",
+										"jeep",
+										"vehicleTelemetry"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Vehicle Telemetry Step 2",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "2dfaf486-2833-3d02-9f7f-dbbb89d2d59c",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://{{url_preprod}}/jeep/can/decoder/signallist/356",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"jeep",
+										"can",
+										"decoder",
+										"signallist",
+										"356"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get vehicle Telemtry data",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "7c0e1062-e221-309c-bb1b-ff0c88d6212f",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://{{url_preprod}}/jeep/can/decoder/MCANJREB1MFA65412/vehicleTelemetry/signalname/FuelLevel",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"jeep",
+										"can",
+										"decoder",
+										"MCANJREB1MFA65412",
+										"vehicleTelemetry",
+										"signalname",
+										"FuelLevel"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Location Telemetry",
+					"item": [
+						{
+							"name": "GetToken_Factorytenant",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = JSON.parse(responseBody);\r",
+											"postman.setEnvironmentVariable(\"factorypp\", jsonData.access_token);"
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"auth": {
+									"type": "noauth"
+								},
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json",
+										"type": "text"
+									},
+									{
+										"key": "Accept",
+										"value": "application/json",
+										"type": "text",
+										"disabled": true
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"Factorytenant\",\r\n    \"clientId\": \"0gf3yAv29550GxrNVN4hDEUGYmEa\",\r\n    \"clientSecret\": \"0K1S1VQ9u1Cc0z2Pptr6ZtzRviAa\"\r\n} "
+								},
+								"url": {
+									"raw": "https://{{url_preprod}}/authentication/login",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"authentication",
+										"login"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Get location Telemtry data",
+							"request": {
+								"auth": {
+									"type": "bearer",
+									"bearer": [
+										{
+											"key": "token",
+											"value": "a5dde05f-99a7-36e5-b1fa-312a5086d97d",
+											"type": "string"
+										}
+									]
+								},
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://{{url_preprod}}/jeep/devices/vin/MCANJREB1MFA65412/states?subcategory=LocationTelemetry&startTime=2026-26-03 15:30:00&endTime=2026-26-03 16:10:00&count=1000",
+									"protocol": "https",
+									"host": [
+										"{{url_preprod}}"
+									],
+									"path": [
+										"jeep",
+										"devices",
+										"vin",
+										"MCANJREB1MFA65412",
+										"states"
+									],
+									"query": [
+										{
+											"key": "subcategory",
+											"value": "LocationTelemetry"
+										},
+										{
+											"key": "startTime",
+											"value": "2026-26-03 15:30:00"
+										},
+										{
+											"key": "endTime",
+											"value": "2026-26-03 16:10:00"
+										},
+										{
+											"key": "count",
+											"value": "1000"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Alerts",
+			"item": [
+				{
+					"name": "GetToken Platform Management Token",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);\r",
+									"postman.setEnvironmentVariable(\"platformpre\", jsonData.access_token);"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json",
+								"type": "text"
+							},
+							{
+								"key": "Accept",
+								"value": "application/json",
+								"type": "text",
+								"disabled": true
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"admin\",\r\n    \"accountId\": \"primary\",\r\n    \"clientId\": \"doFBMiLMdcqaSYxbo_68NmmHgkYa\",\r\n    \"clientSecret\": \"JmMwN6yEZb3jbtSWMq2hwEOCjP8a\"\r\n}"
+						},
+						"url": {
+							"raw": "https://{{url_preprod}}/authentication/login",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Alerts Ingestion Audit Api",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "5c1ccb88-8f0e-326f-a87b-d6d9be4d3048",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://{{url_preprod}}/jeep/alerts/MCANJREB1MFA65412/",
+							"protocol": "https",
+							"host": [
+								"{{url_preprod}}"
+							],
+							"path": [
+								"jeep",
+								"alerts",
+								"MCANJREB1MFA65412",
+								""
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Trip",
+			"item": [
+				{
+					"name": "LoginAPI",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": " {\r\n  \"countryCode\":\"+91\",\r\n  \"password\": \"Password@123\",\r\n  \"mobileNum\":\"9629929028\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/users/login",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"users",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "trip details with pagination",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiMWVhNzJkMDctNzU1OC00OTRiLWFiNmUtYTFlOTk3NjA1NDE0IiwiZXZlbnRfaWQiOiI3OWIxOGY2YS1jZGFiLTQ3YmUtOWUxMC1kYWVkZjQxYjA1NWQiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzczMjE5MDk1LCJleHAiOjE3NzMyMjI2OTUsImlhdCI6MTc3MzIxOTA5NSwianRpIjoiMGUwMmVmZTYtNzQyOC00OTQ1LWFmOGQtNGJmMTU4ZThkMDY5IiwidXNlcm5hbWUiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMifQ.Q7tsXnr6OOL0MB6wnbfSmI_c9CtqixZEtALFj3sqPjLUY5g9L3zSoR-jygbXsgcrW23LyM1AaAfEmZvTIVrCuBYmMdqBBpsKNkpkOtxRsDSaHYwEQU3dS6jvJxeAkkLavlZlCkuPutqKX93lW1_Jo-5m9DAeESUC7Cp3ibUVOy2lGkCc9WXE-3ptLso8Qf4RPrvjgMfCKkj8kWsg8qhRQ5qVWGrgPxPJ8jgdK211ydbtZkwPckjS8R8SCnyyWy0RwJrXWvNhbYbLZLom2U-u1aEx3Ou0zeyKJbmwgIHeIsudP7UpmT72TmlFFxzT0moMtjYrV2iaWsz0W8m2Hf2_gA",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/details?pageNo=0",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"trip",
+								"MCANJREB1MFA65412",
+								"details"
+							],
+							"query": [
+								{
+									"key": "pageNo",
+									"value": "0"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "ongoing trip",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiMWVhNzJkMDctNzU1OC00OTRiLWFiNmUtYTFlOTk3NjA1NDE0IiwiZXZlbnRfaWQiOiI3OWIxOGY2YS1jZGFiLTQ3YmUtOWUxMC1kYWVkZjQxYjA1NWQiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzczMjE5MDk1LCJleHAiOjE3NzMyMjI2OTUsImlhdCI6MTc3MzIxOTA5NSwianRpIjoiMGUwMmVmZTYtNzQyOC00OTQ1LWFmOGQtNGJmMTU4ZThkMDY5IiwidXNlcm5hbWUiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMifQ.Q7tsXnr6OOL0MB6wnbfSmI_c9CtqixZEtALFj3sqPjLUY5g9L3zSoR-jygbXsgcrW23LyM1AaAfEmZvTIVrCuBYmMdqBBpsKNkpkOtxRsDSaHYwEQU3dS6jvJxeAkkLavlZlCkuPutqKX93lW1_Jo-5m9DAeESUC7Cp3ibUVOy2lGkCc9WXE-3ptLso8Qf4RPrvjgMfCKkj8kWsg8qhRQ5qVWGrgPxPJ8jgdK211ydbtZkwPckjS8R8SCnyyWy0RwJrXWvNhbYbLZLom2U-u1aEx3Ou0zeyKJbmwgIHeIsudP7UpmT72TmlFFxzT0moMtjYrV2iaWsz0W8m2Hf2_gA",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/ongoing",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"trip",
+								"MCANJREB1MFA65412",
+								"ongoing"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Trip details by TripId",
+					"protocolProfileBehavior": {
+						"disabledSystemHeaders": {}
+					},
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiMWVhNzJkMDctNzU1OC00OTRiLWFiNmUtYTFlOTk3NjA1NDE0IiwiZXZlbnRfaWQiOiI3OWIxOGY2YS1jZGFiLTQ3YmUtOWUxMC1kYWVkZjQxYjA1NWQiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzczMjE5MDk1LCJleHAiOjE3NzMyMjI2OTUsImlhdCI6MTc3MzIxOTA5NSwianRpIjoiMGUwMmVmZTYtNzQyOC00OTQ1LWFmOGQtNGJmMTU4ZThkMDY5IiwidXNlcm5hbWUiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMifQ.Q7tsXnr6OOL0MB6wnbfSmI_c9CtqixZEtALFj3sqPjLUY5g9L3zSoR-jygbXsgcrW23LyM1AaAfEmZvTIVrCuBYmMdqBBpsKNkpkOtxRsDSaHYwEQU3dS6jvJxeAkkLavlZlCkuPutqKX93lW1_Jo-5m9DAeESUC7Cp3ibUVOy2lGkCc9WXE-3ptLso8Qf4RPrvjgMfCKkj8kWsg8qhRQ5qVWGrgPxPJ8jgdK211ydbtZkwPckjS8R8SCnyyWy0RwJrXWvNhbYbLZLom2U-u1aEx3Ou0zeyKJbmwgIHeIsudP7UpmT72TmlFFxzT0moMtjYrV2iaWsz0W8m2Hf2_gA",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/tripId/MCANJREB1MFA654121103202603",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"trip",
+								"MCANJREB1MFA65412",
+								"tripId",
+								"MCANJREB1MFA654121103202603"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Trip summary",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiMmFiYTIxMzYtNDY3Yy00ZmUyLTg1YzItMzM2Yjk4NmM2ODU4IiwiZXZlbnRfaWQiOiI4N2I0NTMzYi1kNzMwLTQxNTItODNjZi0yYzIzYTVjOThjZTYiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzczNzU1MTAyLCJleHAiOjE3NzM3NTg3MDIsImlhdCI6MTc3Mzc1NTEwMiwianRpIjoiYjZjZTQ2MGYtNDg2OC00Y2FlLTkzZTctZjVhYTFhNDYzNzUyIiwidXNlcm5hbWUiOiI1MTUzOGQwYS01MDUxLTcwMjQtZjE3My0xMDA5ZTAxOTFlYTMifQ.KwGDuH4u0MtYYROB9i7qv65Za6r5FmvDNbpaUmtSuZivXe3XrLROCuchsQ1MEjwugGcEaz2-nCHxmP2IBzEvOXxe4p4y0yDCSvS0K7zxBkyAlTtLYdAdJBknDCopScvpimQ_hCLOgPb7p3HlBNC5O7n8CQ-tXhJqgx0D9UUELYjDqbp3gBZelX1zeeolHGMFofd93vcVpuGDXEW5WG1snDDCKmK3xIGxAFtz70dSzLEZmgSTwgtnG6Lmp1QEqOU0P4lv3XWem21thmdKb9-kvSYkHs-1-4KQa8NlRfJnlG19QH4Y4Pc-NmFfORpx9-yqH1pa5Gw-fByWSEv30D_mhg",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/trip/MCANJREB1MFA65412/summary?starttime=2026-03-16 00:00:01&endtime=2026-03-17 23:22:21",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"trip",
+								"MCANJREB1MFA65412",
+								"summary"
+							],
+							"query": [
+								{
+									"key": "starttime",
+									"value": "2026-03-16 00:00:01"
+								},
+								{
+									"key": "endtime",
+									"value": "2026-03-17 23:22:21"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Trip Audit",
+			"item": [
+				{
+					"name": "Login API",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n\"userName\":\"admin\",\n\"password\":\"admin\",\n\"accountId\":\"primary\",\n\"clientId\":\"BQESzZvwPTCY5v7uekXU_h8EEXka\",\n\"clientSecret\":\"XhwlaKfa4dk9zCFjpGZuHzmYluka\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						},
+						"description": "Generated from cURL: curl --location 'https://lb1.cvip-preprod.citroen.in:40543/authentication/login' \\\n--header 'Content-Type: application/json' \\\n--data '{\n\"userName\":\"admin\",\n\"password\":\"admin\",\n\"accountId\":\"primary\",\n\"clientId\":\"BQESzZvwPTCY5v7uekXU_h8EEXka\",\n\"clientSecret\":\"XhwlaKfa4dk9zCFjpGZuHzmYluka\"\n}'"
+					},
+					"response": []
+				},
+				{
+					"name": "Trip Audit",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "aa33fa2e-b061-3c4e-9c39-9af6d95fdb74",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "subcategory",
+								"value": "tripStart",
+								"type": "text"
+							},
+							{
+								"key": "",
+								"value": "",
+								"type": "text"
+							}
+						],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/trip/v2/vin/MCANJREB1MFA65412/states?subcategory=tripCurrent",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"trip",
+								"v2",
+								"vin",
+								"MCANJREB1MFA65412",
+								"states"
+							],
+							"query": [
+								{
+									"key": "subcategory",
+									"value": "tripCurrent"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Fetch Logs",
+			"item": [
+				{
+					"name": "Token_API",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = JSON.parse(responseBody);",
+									"postman.setEnvironmentVariable(\"Runtoken\", jsonData.access_token);"
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"userName\": \"admin\",\n    \"password\": \"V6PS0EWwF5V&\",\n    \"accountId\": \"runmanagementtenant\",\n    \"clientId\": \"Y1sfx4ViAPPre1JX0J1VMQPiX8Ua\",\n    \"clientSecret\": \"YFTYLtflmEPEuJvtLJfeU9kftDsa\"\n} ",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "fetch logs command",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{Runtoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"deviceVinno\": \"MCANJREB1MFA76524\",\r\n    \"actionType\": \"fetchlogs\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/concurrentcommands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"concurrentcommands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Log upload",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "b95f276d-cb8e-3734-8ccd-506dfbea5dd6",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "files",
+									"type": "file",
+									"src": "/C:/Users/28692/Downloads/tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549.zip"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/tboxfileupload?vin=MCANJREB1MFA76523",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"tboxfileupload"
+							],
+							"query": [
+								{
+									"key": "vin",
+									"value": "MCANJREB1MFA76523"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "download the file from CVIP",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{Runtoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/fileupload/download?vin=MZZCCHPTPPV220068&filename=tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1)",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"fileupload",
+								"download"
+							],
+							"query": [
+								{
+									"key": "vin",
+									"value": "MZZCCHPTPPV220068"
+								},
+								{
+									"key": "filename",
+									"value": "tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1)"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "CVIP fetch list of available logs under a VIN",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{Runtoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/fileupload?vin=MZZCCHPTPPV220068",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"fileupload"
+							],
+							"query": [
+								{
+									"key": "vin",
+									"value": "MZZCCHPTPPV220068"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "01a_Get List of Details based on Search Pattern and Search Keys",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{Runtoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/portal/search?searchPattern=MCANJREB1MFA76524&searchKey=vin",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"portal",
+								"search"
+							],
+							"query": [
+								{
+									"key": "searchPattern",
+									"value": "MCANJREB1MFA76524"
+								},
+								{
+									"key": "searchKey",
+									"value": "vin"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete logs",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "{{Runtoken}}",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/fileupload?vin=MCANJREB1MFA65412&filename=tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1).zip",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"fileupload"
+							],
+							"query": [
+								{
+									"key": "vin",
+									"value": "MCANJREB1MFA65412"
+								},
+								{
+									"key": "filename",
+									"value": "tboxlog_20250107T050102_MZZCCHPTPPV220068_0000000002549 (1).zip"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "command status",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer 1d4e5758-fb3b-3143-88f6-d47f1e4ea583"
+							}
+						],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/concurrentcommands/device/vin/T99ZTZT5555557706/command/4b49999c-fd9e-11f0-91c2-d1b5a218828e",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"concurrentcommands",
+								"device",
+								"vin",
+								"T99ZTZT5555557706",
+								"command",
+								"4b49999c-fd9e-11f0-91c2-d1b5a218828e"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Vehicle Speed Alert command",
+			"item": [
+				{
+					"name": "speedalertcommand",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMWUzNWRmYS01MGMxLTcwNDctNzAxYi1mM2EyZjQ4ODE5ZmYiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiNzNjZWQzNDUtNzZmMy00MTMwLWFmMmYtOGU5YjA1ZjJmNDQwIiwiZXZlbnRfaWQiOiI1NGNkMzdlYi00ZjkzLTQzYmYtYjkwMy0zOTU1YjdkNmQ4ZjkiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzczMzc0MzM1LCJleHAiOjE3NzMzNzc5MzUsImlhdCI6MTc3MzM3NDMzNSwianRpIjoiMmY0NzUxMTUtYzAxMS00YzRkLWFjNmItZjc5ODlkYzg4ZTAzIiwidXNlcm5hbWUiOiJkMWUzNWRmYS01MGMxLTcwNDctNzAxYi1mM2EyZjQ4ODE5ZmYifQ.bjaDL9szZca4gVzlflgGYUQDrJzVVlwV5IPOBJOtwhC_VY3600pQDifnRTqPvgdm7yBAPbWndlLIZkqT3gpHCe3SzJz75Dm83ajgcSMf9Q4K2hayciwtvbEpT6366dRk0OpXLSwRkEUMDln9y3r3zBeDr_QLb2BZzpUox9db64yCO-gv0on_5saDdTAr8w-hZuqznpfTne6VbIgVfb70MDGauNiSk3uFdZoKiMpmBQQZCkcK36nvLXfuD7qkaudpuIM84khJZDjWEpQfe1gps4VSKqcTSiE4xU0kC2kFpkAi-0fa55omLiw13krSc-OfU0W4vniyX2N2B4aR5wjR3w",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"MCANJREB1MFA76734\",\n    \"actionType\": \"speedalertcommand\",\n    \"command\":{\n        \"speed\": \"90\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "command status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/device/vin/MCANJREB1MFA76524/command/fd26b0d2-1146-11f1-9df1-3d21a5f55e1f",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"device",
+								"vin",
+								"MCANJREB1MFA76524",
+								"command",
+								"fd26b0d2-1146-11f1-9df1-3d21a5f55e1f"
+							],
+							"query": [
+								{
+									"key": "",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Remote commands",
+			"item": [
+				{
+					"name": "LoginAPI",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiZmE1NWM2NWItNDAxZC00M2FmLTk4MzItYjA2OTMxM2YwNjc0IiwiZXZlbnRfaWQiOiJiZTY2YWQ1MS1kZTdmLTRmNmYtYjQ0Yi1jMmY5MjMwNTY5YTQiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4MzI0NjQ3LCJleHAiOjE3NjgzMjgyNDcsImlhdCI6MTc2ODMyNDY0NywianRpIjoiZmZhOTM5NTctODcwMy00MWQ1LTg2NzMtNDMwYzMxZjcyMDJhIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.VtUaqiW3S6g21clvuziORi5neKw1rwZrMlgIbNbbCkk0LwEIlmmWCcKkjnhwYx6-bP0ivDmcbdwGt6_qNrmBbBB25EmsG0wDXEYCtZw8ZL-ao2tqIpP2n0yNRRymmvZpqwKzpvKAMKoGZUOdAbSf6W__zcRye6xcncW2FD9yfvXI_rEK6uEDPRMfW1PdVC2QDpx4Fx9RfRnFKHQWXAHqEavXsyUxWK1yjVtwRLvms2tocaXlsPnZD-L52rW2nnevcLK3CQ9mmtAs5DHD0XGw6qlrobN8t7DiO33LP-Vajb8SIMyCgPG8uWiNvcwdh3bWr9T503gL9-NhI-xUGgE37g",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"countryCode\":\"+91\",\r\n  \"password\": \"Password@123\",\r\n  \"mobileNum\":\"9629929028\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/users/login",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"users",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "remotedooorlockcommand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiZmYwM2IxODktNTM0Yy00ZTdjLTlhYzQtMTAwYjQ4MTNjMWQ5IiwiZXZlbnRfaWQiOiI3ZDdlZTA0NS00OTk1LTRlZjItOTM4OS0wYjUzNzExOTQ5ZjYiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY5NDI1MjgyLCJleHAiOjE3Njk0Mjg4ODIsImlhdCI6MTc2OTQyNTI4MiwianRpIjoiNDRmMmFhOWUtODA4OC00ZDg3LTk2YzItN2MxYjI5YjI2YzY0IiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.SEvZYonql4xnS0VOU1aF5TNNAoa48cwGumnxj4Bset60vNCVs7rh3CPQRuoLxophRjiFVjNdLaYW5y1gBcJ51gVLAsUMEWjb5-RSkcCKkGAGulolwx-YQIOhiGmEp4iFRpYwo9yKx9cYbrVdrKoNin4n6FK_jEPDMI9Mmczqv8xGSSPC7n5reMEGrdQRF8_ylHAcO0VLUeyN89o6wipuu0fVi-QsE3SfE7Dfp083ZdB8FcSoZ1uzisMNBM3P0dX8TK7ikAgZgV1KUvOF-UkMmkItZ1MyA1nTrW_AuT0fOPIdiCJYtkk2El6MGN9SEVWV0imHrSoQBOI7rTPOqZT66Q"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"MCANJREB1MFA76525\",\n    \"actionType\": \"remotedoorlockcommand\"\n}"
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "remotedoorunlockcommand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"T99ZTZT5555557706\",\n    \"actionType\": \"remotedoorunlockcommand\"\n}"
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "remoteblinkeroncommand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"T99ZTZT5555557706\",\n    \"actionType\": \"remoteblinkeroncommand\"\n}"
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "remoteblinkeroffcommand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"T99ZTZT5555557706\",\n    \"actionType\": \"remoteblinkeroffcommand\"\n}"
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "remotehonkcommand",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"deviceVinno\": \"T99ZTZT5555557706\",\n    \"actionType\": \"remotehonkcommand\"\n}"
+						},
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/vinno",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"vinno"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "command status",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "eyJraWQiOiJOYVZHczFpRk84NzlxZHA3N0RuWithYjRoeHZZaG1GWnZuQlBkeDZ6a0Y0PSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkiLCJpc3MiOiJodHRwczpcL1wvY29nbml0by1pZHAuYXAtc291dGgtMS5hbWF6b25hd3MuY29tXC9hcC1zb3V0aC0xX016T2d6N0d6SyIsImNsaWVudF9pZCI6Imc2bDkzNjk2MzNsdHBtNmdkdm51YTFzYm4iLCJvcmlnaW5fanRpIjoiYjczOGE0MTYtMmZmMy00NTljLWE4ZWEtNWE5MjljNzVmNjc4IiwiZXZlbnRfaWQiOiI2Y2MxYzI3NS1iOWZjLTQ0MmMtOWU1OC1iYzU2MDg3MzFjZGMiLCJ0b2tlbl91c2UiOiJhY2Nlc3MiLCJzY29wZSI6ImF3cy5jb2duaXRvLnNpZ25pbi51c2VyLmFkbWluIiwiYXV0aF90aW1lIjoxNzY4OTE2NTE2LCJleHAiOjE3Njg5MjAxMTYsImlhdCI6MTc2ODkxNjUxNiwianRpIjoiMWQ5MGE1ZDgtZTczMi00MGZiLTgxMmYtODY3MmY2Y2M2YmQyIiwidXNlcm5hbWUiOiJkMTQzOWRiYS05MDcxLTcwMTQtMGNmNy02YmMxNTY5YjJmYTkifQ.BFRRruzRO0sryrwgifbCAqqilEcKIFIRDvD02BhTbDybKtnZOCdQbSw1XNku5HPt9XMelZHxxnXUkbEXsETRZrANabFvLbHtE2dLbyi9yr-vh_Efpe26eWCZFOVkcWNfUQVKmRZnJ5Xyv4DwmtBJ3htZJXmecB_malRtEduP0LqtxD8mLgj4YlUiL4yW7Tx4tyXkfJmc5tenjzl8WXRbDDndl8Zk3TgZm2PiUE9LG3AtiRBBFeRr5RPZK-HzfkDCecNT8JL-k5V0dfoZ22JRhDxCA5u54_LvbE0Chgnw6je1BcMJ873rvCQPcCpeqB252HEm7GMuNQt_MTCCPm9pyg"
+							}
+						],
+						"url": {
+							"raw": "https://cvipapi-preprod.fca-india.com/jeep/commands/device/vin/MCANJREB1MFA76524/command/fd26b0d2-1146-11f1-9df1-3d21a5f55e1f",
+							"protocol": "https",
+							"host": [
+								"cvipapi-preprod",
+								"fca-india",
+								"com"
+							],
+							"path": [
+								"jeep",
+								"commands",
+								"device",
+								"vin",
+								"MCANJREB1MFA76524",
+								"command",
+								"fd26b0d2-1146-11f1-9df1-3d21a5f55e1f"
+							],
+							"query": [
+								{
+									"key": "",
+									"value": "",
+									"disabled": true
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "FOTA_Upload_delete_firmware",
+			"item": [
+				{
+					"name": "Login [Token] App",
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"fotatenant\",\r\n    \"clientId\": \"HLzVgxYxPbzLOD3rzoWh6Gsv7Twa\",\r\n    \"clientSecret\": \"8OoOUy5Ny7spvefvSfXssvddeLEa\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Fota upload devicetype",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "f3b735fd-85a9-32b3-b18c-ede74c5851b8",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "fileDetails",
+									"value": "{\n  \"category\": \"BATCH\",\n  \"batches\": {\n    \"compatibleNadVersion\": \"176.0\",\n    \"compatibleMcuVersion\": \"176.0\",\n    \"nadVersion\": \"ND0_66_00\",\n    \"mcuVersion\": \"MD0_66_00\",\n    \"releaseVersion\": \"5317.0\",\n    \"fileDetails\": [\n      {\n        \"fileType\": \"mcu\",\n        \"fileName\": \"MD0_66_00.ulp\",\n        \"rawChecksum\": \"0752ebe2bc22744b32e7647053f14350dc47da36b54edff9045f6f6718584403\",\n        \"installType\": \"full\",\n        \"softwareSize\": \"1036308\",\n        \"isGolden\": true\n      },\n      {\n        \"fileType\": \"nad\",\n        \"fileName\": \"ND0_66_00.zip\",\n        \"rawChecksum\": \"fb5344ac4d9d59ac6f0c5b0f4904b6dfc075ca99cefb5016b2a0a35155c5e0e0\",\n        \"installType\": \"full\",\n        \"softwareSize\": \"76926837\",\n        \"isGolden\": true\n      }\n    ]\n  }\n}",
+									"type": "default"
+								},
+								{
+									"key": "files",
+									"type": "file",
+									"src": "/D:/01_Projects/Jeep _Connectivity/Testing/FOTA/1043_ND0.15.00_MD0.15.00_release/ND0_66_00.zip"
+								},
+								{
+									"key": "files",
+									"type": "file",
+									"src": "/D:/01_Projects/Jeep _Connectivity/Testing/FOTA/1043_ND0.15.00_MD0.15.00_release/MD0_66_00.ulp"
+								}
+							]
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"fota",
+								"firmware"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "check uploaded firmware",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "a0ceb1ad-bc9b-3947-9011-73f44d015521",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware/versions?firmwareVersion=2305",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"fota",
+								"firmware",
+								"versions"
+							],
+							"query": [
+								{
+									"key": "firmwareVersion",
+									"value": "2305"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete uploaded image based on release version",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "99fb3173-d504-304f-b6cb-f20be3ecf8d1",
+									"type": "string"
+								}
+							]
+						},
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/fota/firmware?category=BATCH&releaseVersion=2309.0",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"fota",
+								"firmware"
+							],
+							"query": [
+								{
+									"key": "category",
+									"value": "BATCH"
+								},
+								{
+									"key": "releaseVersion",
+									"value": "2309.0"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "FOTA_Download",
+			"item": [
+				{
+					"name": "Login [Token] App",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"userName\": \"admin\",\r\n    \"password\": \"V6PS0EWwF5V&\",\r\n    \"accountId\": \"fotatenant\",\r\n    \"clientId\": \"K4dcMP30mQbE9POIwqfFSHccfAIa\",\r\n    \"clientSecret\": \"94ZhjPBKffxaODNfwFKdliRoO4Aa\"\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/authentication/login",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"authentication",
+								"login"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Tbox-Download Request Trigger from platform_VIN",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "fd3872fb-27a6-3b7d-bc89-5b162693c7f0",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"category\": \"VIN\",\r\n    \"devices\": [\r\n        {\r\n            \"vin\": \"TR99ZTZT555556001\",\r\n            \"releaseVersion\": \"2314.0\"\r\n        }\r\n    ]\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/ota/downloadfirmware",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"ota",
+								"downloadfirmware"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "download files",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "a01143e8-20f1-39e3-a9a2-b2e82a6bafdf",
+									"type": "string"
+								}
+							]
+						},
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/files/device/downloadfirmware?filename=MD0_15_00.ulp&releaseversion=2314.0&filetype=mcu&category=BATCH&fotaid=40b78009-00ee-11f1-8eaa-956adc3440c3",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"files",
+								"device",
+								"downloadfirmware"
+							],
+							"query": [
+								{
+									"key": "filename",
+									"value": "MD0_15_00.ulp"
+								},
+								{
+									"key": "releaseversion",
+									"value": "2314.0"
+								},
+								{
+									"key": "filetype",
+									"value": "mcu"
+								},
+								{
+									"key": "category",
+									"value": "BATCH"
+								},
+								{
+									"key": "fotaid",
+									"value": "40b78009-00ee-11f1-8eaa-956adc3440c3"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Reset",
+					"request": {
+						"auth": {
+							"type": "bearer",
+							"bearer": [
+								{
+									"key": "token",
+									"value": "a4e87ffa-52d0-30ee-82f6-d52d410e6a2e",
+									"type": "string"
+								}
+							]
+						},
+						"method": "PUT",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/ota/resetfotastate?vinNo=TR99ZTZT555556001&commandName=firmwaredownloadcommand",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"ota",
+								"resetfotastate"
+							],
+							"query": [
+								{
+									"key": "vinNo",
+									"value": "TR99ZTZT555556001"
+								},
+								{
+									"key": "commandName",
+									"value": "firmwaredownloadcommand"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "FOTA command validity",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/ota/commandvalidity?commandid=6f5feb71-3a5e-11f1-8ed7-ab6b879a80f1&username=T123ZTZT1396798769",
+							"protocol": "https",
+							"host": [
+								"cvipiot-preprod",
+								"fca-india",
+								"com"
+							],
+							"port": "40543",
+							"path": [
+								"jeep",
+								"ota",
+								"commandvalidity"
+							],
+							"query": [
+								{
+									"key": "commandid",
+									"value": "6f5feb71-3a5e-11f1-8ed7-ab6b879a80f1"
+								},
+								{
+									"key": "username",
+									"value": "T123ZTZT1396798769"
+								}
+							]
+						}
+					},
+					"response": [
+						{
+							"name": "FOTA command validity",
+							"originalRequest": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://cvipiot-preprod.fca-india.com:40543/jeep/ota/commandvalidity?commandid=6f5feb71-3a5e-11f1-8ed7-ab6b879a80f1&username=T123ZTZT1396798769",
+									"protocol": "https",
+									"host": [
+										"cvipiot-preprod",
+										"fca-india",
+										"com"
+									],
+									"port": "40543",
+									"path": [
+										"jeep",
+										"ota",
+										"commandvalidity"
+									],
+									"query": [
+										{
+											"key": "commandid",
+											"value": "6f5feb71-3a5e-11f1-8ed7-ab6b879a80f1"
+										},
+										{
+											"key": "username",
+											"value": "T123ZTZT1396798769"
+										}
+									]
+								}
+							},
+							"status": "OK",
+							"code": 200,
+							"_postman_previewlanguage": "json",
+							"header": [
+								{
+									"key": "Server",
+									"value": "nginx/1.20.2"
+								},
+								{
+									"key": "Date",
+									"value": "Thu, 23 Apr 2026 03:04:40 GMT"
+								},
+								{
+									"key": "Content-Type",
+									"value": "application/json"
+								},
+								{
+									"key": "Transfer-Encoding",
+									"value": "chunked"
+								},
+								{
+									"key": "Connection",
+									"value": "keep-alive"
+								},
+								{
+									"key": "Access-Control-Allow-Methods",
+									"value": "GET"
+								},
+								{
+									"key": "Access-Control-Allow-Headers",
+									"value": "authorization,Access-Control-Allow-Origin,Content-Type,SOAPAction"
+								},
+								{
+									"key": "Access-Control-Allow-Origin",
+									"value": "https://lb1.cvip-preprod.citroen.in:59494"
+								},
+								{
+									"key": "Strict-Transport-Security",
+									"value": "max-age=31536000; includeSubDomains"
+								},
+								{
+									"key": "X-Frame-Options",
+									"value": "SAMEORIGIN"
+								},
+								{
+									"key": "X-Content-Type-Options",
+									"value": "nosniff"
+								},
+								{
+									"key": "Content-Security-Policy",
+									"value": "default-src 'self'; font-src *;img-src * data:; script-src *; style-src *"
+								},
+								{
+									"key": "Referrer-Policy",
+									"value": "strict-origin"
+								},
+								{
+									"key": "Permissions-Policy",
+									"value": "geolocation=(),midi=(),sync-xhr=(),microphone=(),camera=(),magnetometer=(),gyroscope=(),fullscreen=(self),payment=()"
+								}
+							],
+							"cookie": [],
+							"body": "{\n    \"commandStatus\": \"InProgress\"\n}"
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "url_preprod",
+			"value": "lb2.cvip-preprod.citroen.in:40543"
+		}
+	]
+}

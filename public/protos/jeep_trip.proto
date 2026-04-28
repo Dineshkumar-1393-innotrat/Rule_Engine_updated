@@ -1,0 +1,105 @@
+// JEEP - Connected Vehicle India Plaform - TripStart
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+//import "jeep_common.proto";
+import "timestamp.proto";
+
+message LocationData{
+		double gpsLat  = 1 [json_name = "lat"];
+		double gpsLong  = 2 [json_name = "lng"];
+		float gpsAlt  = 3 [json_name = "alt"];
+		float gpsAccLat = 4 [json_name = "ala"];
+		float gpsAccLon = 5 [json_name = "alo"];
+		float gpsAccAlt = 6 [json_name = "aal"];
+		float gpsCourseAngle = 7 [json_name = "coa"];
+		float gpsSignalQuality = 8 [json_name = "siq"];
+}
+
+message gnssInfoStart {
+	
+	LocationData startlocationData = 1 [json_name = "locst"];
+
+}
+
+message gnssInfoCurrent {
+	
+	LocationData currentlocationData = 1 [json_name = "loccu"];
+
+}
+
+
+//
+//
+//
+
+message TripStartData {
+    int64 tripId = 1 [json_name = "tpid"];
+	google.protobuf.Timestamp start_time = 2 [json_name = "tmst"];
+    int64 start_date = 3 [json_name = "dtst"];
+    gnssInfoStart gnssinfostart = 4 [json_name = "gnsst"];
+	int32 gpsFixedStatus = 5 [json_name = "gpfist"];
+}
+
+message TripStartPayload{
+	repeated TripStartData tripstartdata = 1;
+}
+
+message TripInProgressData {
+    int64 tripId = 1 [json_name = "tpid"];
+	google.protobuf.Timestamp current_time = 2 [json_name = "tmcu"];
+    int64 current_date = 3 [json_name = "dtcu"];
+    gnssInfoCurrent gnssinfocurrent = 4 [json_name = "gnscu"];
+	float tripDistance = 7 [json_name = "tpdt"];
+	int32 tripTime = 8 [json_name = "tpti"];
+	string tripType = 12 [json_name = "tpty"];
+	int32 hardBrakeCnt = 14 [json_name = "habrcn"];
+	int32 harshAccCnt = 15 [json_name = "haaccn"];
+	float avgSpeed = 21 [json_name = "avsp"];
+	float topSpeed = 22 [json_name = "tosp"];
+	int32 gpsFixedStatus = 23 [json_name = "gpfist"];
+	int32 harshTurnCnt = 24 [json_name = "htrncn"];
+	int32 minimumTripDistance = 25 [json_name = "mintrpdst"];
+	int32 engineOffTime = 26 [json_name = "engofftme"]	;
+	float vehicleSpeed = 27 [json_name = "vhlspd"];
+}
+
+message TripInProgressPayload{
+	repeated TripInProgressData tripinprogressdata = 1;
+}
+
+message TripEndedData {
+        int64 tripId = 1;
+	google.protobuf.Timestamp current_time = 2 [json_name = "tmcu"];
+        int64 current_date = 3 [json_name = "dtcu"];
+        gnssInfoCurrent gnssinfocurrent = 4 [json_name = "gnscu"];
+	float tripDistance = 7 [json_name = "tpdt"];
+	int32 tripTime = 8 [json_name = "tpti"];
+	int32 idlingCnt = 12 [json_name = "idcn"];
+	int32 hardBrakeCnt = 13 [json_name = "habrcn"];
+	int32 harshAccCnt = 14 [json_name = "haaccn"];
+	float avgSpeed = 20 [json_name = "avsp"];
+	float topSpeed = 21 [json_name = "tosp"];
+	int32 gpsFixedStatus = 22 [json_name = "gpfist"];
+	int32 harshTurnCnt = 23 [json_name = "htrncn"];
+	float drivingScore = 24 [json_name = "drvscr"];
+	int32 minimumTripDistance = 25 [json_name = "mintrpdst"];
+	int32 engineOffTime = 26 [json_name = "engofftme"];
+	float vehicleSpeed = 27 [json_name = "vhlspd"];
+}
+
+message TripEndedPayload{
+	repeated TripEndedData tripendeddata = 1;
+}
+
+
+
+
+//
+// 
+/////////////////////////////////////////////////////////////

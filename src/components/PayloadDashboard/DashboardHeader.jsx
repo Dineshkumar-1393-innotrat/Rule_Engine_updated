@@ -1,12 +1,13 @@
 import React from 'react';
-import { Box, Flex, HStack, Text, Button, Input, InputGroup, InputLeftElement, Select, IconButton, Spacer, Stack } from '@chakra-ui/react';
+import { Box, Flex, HStack, Text, Button, Input, InputGroup, InputLeftElement, Select, IconButton, Spacer, Stack, Badge } from '@chakra-ui/react';
 import { motion } from 'framer-motion';
 import { LayoutDashboard, Monitor, Search, RotateCcw, Download } from 'lucide-react';
 import { isValidVin, formatVin } from '../../utils/validation';
 
 export const DashboardHeader = ({
     viewMode, setViewMode, searchTerm, setSearchTerm, vin, setVin,
-    pollingInterval, setPollingInterval, isLive, setIsLive, handleRefresh, handleExport
+    pollingInterval, setPollingInterval, isLive, setIsLive, handleRefresh, handleExport,
+    isSimulated = false
 }) => {
     return (
         <Box mb={6} position="relative" zIndex={2}>
@@ -61,20 +62,21 @@ export const DashboardHeader = ({
                         <HStack spacing={3} wrap="wrap" justify="center">
                             <HStack spacing={1} align="center">
                                 <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="0.5px">VIN</Text>
-                                <Input 
-                                    value={vin} 
-                                    onChange={e => setVin(formatVin(e.target.value))} 
-                                    size="sm" 
-                                    w={{ base: "full", xs: "140px", md: "155px" }} 
-                                    borderRadius="lg" 
-                                    color={vin.length > 0 && !isValidVin(vin) ? "red.600" : "black"} 
-                                    fontWeight="bold" 
-                                    fontSize="11px" 
-                                    bg={vin.length > 0 && !isValidVin(vin) ? "red.50" : "gray.50"} 
-                                    border={vin.length > 0 && !isValidVin(vin) ? "1px solid" : "none"}
-                                    borderColor={vin.length > 0 && !isValidVin(vin) ? "red.200" : "transparent"}
-                                />
-                            </HStack>
+                                    <Input 
+                                        value={vin} 
+                                        onChange={e => setVin(formatVin(e.target.value))} 
+                                        size="sm" 
+                                        w={{ base: "full", xs: "140px", md: "155px" }} 
+                                        borderRadius="lg" 
+                                        color={vin.length > 0 && !isValidVin(vin) ? "red.600" : "black"} 
+                                        fontWeight="bold" 
+                                        fontSize="11px" 
+                                        bg={vin.length > 0 && !isValidVin(vin) ? "red.50" : "gray.50"} 
+                                        border={vin.length > 0 && !isValidVin(vin) ? "1px solid" : "none"}
+                                        borderColor={vin.length > 0 && !isValidVin(vin) ? "red.200" : "transparent"}
+                                    />
+                                    {isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="8px">VIRTUAL</Badge>}
+                                </HStack>
 
                             <HStack spacing={1}>
                                 <Text fontSize="9px" color="gray.400" fontWeight="bold">Poll</Text>

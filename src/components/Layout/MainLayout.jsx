@@ -17,7 +17,7 @@ import {
   Spacer,
   Tooltip,
 } from '@chakra-ui/react';
-import { Menu, LayoutDashboard, Zap, Settings, Activity, ChevronRight, ChevronLeft, Car, History, UploadCloud, Terminal } from 'lucide-react';
+import { Menu, LayoutDashboard, Zap, Settings, Activity, ChevronRight, ChevronLeft, Car, History, UploadCloud, Terminal, Radio } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const navItems = [
@@ -26,6 +26,7 @@ const navItems = [
   // { label: 'Historical Analysis', icon: History, path: '/historical-analysis' },
   { label: 'Bulk Provisioning', icon: UploadCloud, path: '/bulk-provision' },
   { label: 'System Console', icon: Terminal, path: '/system-console' },
+  { label: 'MQTT Virtual Device', icon: Radio, path: '/mqtt-virtual-device' },
 ];
 
 const SidebarContent = ({ onClose, currentPath, isCollapsed, onToggle, ...rest }) => {
@@ -201,8 +202,12 @@ const MainLayout = ({ children }) => {
       <Navbar onOpen={onOpen} isCollapsed={isCollapsed} />
       <Box 
         ml={{ base: 0, md: isCollapsed ? 20 : 60 }} 
-        p={{ base: 4, md: 8 }}
+        p={location.pathname === '/mqtt-virtual-device' ? 0 : { base: 4, md: 8 }}
         transition="0.3s ease"
+        height={location.pathname === '/mqtt-virtual-device' ? 'calc(100vh - 80px)' : 'auto'}
+        overflow={location.pathname === '/mqtt-virtual-device' ? 'hidden' : 'visible'}
+        display={location.pathname === '/mqtt-virtual-device' ? 'flex' : 'block'}
+        flexDirection="column"
       >
         {children}
       </Box>

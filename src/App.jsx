@@ -15,6 +15,7 @@ const PayloadDashboardPage = React.lazy(() => import("./components/PayloadDashbo
 const HistoricalDataPage = React.lazy(() => import("./components/HistoricalData/HistoricalDataPage"));
 const BulkProvisionPage = React.lazy(() => import("./components/BulkProvision/BulkProvisionPage"));
 const SystemConsolePage = React.lazy(() => import("./components/SystemOverview/SystemConsolePage"));
+const MQTTVirtualDeviceDashboard = React.lazy(() => import("./components/MQTTVirtualDevice/MQTTVirtualDeviceDashboard"));
 
 
 const App = () => {
@@ -56,6 +57,7 @@ const App = () => {
                   <Route path="/bulk-provision" element={<BulkProvisionPage />} />
                   <Route path="/system-console/:vin?" element={<SystemConsolePage />} />
                   <Route path="/payload-dashboard/:vin" element={<PayloadDashboardPage />} />
+                  <Route path="/mqtt-virtual-device" element={<MQTTVirtualDeviceDashboard />} />
                 </Routes>
               </React.Suspense>
             </MainLayout>

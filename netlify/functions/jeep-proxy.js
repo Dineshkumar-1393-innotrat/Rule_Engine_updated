@@ -4,7 +4,7 @@ const https = require('https');
 exports.handler = async (event, context) => {
     // Extract the path after /api/jeep/
     const path = event.path.replace('/api/jeep/', '');
-    const url = `https://cvipapi-preprod.fca-india.com/jeep/${path}`;
+    const url = `https://cvipiot-preprod.fca-india.com:40543/jeep/${path}`;
 
     console.log(`Proxying request to: ${url}`);
     console.log(`Method: ${event.httpMethod}`);

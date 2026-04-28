@@ -35,6 +35,7 @@ export const SignalCard = ({ signal, searchTerm, onRefresh, handlers }) => {
                         <Badge variant="outline" colorScheme="gray" fontSize="8px" fontFamily="monospace" borderRadius="sm" px={1.5}>{signal.id}</Badge>
                         {signal.error && <Badge colorScheme="red" fontSize="8px">ERROR</Badge>}
                         {signal.loading && <Spinner size="xs" color="blue.400" />}
+                        {signal.data?.[0]?.isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="8px">SIMULATED</Badge>}
                         {signal.lastUpdated && !signal.error && <Badge colorScheme="green" variant="subtle" fontSize="8px">{signal.lastUpdated}</Badge>}
                     </HStack>
                     {latestVal !== null && !signal.error && (

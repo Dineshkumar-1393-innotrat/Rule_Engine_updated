@@ -61,7 +61,7 @@ import { isValidVin, formatVin } from '../../utils/validation';
 const HistoricalDataPage = () => {
     const toast = useToast();
     const { isOpen, onOpen, onClose } = useDisclosure();
-    const [vin, setVin] = useState('MCANJREB1MFA65412');
+    const [vin, setVin] = useState('');
     const [startTime, setStartTime] = useState(() => {
         const d = new Date();
         d.setHours(d.getHours() - 24);

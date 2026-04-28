@@ -144,8 +144,17 @@ export const VisualView = ({ signals, deviceState, highestSpeed }) => {
         return val || 'OFF';
     })();
 
+    const isSimulated = signals.some(s => s.data?.[0]?.isSimulated) || deviceState?.isSimulated;
+
     return (
         <Box w="full" bg="#f8faff" p={{ base: 4, md: 8 }} borderRadius="none" position="relative" overflow="hidden">
+            {isSimulated && (
+                <Box position="absolute" top={2} left={0} right={0} textAlign="center" zIndex={10}>
+                    <Badge colorScheme="purple" variant="solid" fontSize="10px" px={4} py={1} borderRadius="full" boxShadow="lg">
+                        SIMULATED DEVICE DATA
+                    </Badge>
+                </Box>
+            )}
             {/* HUD Grid Background */}
             <Box
                 position="absolute" top={0} left={0} right={0} bottom={0}
@@ -191,6 +200,7 @@ export const VisualView = ({ signals, deviceState, highestSpeed }) => {
                         isOn={deviceState?.deviceConnectedState === 'CONNECTED'}
                         icon={Wifi}
                         color="green"
+                        isSimulated={deviceState?.isSimulated}
                     />
                     <StatusToggle
                         label="Trip Active"
@@ -207,7 +217,7 @@ export const VisualView = ({ signals, deviceState, highestSpeed }) => {
                     templateColumns={{ base: "1fr", lg: "1.2fr 0.8fr 1.5fr" }} 
                     gap={6} 
                     mb={8} 
-                    h={{ base: "auto", lg: "380px" }}
+                    h={{ base: "auto", lg: "420px" }}
                 >
                     {/* Left: Map Card */}
                     <Box 
@@ -333,13 +343,16 @@ export const VisualView = ({ signals, deviceState, highestSpeed }) => {
                     {/* Right: Car Visualization */}
                     <Box 
                         h={{ base: "300px", lg: "full" }}
-                        bg="white" 
+                        bg="#ebebeb" 
                         borderRadius="2xl" 
                         border="1px solid" 
                         borderColor="rgba(0,0,0,0.06)" 
                         boxShadow="sm" 
                         overflow="hidden" 
                         position="relative"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
                     >
                         <Vehicle360Viewer
                             baseUrl="https://imgd.aeplcdn.com/1280x720/cw/360/jeep/1048/5364/closed-door/c2c7cb/"

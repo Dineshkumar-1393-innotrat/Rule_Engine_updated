@@ -1,0 +1,38 @@
+// JEEP - Connected Vehicle India Plaform - LocationTelemetry
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+import "timestamp.proto";
+
+//
+// [START LocationTelemetry_MessageType_Definition]
+//
+message LocationTelemetry {
+
+		google.protobuf.Timestamp time_stamp = 1;
+		double gpsLat  = 2 [json_name = "lat"];
+		double gpsLong  = 3 [json_name = "lng"];
+		reserved 4,5,6,7;
+		float gpsCourseAngle = 8 [json_name = "coa"];
+		float gpsSignalQuality = 9 [json_name = "siq"];
+		int32 gpsFixedStatus = 10 [json_name = "gpfist"];
+		double speed         = 11 [json_name = "spd"];
+}
+
+message LocationTelemetryPayload {
+	repeated LocationTelemetry locationData = 1;
+}
+
+////////////////////////////////////////////////////////////
+
+
+
+
+//
+// [END LocationTelemetry_MessageType_Definition]
+/////////////////////////////////////////////////////////////

@@ -38,6 +38,14 @@ export default defineConfig({
           });
         }
       },
+      '/api/platform': {
+        target: 'https://lb2.cvip-preprod.citroen.in:40543',
+        changeOrigin: true,
+        secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/platform/, ''),
+      },
       '/api/fota-fca': {
         target: 'https://cvipiot-preprod.fca-india.com:40543',
         changeOrigin: true,
@@ -53,6 +61,14 @@ export default defineConfig({
         timeout: 60000,
         proxyTimeout: 60000,
         rewrite: (path) => path.replace(/^\/api\/fota-lb1-fca/, ''),
+      },
+      '/api/aws': {
+        target: 'https://gp98o9kt3c.execute-api.ap-south-1.amazonaws.com',
+        changeOrigin: true,
+        secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/aws/, ''),
       }
     }
   },

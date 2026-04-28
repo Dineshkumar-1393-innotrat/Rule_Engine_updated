@@ -2587,7 +2587,7 @@ const RuleEngineDashboard = () => {
                                                 },
                                             }}
                                         >
-                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }} onClick={() => navigate('/payload-dashboard/MCANJREB1MFA65412')}>Dashboard</Tab>
+                                            <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }} onClick={() => navigate(`/payload-dashboard/${deviceVariables.current.vehicleId || ''}`)}>Dashboard</Tab>
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Alert Rules</Tab>}
                                             {!showTripOnly && <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Rule Templates</Tab>}
                                             <Tab justifyContent="flex-start" py={3} px={4} borderRadius="xl" fontWeight="bold" fontSize="sm" color="gray.600" transition="all 0.3s ease" _hover={{ bg: "white", shadow: "sm", transform: "translateY(-1px)", color: "blue.600" }} _selected={{ bgGradient: "linear(to-r, blue.500, blue.600)", color: "white", shadow: "md", transform: "scale(1.02)" }}>Trip Configuration</Tab>
@@ -2661,7 +2661,7 @@ const RuleEngineDashboard = () => {
                                     <TabPanel>
                                         <VStack align="center" justify="center" h="200px" spacing={4}>
                                             <Text color="gray.500">Payload View is open in a separate window.</Text>
-                                            <Button size="sm" colorScheme="blue" onClick={() => navigate('/payload-dashboard/MCANJREB1MFA65412')}>
+                                            <Button size="sm" colorScheme="blue" onClick={() => navigate(`/payload-dashboard/${deviceVariables.current.vehicleId || ''}`)}>
                                                 Open Live View
                                             </Button>
                                         </VStack>

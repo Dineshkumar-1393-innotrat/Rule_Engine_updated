@@ -1,0 +1,166 @@
+// JEEP - Connected Vehicle India Plaform
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+//
+// [START Enumerations_definitions]
+// 
+
+//This need to discussed and modified based on need
+enum eTboxOperatingState
+{
+    normal = 0;
+    disconnected = 1;
+	remote_sms_wakeup =2;
+}
+
+//This need to discussed and modified based on need
+enum eTboxApplicationState
+{
+    factory = 0;
+    provisioned  = 1;
+	authorized = 2;
+    customer = 4;
+}
+
+//This need to discussed and modified based on need
+enum eTboxeSimState
+{
+	invalid_state = 0;
+	normal_sim  = 1;
+}
+
+enum AlertState {
+    alsInvalid = 0;
+    alsNormal = 1;
+    alsAlert = 2;
+}
+
+enum AlertType {
+    InvalidAlertType = 0;
+    SpeedAlert = 2;
+    TowAwayAlert = 9;
+	DongleStatusAlert = 32;
+	EngineIdlingAlert = 33;
+	ParkingDisturbanceAlert = 34;
+}
+
+enum DongleStatus{
+	InvalidDongleStatus = 0;
+	dongleStatus = 1;
+}
+
+enum EngineIdling{
+	InvalidEngineIdling = 0;
+	engineIdling = 1;
+}
+
+enum ParkingDisturbance{
+    InvalidBreakIn=0;
+    NoBreakIn = 1;
+    RightFrontDoorBreakIn = 2;
+    LeftFrontDoorBreakIn = 3;
+    RightRearDoorBreakIn = 4;
+    LeftRearDoorBreakIn = 5;
+    HoodBreakIn = 6;
+    TrunkBreakIn = 7;
+    BackliteBreakIn = 8;
+    OpeningRoofBreakIn = 9;
+    VolumetricBreakIn = 10;
+    LiftingBreakIn = 11;
+    ElecSystemBreakIn = 12;
+
+}
+
+enum MainWakeUpType{
+    Invalid_RCD = 0;
+    No_main_wakeup_req = 1;
+    main_wakeup_req = 2;
+    Wake_up_not_valid = 3;
+}
+
+enum IgnitionPropertyType{
+    Initialization=0;
+    IGN_LK = 1;
+    ACC = 3;
+    RUN = 4;
+    START = 5;
+	SNA = 7;
+}
+
+enum EmergencyAlertType{
+    InvalidEmergencyAlertType = 0;
+    CrashInfo = 1;
+}
+
+enum EngineState{
+    Invalid_EngineState=0;
+    on = 1;
+    off = 2;
+}
+
+enum ECUCode{
+	TBOX = 0;
+}	
+
+enum RemoteHonkPropertyType{
+    InvalidRemoteHonkPropertyType = 0;
+    RemoteHonk_on = 1;
+}
+
+enum TboxfullSleepType{
+    Not_in_full_sleep = 0;
+    full_sleep = 1;
+}
+
+	
+enum RemoteBlinkerEventType{
+	defaultBlinkersStatus = 0;
+	invalidBlinkersStatus=1;
+	TurnBlinkers_on=2;
+	TurnBlinkers_off =3;
+	}
+
+enum RemoteCommandFailureCodes{
+    invalidRemoteFailureCode=0;
+	KeyIn_ACC = 1;
+	KeyIn_IGN = 2;
+    Engine_Running_or_Ready_ToDrive = 3;
+    LVBAT_LowVoltage_or_High_Voltage = 4;
+    Limp_Home_Mode_or_Reserved = 5;
+    Crashed_Detected_ = 6;
+    RequestRefused_DoorOpen = 7;
+    Bounce=8;
+    FotaInProgress=9;
+	authentication_failed=16;
+	authentication_timeout=17;
+	request_failed=18;
+	response_timeOut=19;
+	DoorOpenLock=23;
+	DoorsAutoLockedAfterTimeout=24;
+	RequestRefused=25;
+	RequestFailed=26;
+}
+
+
+enum RemoteHonkEventType{
+  invalidRemoteHonkCommand=0;
+  remoteHonk_on=1;
+}
+
+
+enum RemoteDoorLockUnlockCommandEventType{
+	invalidRemoteDoorLockUnlockCommand=0;
+    no_Request=1;
+	request_Successful_All_Doors_Locked=2;
+	request_Successful_All_Door_Unlocked=3;
+}
+
+//
+// [END Enumerations_definitions]
+////////////////////////////////////////////////////////

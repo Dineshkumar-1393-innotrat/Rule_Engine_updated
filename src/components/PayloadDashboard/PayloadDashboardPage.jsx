@@ -23,8 +23,6 @@ import { VisualView } from './VisualView';
 import { SignalCard } from './SignalCard';
 import { DeviceEventsList } from './DeviceEventsList';
 import { DeviceDetails, RemoteCommands } from './DeviceControlPanel';
-import { BulkProvisionSection } from './BulkProvisionSection';
-
 const THEME = { bg: 'gray.50' };
 
 const PayloadDashboardPage = () => {
@@ -32,17 +30,17 @@ const PayloadDashboardPage = () => {
     const navigate = useNavigate();
     const toast = useToast();
 
-    const [vin, setVin] = useState(urlVin || localStorage.getItem('last_vin') || 'MCANJREB1MFA65412');
+    const [vin, setVin] = useState(urlVin || '');
     const [signals, setSignals] = useState([
-        { name: 'Fuel Level', apiName: 'fuelPercentage', id: '0x356', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
-        { name: 'Total Odometer', apiName: 'odometer', id: '0x760', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
-        { name: 'Engine Water Temp', apiName: 'coolant', id: '0x3E2', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
-        { name: 'Engine Speed', apiName: 'engineRpm', id: '0x3E6', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
-        { name: 'Vehicle Speed', apiName: 'speed', id: '0x3E8', isChecked: true, data: [], loading: false, error: null, hideInConsole: true, useVehicleStatus: true },
-        { name: 'Battery Voltage Level', apiName: 'battery', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'Fuel Level', apiName: 'FuelLevel', id: '0x356', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
+        { name: 'Total Odometer', apiName: 'TotalOdometer', id: '0x760', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
+        { name: 'Engine Water Temp', apiName: 'EngineWaterTemp', id: '0x3E2', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
+        { name: 'Engine Speed', apiName: 'EngineSpeed', id: '0x3E6', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
+        { name: 'Vehicle Speed', apiName: 'VehicleSpeed', id: '0x3E8', isChecked: true, data: [], loading: false, error: null, hideInConsole: true, useVehicleStatus: false },
+        { name: 'Battery Voltage Level', apiName: 'BatteryVoltageLevel', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
         { name: 'Ignition Status', apiName: 'CmdIgnSts', id: '0x46C', isChecked: true, data: [], loading: false, error: null, fetchType: 'ignition' },
-        { name: 'External Temperature (F)', apiName: 'ExternalTemperatureF', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
-        { name: 'External Temperature (C)', apiName: 'ExternalTemperatureC', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
+        { name: 'External Temperature (F)', apiName: 'ExternalTemperatureF', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
+        { name: 'External Temperature (C)', apiName: 'ExternalTemperatureC', id: '0x46C', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
         { name: 'Location', apiName: 'Location', id: 'location', isChecked: true, data: [], loading: false, error: null, fetchType: 'location' },
         { name: 'Alerts', apiName: 'Alerts', id: 'alerts', isChecked: true, data: [], loading: false, error: null, fetchType: 'alerts' },
         { name: 'Device Events', apiName: 'DeviceEvents', id: 'events', isChecked: true, data: [], loading: false, error: null, fetchType: 'events' },
@@ -59,6 +57,7 @@ const PayloadDashboardPage = () => {
         { name: 'Portal Search', apiName: 'PortalSearch', id: 'portal_lookup', isChecked: false, data: [], loading: false, error: null, fetchType: 'search' },
         { name: 'Device Join Status', apiName: 'DeviceJoinStatus', id: 'notification_api', isChecked: true, data: [], loading: false, error: null, fetchType: 'notification' },
         { name: 'Command History Audit', apiName: 'CommandAudit', id: 'cmd_audit', isChecked: true, data: [], loading: false, error: null, fetchType: 'command_audit' },
+        { name: 'Trip Audit', apiName: 'TripAudit', id: 'trip_audit', isChecked: true, data: [], loading: false, error: null, fetchType: 'trip_audit' },
     ]);
 
     const [viewMode, setViewMode] = useState('visual');
@@ -74,21 +73,20 @@ const PayloadDashboardPage = () => {
     const [lastRefreshTime, setLastRefreshTime] = useState(null);
     const [pollingInterval, setPollingInterval] = useState(10);
 
-    const pollingTimeout = useRef(null);
+    const savedPollCallback = useRef();
 
     useEffect(() => {
         if (vin) {
-            localStorage.setItem('last_vin', vin);
-            // navigate(`/payload-dashboard/${vin}`, { replace: true });
+            if (urlVin !== vin) {
+                navigate(`/payload-dashboard/${vin}`, { replace: true });
+            }
             setSignals(prev => prev.map(s => ({ ...s, data: [], loading: false, error: null, hasFetched: false })));
             setDeviceState(null);
             setOngoingTrip(null);
             (async () => {
                 await Promise.all([fetchCheckedSignals(), fetchOtherData()]);
-                if (isLive) startPolling();
             })();
         }
-        return () => stopPolling();
     }, [vin]);
 
     useEffect(() => {
@@ -97,27 +95,33 @@ const PayloadDashboardPage = () => {
         }
     }, [urlVin]);
 
+    // Keep the latest poll function in a ref to avoid stale closures during fetch
     useEffect(() => {
-        if (isLive) startPolling();
-        else stopPolling();
-    }, [isLive]);
-
-    const startPolling = () => {
-        if (pollingTimeout.current) clearTimeout(pollingTimeout.current);
-        const poll = async () => {
+        savedPollCallback.current = async () => {
             if (!isLive || !vin) return;
             try { await Promise.all([fetchCheckedSignals(), fetchOtherData()]); } catch (e) { console.warn('Poll error', e); }
-            if (isLive) pollingTimeout.current = setTimeout(poll, pollingInterval * 1000);
         };
-        pollingTimeout.current = setTimeout(poll, pollingInterval * 1000);
-    };
+    });
 
-    const stopPolling = () => {
-        if (pollingTimeout.current) {
-            clearTimeout(pollingTimeout.current);
-            pollingTimeout.current = null;
-        }
-    };
+    // Robust Polling Effect that reacts to interval changes dynamically
+    useEffect(() => {
+        if (!isLive || !vin) return;
+
+        let timeoutId;
+        const tick = async () => {
+            if (savedPollCallback.current) {
+                await savedPollCallback.current();
+            }
+            timeoutId = setTimeout(tick, pollingInterval * 1000);
+        };
+
+        // Start initial poll timer
+        timeoutId = setTimeout(tick, pollingInterval * 1000);
+
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [isLive, vin, pollingInterval]);
 
     // Helper logic from modal extracted here
     const mapVSToSignal = (vsData, signal) => {
@@ -158,7 +162,23 @@ const PayloadDashboardPage = () => {
     const fetchOtherData = async () => {
         if (!vin) return;
         try {
-            const s = await TraxoApi.getDeviceState(vin);
+            let s = await TraxoApi.getDeviceState(vin);
+            
+            // Fallback for device state from virtual device
+            if ((!s || Object.keys(s).length === 0)) {
+                const stored = localStorage.getItem(`mqtt_virtual_device_data_${vin}`);
+                if (stored) {
+                    try {
+                        const virtual = JSON.parse(stored);
+                        s = {
+                            vin: vin,
+                            deviceConnectedState: virtual.connectionStatus === 'CONNECTED' ? 'CONNECTED' : 'DISCONNECTED',
+                            isSimulated: true
+                        };
+                    } catch (e) { console.warn("Virtual state parse error", e); }
+                }
+            }
+
             if (s) setDeviceState(s);
             try {
                 const t = await TraxoApi.getOngoingTrip(vin);
@@ -208,35 +228,178 @@ const PayloadDashboardPage = () => {
                 else if (signal.fetchType === 'vehicleStatus') newData = await TraxoApi.getVehicleStatus(vin);
                 else if (signal.fetchType === 'files') newData = await TraxoApi.listLogFiles(vin);
                 else if (signal.fetchType === 'alerts_audit') newData = await TraxoApi.getAlertIngestion(vin);
-                else if (signal.fetchType === 'signals') newData = await TraxoApi.getSignalList('356');
-                else if (signal.fetchType === 'messages') newData = await TraxoApi.getVehicleTelemetryMessageList();
+                else if (signal.fetchType === 'signals') newData = await TraxoApi.getCanSignals('356');
+                else if (signal.fetchType === 'messages') newData = await TraxoApi.getCanMessages('jeep');
                 else if (signal.fetchType === 'trip_pagination') newData = await TraxoApi.getTripDetailsWithPagination(vin, 0);
                 else if (signal.fetchType === 'trip_details') {
                     const tid = ongoingTrip?.tripId || signals.find(s => s.name === 'Trip History')?.data[0]?.tripId;
-                    if (tid) newData = await TraxoApi.getTripDetailsByTripId(vin, tid);
+                    if (tid) newData = await TraxoApi.getTripById(vin, tid);
                     else return null;
                 }
                 else if (signal.fetchType === 'search') newData = await TraxoApi.portalSearch(vin, 'vin');
                 else if (signal.fetchType === 'notification') newData = await TraxoApi.getDeviceJoinStatus(vin);
                 else if (signal.fetchType === 'command_audit') newData = await TraxoApi.getCommandAudit(vin);
-                else if (signal.fetchType !== 'manual') newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
+                else if (signal.fetchType === 'trip_audit') newData = await TraxoApi.getTripAudit(vin);
+                else if (signal.fetchType !== 'manual') {
+                    newData = await TraxoApi.getVehicleTelemetryData(vin, signal.apiName);
+                }
                 else return null;
 
-                // Simple normalization logic (already moved to separate file in the modal, keeping it clean here)
+                // Normalize improperly formatted API responses for ALL fetch types
+                if (newData !== null && newData !== undefined) {
+                    // Treat empty object as no records rather than improper format
+                    if (typeof newData === 'object' && !Array.isArray(newData) && Object.keys(newData).length === 0) {
+                        newData = [];
+                    } else {
+                        let arr = Array.isArray(newData) ? newData : [newData];
+                        
+                        // Extract from wrapper if necessary
+                        if (arr.length === 1 && typeof arr[0] === 'object' && arr[0] !== null) {
+                            if (Array.isArray(arr[0].data)) arr = arr[0].data;
+                            else if (Array.isArray(arr[0].result)) arr = arr[0].result;
+                            else if (Array.isArray(arr[0].vehicleTelemetry)) arr = arr[0].vehicleTelemetry;
+                            else if (Array.isArray(arr[0].alerts)) arr = arr[0].alerts;
+                            else if (Array.isArray(arr[0].events)) arr = arr[0].events;
+                            else if (Array.isArray(arr[0].logFiles)) arr = arr[0].logFiles;
+                            else if (Array.isArray(arr[0].items)) arr = arr[0].items;
+                        }
+
+                        // Map primitives to objects so DataTable can read keys
+                        newData = arr.map(item => {
+                            if (typeof item !== 'object' || item === null) {
+                                return { signalValue: item, updatedTimeStamp: new Date().toISOString() };
+                            }
+                            // Also map empty objects to primitive-like representation to avoid IMPROPER FORMAT
+                            if (Object.keys(item).length === 0) {
+                                return { message: "Empty record", updatedTimeStamp: new Date().toISOString() };
+                            }
+                            return item;
+                        });
+                    }
+                }
+
                 return { name: signal.name, newData };
             } catch (error) {
-                return { name: signal.name, error: error.message || 'Fetch failed' };
+                const errMsg = error?.message || String(error) || '';
+                if (errMsg.includes('400') || errMsg.includes('403') || errMsg.includes('404') || error?.response?.status >= 400) {
+                    console.warn(`[PayloadDashboard] Suppressed API error for ${signal.name}:`, errMsg);
+                    return { name: signal.name, newData: [] };
+                }
+                return { name: signal.name, error: errMsg || 'Fetch failed' };
             }
         });
 
         const results = await Promise.all(promises);
+
+        // Fallback logic for Virtual Device data
+        const virtualStored = localStorage.getItem(`mqtt_virtual_device_data_${vin}`);
+        let virtualData = null;
+        if (virtualStored) {
+            try { virtualData = JSON.parse(virtualStored); } catch (e) { console.warn("Failed to parse virtual data", e); }
+        }
+
         setSignals(prevSignals => prevSignals.map(signal => {
             const result = results.find(r => r?.name === signal.name);
-            if (!result) return signal;
-            const { newData, error } = result;
+            let newData = result?.newData;
+            let error = result?.error;
+
+            // If no API data or error, try virtual fallback
+            if ((!newData || (Array.isArray(newData) && newData.length === 0)) && virtualData) {
+                const { telemetry, log, lastUpdate } = virtualData;
+                
+                // Map telemetry fields
+                const telMap = {
+                    'Fuel Level': 'fuelLevel',
+                    'Engine Speed': 'engineSpeed',
+                    'Engine Water Temp': 'engineWaterTemp',
+                    'Battery Voltage Level': 'batteryVoltage',
+                    'Total Odometer': 'odometer',
+                    'Vehicle Speed': 'speed',
+                    'GPS Latitude': 'gpsLat',
+                    'GPS Longitude': 'gpsLong'
+                };
+
+                if (telMap[signal.name] && telemetry[telMap[signal.name]] !== undefined) {
+                    newData = [{
+                        signalValue: telemetry[telMap[signal.name]],
+                        updatedTimeStamp: lastUpdate,
+                        isSimulated: true
+                    }];
+                    error = null;
+                }
+                else if (signal.name === 'Device Events') {
+                     const logs = (log || [])
+                        .filter(entry => entry.direction === 'PUB' && ['events', 'alerts', 'deviceJoined'].includes(entry.messageType))
+                        .map(entry => ({
+                            ...(typeof entry.payloadJson === 'object' ? entry.payloadJson : {}),
+                            eventtype: entry.messageType,
+                            sourcetimestamp: entry.timestamp,
+                            updatedTimeStamp: entry.timestamp,
+                            isSimulated: true
+                        }));
+                     if (logs.length > 0) { newData = logs; error = null; }
+                }
+                else if (signal.name === 'Ignition Status') {
+                     const ignEntry = (log || []).find(entry => 
+                        entry.messageType === 'events' && JSON.stringify(entry.payloadJson).includes('IgnitionStatus')
+                     );
+                     if (ignEntry) {
+                         const ignState = ignEntry.payloadJson?.eventPayload?.EventsData?.[0]?.IgnitionStatus?.IgnitionState;
+                         newData = [{
+                             signalValue: ignState || 'OFF',
+                             updatedTimeStamp: ignEntry.timestamp,
+                             isSimulated: true
+                         }];
+                         error = null;
+                     }
+                }
+                else if (signal.name === 'Device Join Status') {
+                     const joinEntry = (log || []).find(entry => entry.messageType === 'deviceJoined');
+                     if (joinEntry) {
+                         newData = [{
+                             ...(typeof joinEntry.payloadJson === 'object' ? joinEntry.payloadJson : {}),
+                             signalValue: 'CONNECTED',
+                             alertName: 'DEVICE JOIN',
+                             body: 'Virtual Device connected to broker',
+                             updatedTimeStamp: joinEntry.timestamp,
+                             isSimulated: true
+                         }];
+                         error = null;
+                     }
+                }
+                else if (signal.name === 'Remote Commands') {
+                    // Extract commands from log or simulated commands
+                    const cmdLogs = (log || [])
+                       .filter(entry => entry.messageType.toLowerCase().includes('command') || entry.direction === 'SUB')
+                       .map(entry => ({
+                           commandId: entry.payloadJson?.commandId || entry.payloadJson?.messageId || `SIM-${entry.timestamp}`,
+                           command: entry.messageType || entry.payloadJson?.actionType || 'Unknown',
+                           status: entry.status || 'SUCCESS',
+                           time: formatFullDate(entry.timestamp),
+                           apiResponse: entry.payloadJson,
+                           isSimulated: true
+                       }));
+                    if (cmdLogs.length > 0) { newData = cmdLogs; error = null; }
+                }
+                else if (signal.name === 'Location' && telemetry.gpsLat) {
+                    newData = [{
+                        gpsLat: telemetry.gpsLat,
+                        gpsLong: telemetry.gpsLong,
+                        updatedTimeStamp: lastUpdate,
+                        isSimulated: true
+                    }];
+                    error = null;
+                }
+            }
+
+            // If it's a simulated device, suppress API errors to ensure a clean UI
+            if (virtualData) {
+                error = null;
+                if (!newData) newData = [];
+            }
+
             if (error) return { ...signal, error, loading: false };
             if (newData !== null && newData !== undefined) {
-                // Simplified update logic for the page
                 return { ...signal, data: Array.isArray(newData) ? newData : [newData], loading: false, lastUpdated: formatFullDate(new Date()), error: null };
             }
             return signal;
@@ -289,16 +452,42 @@ const PayloadDashboardPage = () => {
         setCommandLoading(commandName);
         const timestamp = new Date().toLocaleTimeString();
         try {
-            const result = await apiCall(vin, ...params);
+            let result;
+            const isSimulated = deviceState?.isSimulated;
+            
+            if (isSimulated) {
+                result = { commandId: `SIM-${Date.now()}`, status: 'SUCCESS', actionType: commandName };
+                const stored = localStorage.getItem(`mqtt_virtual_device_data_${vin}`);
+                if (stored) {
+                    try {
+                        const virtualData = JSON.parse(stored);
+                        const newEntry = {
+                            timestamp: new Date().toISOString(),
+                            direction: 'SUB',
+                            messageType: commandName,
+                            topic: `/dongle/${vin}/commands`,
+                            status: 'SUCCESS',
+                            payloadJson: result
+                        };
+                        virtualData.log = [newEntry, ...(virtualData.log || [])].slice(0, 50);
+                        localStorage.setItem(`mqtt_virtual_device_data_${vin}`, JSON.stringify(virtualData));
+                    } catch (e) { }
+                }
+                await new Promise(r => setTimeout(r, 800));
+            } else {
+                result = await apiCall(vin, ...params);
+            }
+
             const commandId = result.commandId || result.data?.commandId;
             toast({ title: `${commandName} Sent`, description: 'Waiting for device...', status: 'info', duration: 2000 });
 
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? {
                 ...s,
-                data: [{ command: commandName, status: 'PENDING', time: timestamp, commandId, apiResponse: result }, ...s.data].slice(0, 50)
+                data: [{ command: commandName, status: isSimulated ? 'SUCCESS' : 'PENDING', time: timestamp, commandId, apiResponse: result, isSimulated }, ...s.data].slice(0, 50)
             } : s));
 
-            if (commandId) pollCommandStatus(commandName, commandId, false, isConcurrent);
+            if (commandId && !isSimulated) pollCommandStatus(commandName, commandId, false, isConcurrent);
+            else if (isSimulated) toast({ title: `${commandName} Success`, status: 'success', duration: 3000 });
         } catch (error) {
             toast({ title: `${commandName} Failed`, description: error.message, status: 'error', duration: 3000 });
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? {
@@ -351,12 +540,22 @@ const PayloadDashboardPage = () => {
         if (!fotaVersion) { toast({ title: 'Enter firmware version', status: 'error' }); return; }
         setIsFotaUpdating(true);
         try {
-            const newCmd = { command: 'FOTA Update', status: 'PENDING', time: new Date().toLocaleTimeString(), apiResponse: { actionType: 'FOTA_DOWNLOAD', version: fotaVersion, status: 'PENDING' } };
+            const isSimulated = deviceState?.isSimulated;
+            const newCmd = { command: 'FOTA Update', status: 'PENDING', time: new Date().toLocaleTimeString(), apiResponse: { actionType: 'FOTA_DOWNLOAD', version: fotaVersion, status: 'PENDING' }, isSimulated };
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' ? { ...s, data: [newCmd, ...s.data] } : s));
-            const response = await TraxoApi.triggerFotaUpdate(vin, fotaVersion);
+            
+            let response;
+            if (isSimulated) {
+                response = { commandId: `FOTA-${Date.now()}`, status: 'SUCCESS', actionType: 'FOTA_DOWNLOAD', version: fotaVersion };
+                await new Promise(r => setTimeout(r, 1500));
+            } else {
+                response = await TraxoApi.triggerFotaUpdate(vin, fotaVersion);
+            }
+
             const commandId = response.commandId || response.fotaId || response.data?.commandId;
-            setSignals(prev => prev.map(s => s.name === 'Remote Commands' && s.data.length ? { ...s, data: [{ ...s.data[0], status: commandId ? 'PENDING' : 'SUCCESS', commandId, apiResponse: response }, ...s.data.slice(1)] } : s));
-            if (commandId) pollCommandStatus('FOTA Update', commandId, true);
+            setSignals(prev => prev.map(s => s.name === 'Remote Commands' && s.data.length ? { ...s, data: [{ ...s.data[0], status: (commandId && !isSimulated) ? 'PENDING' : 'SUCCESS', commandId, apiResponse: response }, ...s.data.slice(1)] } : s));
+            
+            if (commandId && !isSimulated) pollCommandStatus('FOTA Update', commandId, true);
             toast({ title: 'FOTA Update Initiated', status: 'success', duration: 3000 });
         } catch (error) {
             setSignals(prev => prev.map(s => s.name === 'Remote Commands' && s.data.length ? { ...s, data: [{ ...s.data[0], status: 'FAILED', apiResponse: { error: error.message } }, ...s.data.slice(1)] } : s));
@@ -389,6 +588,7 @@ const PayloadDashboardPage = () => {
                 isLive={isLive} setIsLive={setIsLive}
                 handleRefresh={handleRefresh}
                 handleExport={handleExport}
+                isSimulated={deviceState?.isSimulated || signals.some(s => s.data?.some(d => d.isSimulated))}
             />
 
             {viewMode === 'visual' ? (
@@ -422,7 +622,6 @@ const PayloadDashboardPage = () => {
 
             <Box mt={2}>
                 <DeviceDetails deviceState={deviceState} vin={vin} />
-                <BulkProvisionSection />
                 <RemoteCommands
                     commandLoading={commandLoading} handleCommand={handleCommand}
                     speedAlert={speedAlert} setSpeedAlert={setSpeedAlert}

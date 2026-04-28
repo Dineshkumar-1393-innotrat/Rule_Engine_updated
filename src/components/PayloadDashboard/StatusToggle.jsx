@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Flex, HStack, VStack, Text } from '@chakra-ui/react';
 
-export const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false, color: customColor, statusText }) => {
+export const StatusToggle = ({ label, description, isOn, icon: Icon, isError = false, color: customColor, statusText, isSimulated = false }) => {
     const defaultColor = isError ? "red" : (isOn ? "blue" : "gray");
     const activeColor = customColor || defaultColor;
 
@@ -12,6 +12,11 @@ export const StatusToggle = ({ label, description, isOn, icon: Icon, isError = f
             boxShadow="sm" _hover={{ border: '1px solid', borderColor: `${activeColor}.200`, boxShadow: 'lg' }}
             transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)" position="relative" overflow="hidden"
         >
+            {isSimulated && (
+                <Box position="absolute" top={0} right={0} bg="purple.500" color="white" px={2} py={0.5} borderBottomLeftRadius="md" fontSize="7px" fontWeight="black" zIndex={2}>
+                    SIMULATED
+                </Box>
+            )}
             {/* Subtle glow background */}
             {isOn && !isError && <Box position="absolute" top="-20%" right="-10%" w="100px" h="100px" bg={`${activeColor}.50`} filter="blur(40px)" opacity={0.6} zIndex={0} />}
 

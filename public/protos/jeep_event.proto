@@ -1,0 +1,75 @@
+// JEEP - Connected Vehicle India Plaform - Events
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+import "jeep_common.proto";
+import "timestamp.proto";
+
+//
+// [START Event_MessageType_Definition]
+//
+message Events {
+	google.protobuf.Timestamp time_stamp = 1;
+	oneof eventProperty {
+		MainWakeUpPayload MainWakeUpStatus = 12;
+		IgnitionStatusPayload IgnitionStatus=16;
+		TboxInFullSleepPayload TboxInFullSleepStatus=24;
+		TboxStateUpdateEventPayload TboxStateUpdateEvent = 26;
+		RemoteDoorLockUnlockCommandEventPayload RemoteDoorLockUnlockCommandEventStatus =46;
+		RemoteBlinkerOnOffCommandEventPayload RemoteBlinkerOnOffCommandEventStatus =47;
+		RemoteHonkEventPayload RemoteHonkEventStatus = 49;
+	}
+		
+}
+
+message EventPayload {
+	repeated Events EventsData = 1;
+} 
+
+//////////////////////////////////////////////////////////////
+//
+// [START VehicleAlert_MessageType_Definition]
+//
+//
+
+message RemoteBlinkerOnOffCommandEventPayload{
+	RemoteBlinkerEventType RemoteBlinkerEventState =1;
+	
+}
+
+message RemoteHonkEventPayload{
+	RemoteHonkEventType RemoteHonkEventState =1;
+	
+}
+
+message MainWakeUpPayload{
+	MainWakeUpType MainWakeUpState = 1;
+}
+
+message IgnitionStatusPayload{
+	IgnitionPropertyType IgnitionState = 1;
+}
+
+message TboxInFullSleepPayload{
+	TboxfullSleepType TboxfullSleepState = 1;
+}
+
+
+message TboxStateUpdateEventPayload{
+	eTboxApplicationState previousState = 1;
+	eTboxApplicationState currentState = 2;
+}
+
+message RemoteDoorLockUnlockCommandEventPayload{
+	RemoteDoorLockUnlockCommandEventType RemoteDoorLockUnlockCommandEventState=1;
+
+}
+
+//
+// [END Event_MessageType_Definition]
+/////////////////////////////////////////////////////////////

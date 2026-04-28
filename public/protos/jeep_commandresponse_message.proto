@@ -1,0 +1,57 @@
+// JEEP - Connected Vehicle India Plaform - command response message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+option java_outer_classname = "StlaJeepCommandResponse";
+
+import "timestamp.proto";
+import "jeep_common.proto";
+import "jeep_ota_command.proto";
+
+enum eReturnCode {
+	unknown_code = 0;
+	succeeded = 1;
+	failed = 2;
+}
+
+enum commandResponseSubType {
+	unknown_response = 0;
+	WakeupCommandResponse = 1;	
+	TBOXStateUpdateCommandResponse = 3;
+	FetchLogsCommandResponse = 4;
+	UserDefinedSpeedCommandResponse = 6;
+	RemoteDoorLockCommandResponse=9;
+	RemoteDoorUnLockCommandResponse=10;
+	RemoteBlinkerOnCommandResponse =23;
+	RemoteBlinkerOffCommandResponse =24;
+	RemoteHonkCommandResponse =25;	
+}
+
+message CommandResponsePayloadType{
+	oneof commandResponsePayload {
+		WakeupCommandResponsePayload wakeupCommandResponse = 1;
+		TBOXStateUpdateCommandResponsPayload tboxStateUpdateCommandResponsePayload = 3;
+		FetchlogsCommandResponsePayload fetchlogsCommandResponsePayload = 4;
+		UserDefinedSpeedCommandResponsePayload userDefinedSpeedCommandResponsePayload = 6;
+		RemoteDoorLockCommandResponsePayload remoteDoorLockCommandResponsePayload =9;
+		RemoteDoorUnLockCommandResponsePayload remoteDoorUnLockCommandResponsePayload =10;
+		RemoteBlinkerOnCommandResponsePayload remoteBlinkerOnCommandResponsePayload =23;
+		RemoteBlinkerOffCommandResponsePayload remoteBlinkerOffCommandResponsePayload =24;
+		RemoteHonkCommandResponsePayload remoteHonkCommandResponsePayload=25;
+	}
+}
+
+message CommandResponseMessage {
+	string message_id = 1;
+	string correlation_id = 2;
+	commandResponseSubType subtype = 3;
+	eTboxOperatingState tbox_operating_state = 4;
+	eTboxApplicationState e_tbox_application_state = 5;
+	eTboxeSimState tbox_esim_state = 6;
+	string version = 7;
+	google.protobuf.Timestamp time_stamp = 8;
+	eReturnCode return_code = 9;
+	CommandResponsePayloadType commandResponsePayload = 10;
+}

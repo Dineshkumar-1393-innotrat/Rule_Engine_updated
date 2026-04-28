@@ -2894,6 +2894,7 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
     const lastUpdate = getMostRecentTs();
     const hasAnyError = signals.some(s => s.error);
     const errorNames = signals.filter(s => s.error).map(s => s.name);
+    const isUsingVirtual = signals.some(s => s.data?.[0]?.isVirtual);
     const ignOn = ['ON', 'TRUE', 'CONNECTED', '1', 'RUN', 'START'].includes(String(ignition).toUpperCase());
 
     const ignitionDisplay = (() => {
@@ -3056,6 +3057,20 @@ const VisualDashboardView = ({ signals, deviceState, highestSpeed }) => {
                                     <VStack align="flex-start" spacing={0}>
                                         <Text color="red.700" fontWeight="bold" fontSize="xs">DATA SYNC ALERT</Text>
                                         <Text color="red.600" fontSize="10px">Signals with errors: {errorNames.join(', ')}</Text>
+                                    </VStack>
+                                </Flex>
+                            </Box>
+                        </motion.div>
+                    )}
+
+                    {isUsingVirtual && (
+                        <motion.div initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}>
+                            <Box bg="purple.50" border="1px solid" borderColor="purple.200" p={3} borderRadius="xl" mb={5} boxShadow="sm">
+                                <Flex align="center" gap={3}>
+                                    <Radio color="#805AD5" size={16} />
+                                    <VStack align="flex-start" spacing={0}>
+                                        <Text color="purple.700" fontWeight="bold" fontSize="xs">SIMULATED DATA ACTIVE</Text>
+                                        <Text color="purple.600" fontSize="10px">Rendering telemetry from MQTT Virtual Device for VIN: {vin}</Text>
                                     </VStack>
                                 </Flex>
                             </Box>
@@ -3470,7 +3485,7 @@ const SignalCard = ({ signal, searchTerm, onRefresh }) => {
 };
 
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
-const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412' }) => {
+const PayloadDashboardModal = ({ isOpen, onClose, vinValue = '' }) => {
     const [vin, setVin] = useState(() => localStorage.getItem('last_vin') || vinValue);
     const [signals, setSignals] = useState([
         { name: 'Fuel Level', apiName: 'fuelPercentage', id: '0x356', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: true },
@@ -3554,6 +3569,54 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
         } catch (e) { console.error('fetchOtherData', e); }
     };
 
+    const mapVirtualToSignal = (virtualData, signal) => {
+        if (!virtualData || !virtualData.telemetry) return null;
+        const t = virtualData.telemetry;
+        let val = null;
+        let unit = '';
+        let msg = 'STATUS_VIRTUAL_DEVICE';
+
+        if (signal.name === 'Fuel Level') { val = t.fuelLevel; unit = '%'; msg = 'VIRTUAL_BH_BCM1'; }
+        else if (signal.name === 'Total Odometer') { val = t.odometer; unit = 'km'; msg = 'VIRTUAL_TRIP'; }
+        else if (signal.name === 'Engine Water Temp') { val = t.engineWaterTemp; unit = '°C'; msg = 'VIRTUAL_CCAN3'; }
+        else if (signal.name === 'Engine Speed') { val = t.engineSpeed; unit = '1/min'; msg = 'VIRTUAL_CCAN5'; }
+        else if (signal.name === 'Vehicle Speed') { val = t.speed; unit = 'km/h'; msg = 'VIRTUAL_SPEED'; }
+        else if (signal.name === 'Battery Voltage Level') { val = t.batteryVoltage; unit = 'V'; msg = 'VIRTUAL_BATTERY'; }
+        else if (signal.name === 'External Temperature (C)') { val = t.externalTemp ?? t.ambientTemp; unit = '°C'; msg = 'VIRTUAL_AMBIENT'; }
+        else if (signal.name === 'External Temperature (F)') { let v = t.externalTemp ?? t.ambientTemp; val = v !== null ? (v * 1.8 + 32).toFixed(1) : null; unit = '°F'; msg = 'VIRTUAL_AMBIENT'; }
+        else if (signal.name === 'Location') {
+            return [{
+                gpsLat: t.gpsLat,
+                gpsLong: t.gpsLong,
+                gpsAlt: t.gpsAlt,
+                updatedTimeStamp: virtualData.lastUpdate,
+                messageName: 'VIRTUAL_LOCATION'
+            }];
+        }
+        else if (signal.name === 'Ignition Status') {
+            val = (t.speed > 0 || (t.engineSpeed && t.engineSpeed > 0)) ? 'RUN' : 'OFF';
+            return [{
+                signalValue: val,
+                eventtype: 'VIRTUAL_IGNITION',
+                sourcetimestamp: virtualData.lastUpdate,
+                updatedTimeStamp: virtualData.lastUpdate
+            }];
+        }
+
+        if (val === null || val === undefined) return null;
+
+        return [{
+            signalValue: val,
+            signalUnit: unit,
+            updatedTimeStamp: virtualData.lastUpdate,
+            packetStatus: 'V',
+            messageName: msg,
+            canType: 'VirtualTelemetry',
+            createdTimeStamp: virtualData.lastUpdate,
+            isVirtual: true
+        }];
+    };
+
     const mapVSToSignal = (vsData, signal) => {
         if (!vsData) return null;
         let d = vsData;
@@ -3603,41 +3666,64 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = 'MCANJREB1MFA65412'
             catch (e) { console.warn('VehicleStatus fetch error', e); }
         }
 
+        const virtualDataStr = localStorage.getItem(`mqtt_virtual_device_data_${vin}`);
+        const virtualData = virtualDataStr ? JSON.parse(virtualDataStr) : null;
+
         const promises = signals.map(async (signal) => {
             if (!signal.isChecked) return null;
             try {
-                let newData;
-                if (signal.useVehicleStatus && vsData) {
-                    newData = mapVSToSignal(vsData, signal);
-                    return { name: signal.name, newData };
+                let newData = null;
+                let fetchError = null;
+
+                // 1. Try Primary API Fetch
+                try {
+                    if (signal.useVehicleStatus && vsData) {
+                        newData = mapVSToSignal(vsData, signal);
+                    } else {
+                        if (signal.fetchType === 'events') newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
+                        else if (signal.fetchType === 'ignition') newData = await TraxoApi.getIgnitionEvents(vin, fmtStart, fmtEnd);
+                        else if (signal.fetchType === 'location') newData = await TraxoApi.getLocationTelemetryArray(vin);
+                        else if (signal.fetchType === 'alerts') newData = await TraxoApi.getAlerts(vin);
+                        else if (signal.fetchType === 'trips') {
+                            const format = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
+                            const now = new Date();
+                            const past = new Date(); past.setDate(past.getDate() - 30);
+                            newData = await TraxoApi.getTripSummary(vin, format(past), format(now));
+                        }
+                        else if (signal.fetchType === 'vehicleStatus') newData = await TraxoApi.getVehicleStatus(vin);
+                        else if (signal.fetchType === 'files') newData = await TraxoApi.listLogFiles(vin);
+                        else if (signal.fetchType === 'alerts_audit') newData = await TraxoApi.getAlertIngestion(vin);
+                        else if (signal.fetchType === 'signals') newData = await TraxoApi.getSignalList('356');
+                        else if (signal.fetchType === 'messages') newData = await TraxoApi.getVehicleTelemetryMessageList();
+                        else if (signal.fetchType === 'trip_pagination') newData = await TraxoApi.getTripDetailsWithPagination(vin, 0);
+                        else if (signal.fetchType === 'trip_details') {
+                            const tid = ongoingTrip?.tripId || signals.find(s => s.name === 'Trip History')?.data[0]?.tripId;
+                            if (tid) newData = await TraxoApi.getTripDetailsByTripId(vin, tid);
+                            else throw new Error('No Trip ID available');
+                        }
+                        else if (signal.fetchType === 'search') newData = await TraxoApi.portalSearch(vin, 'vin');
+                        else if (signal.fetchType === 'notification') newData = await TraxoApi.getDeviceJoinStatus(vin);
+                        else if (signal.fetchType === 'command_audit') newData = await TraxoApi.getCommandAudit(vin);
+                        else if (signal.fetchType !== 'manual') newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
+                    }
+                } catch (e) {
+                    console.warn(`API Fetch Failed for ${signal.name}, checking virtual fallback`, e.message);
+                    fetchError = e.message;
                 }
 
-                if (signal.fetchType === 'events') newData = await TraxoApi.getEvents(vin, 50, `${today} 00:00:00`, `${today} 23:59:59`);
-                else if (signal.fetchType === 'ignition') newData = await TraxoApi.getIgnitionEvents(vin, fmtStart, fmtEnd);
-                else if (signal.fetchType === 'location') newData = await TraxoApi.getLocationTelemetryArray(vin);
-                else if (signal.fetchType === 'alerts') newData = await TraxoApi.getAlerts(vin);
-                else if (signal.fetchType === 'trips') {
-                    const format = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:00`;
-                    const now = new Date();
-                    const past = new Date(); past.setDate(past.getDate() - 30);
-                    newData = await TraxoApi.getTripSummary(vin, format(past), format(now));
+                // 2. Fallback to Virtual Device Data if API failed or returned empty
+                const hasApiData = Array.isArray(newData) ? newData.length > 0 : !!newData;
+                if (!hasApiData && virtualData) {
+                    const vData = mapVirtualToSignal(virtualData, signal);
+                    if (vData) {
+                        console.log(`[Fallback] Using Virtual Device data for ${signal.name}`);
+                        newData = vData;
+                        fetchError = null; // Clear error if we have fallback data
+                    }
                 }
-                else if (signal.fetchType === 'vehicleStatus') newData = await TraxoApi.getVehicleStatus(vin);
-                else if (signal.fetchType === 'files') newData = await TraxoApi.listLogFiles(vin);
-                else if (signal.fetchType === 'alerts_audit') newData = await TraxoApi.getAlertIngestion(vin);
-                else if (signal.fetchType === 'signals') newData = await TraxoApi.getSignalList('356');
-                else if (signal.fetchType === 'messages') newData = await TraxoApi.getVehicleTelemetryMessageList();
-                else if (signal.fetchType === 'trip_pagination') newData = await TraxoApi.getTripDetailsWithPagination(vin, 0);
-                else if (signal.fetchType === 'trip_details') {
-                    const tid = ongoingTrip?.tripId || signals.find(s => s.name === 'Trip History')?.data[0]?.tripId;
-                    if (tid) newData = await TraxoApi.getTripDetailsByTripId(vin, tid);
-                    else throw new Error('No Trip ID available');
-                }
-                else if (signal.fetchType === 'search') newData = await TraxoApi.portalSearch(vin, 'vin');
-                else if (signal.fetchType === 'notification') newData = await TraxoApi.getDeviceJoinStatus(vin);
-                else if (signal.fetchType === 'command_audit') newData = await TraxoApi.getCommandAudit(vin);
-                else if (signal.fetchType !== 'manual') newData = await TraxoApi.getVehicleTelemetry(vin, signal.apiName);
-                else return null;
+
+                if (!newData && fetchError) throw new Error(fetchError);
+                if (!newData) return { name: signal.name, newData: null };
 
                 const normalized = (() => {
                     if (!newData) return null;
