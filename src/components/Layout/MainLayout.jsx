@@ -21,12 +21,10 @@ import { Menu, LayoutDashboard, Zap, Settings, Activity, ChevronRight, ChevronLe
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const navItems = [
-  { label: 'Engine Overview', icon: History, path: '/' },
-  { label: 'IoT Controls', icon: Activity, path: '/iot-rule-engine' },
-  // { label: 'Historical Analysis', icon: History, path: '/historical-analysis' },
+  { label: 'Engine Overview', icon: LayoutDashboard, path: '/payload-dashboard' },
   { label: 'Bulk Provisioning', icon: UploadCloud, path: '/bulk-provision' },
-  { label: 'System Console', icon: Terminal, path: '/system-console' },
-  { label: 'MQTT Virtual Device', icon: Radio, path: '/mqtt-virtual-device' },
+  { label: ' VIN Details', icon: Terminal, path: '/system-console' },
+  { label: 'MQTT Physical Device', icon: Radio, path: '/mqtt-virtual-device' },
 ];
 
 const SidebarContent = ({ onClose, currentPath, isCollapsed, onToggle, ...rest }) => {
@@ -112,6 +110,26 @@ const SidebarContent = ({ onClose, currentPath, isCollapsed, onToggle, ...rest }
           );
         })}
       </VStack>
+
+      {/* Logout Button */}
+      <Box position="absolute" bottom={20} w="full" px={4}>
+        <Flex
+          align="center"
+          p="4"
+          borderRadius="xl"
+          cursor="pointer"
+          color="red.500"
+          _hover={{ bg: 'red.50' }}
+          onClick={() => {
+            // Mock logout for now since we are using custom pages
+            navigate('/login');
+          }}
+          justifyContent={isCollapsed ? "center" : "flex-start"}
+        >
+          <Icon as={Radio} transform="rotate(180deg)" mr={isCollapsed ? 0 : 4} />
+          {!isCollapsed && <Text fontSize="sm" fontWeight="600">Logout</Text>}
+        </Flex>
+      </Box>
 
       {/* Collapse Toggle Button - Always at the bottom for Desktop */}
       <Box position="absolute" bottom={8} w="full" px={4} display={{ base: 'none', md: 'block' }}>

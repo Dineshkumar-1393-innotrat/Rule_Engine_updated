@@ -21,10 +21,44 @@ export const Sparkline = ({ data = [], color = '#3B6FE8', height = 32, width = 8
     );
 };
 
-export const SignalCard = ({ signal, searchTerm, onRefresh, handlers, isFullScreen }) => {
-    const [collapsed, setCollapsed] = useState(false);
+export const SignalCardHeader = ({ signal, isFullScreen, onRefresh, isExpanded }) => {
     const latestVal = signal.data?.[0]?.signalValue ?? signal.data?.[0]?.value ?? signal.data?.[0]?.Event ?? signal.data?.[0]?.signalData ?? null;
     const unit = signal.data?.[0]?.signalUnit ?? '';
+
+    return (
+        <Flex align="center" w="full">
+            <VStack align="flex-start" spacing={0} flex={1}>
+                <HStack spacing={3}>
+                    <Text fontWeight="800" fontSize={isFullScreen ? "16px" : "12px"} color="gray.700">{signal.name}</Text>
+                    <Badge variant="outline" colorScheme="gray" fontSize="9px" fontFamily="monospace" borderRadius="sm" px={1.5}>{signal.id}</Badge>
+                    {signal.error && <Badge colorScheme="red" fontSize="9px">ERROR</Badge>}
+                    {signal.loading && <Spinner size="xs" color="blue.400" />}
+                    {signal.data?.[0]?.isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="9px">SIMULATED</Badge>}
+                    {signal.lastUpdated && !signal.error && <Badge colorScheme="green" variant="subtle" fontSize="9px">{signal.lastUpdated}</Badge>}
+                </HStack>
+                {latestVal !== null && !signal.error && (
+                    <HStack spacing={1} mt={1}>
+                        <Text fontSize={isFullScreen ? "14px" : "10px"} fontWeight="800" color="blue.600">{String(latestVal)}</Text>
+                        {unit && <Text fontSize={isFullScreen ? "12px" : "9px"} color="gray.400" fontWeight="bold">{unit}</Text>}
+                    </HStack>
+                )}
+            </VStack>
+            <HStack spacing={3}>
+                {signal.data?.length > 1 && <Sparkline data={signal.data} color="#3B6FE8" width={isFullScreen ? 120 : 60} height={isFullScreen ? 40 : 22} />}
+                <IconButton 
+                    icon={<RotateCcw size={14} />} 
+                    size="sm" 
+                    variant="ghost" 
+                    aria-label="refresh" 
+                    onClick={(e) => { e.stopPropagation(); onRefresh(); }} 
+                />
+            </HStack>
+        </Flex>
+    );
+};
+
+export const SignalCard = ({ signal, searchTerm, onRefresh, handlers, isFullScreen }) => {
+    const [collapsed, setCollapsed] = useState(false);
 
     return (
         <Box 
@@ -38,8 +72,7 @@ export const SignalCard = ({ signal, searchTerm, onRefresh, handlers, isFullScre
             _hover={{ boxShadow: 'md', borderColor: 'blue.200' }}
             w="full"
         >
-            <Flex 
-                align="center" 
+            <Box 
                 px={4} 
                 py={isFullScreen ? 4 : 2.5} 
                 borderBottom="1px solid" 
@@ -48,28 +81,13 @@ export const SignalCard = ({ signal, searchTerm, onRefresh, handlers, isFullScre
                 cursor="pointer" 
                 onClick={() => setCollapsed(c => !c)}
             >
-                <VStack align="flex-start" spacing={0} flex={1}>
-                    <HStack spacing={3}>
-                        <Text fontWeight="800" fontSize={isFullScreen ? "16px" : "12px"} color="gray.700">{signal.name}</Text>
-                        <Badge variant="outline" colorScheme="gray" fontSize="9px" fontFamily="monospace" borderRadius="sm" px={1.5}>{signal.id}</Badge>
-                        {signal.error && <Badge colorScheme="red" fontSize="9px">ERROR</Badge>}
-                        {signal.loading && <Spinner size="xs" color="blue.400" />}
-                        {signal.data?.[0]?.isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="9px">SIMULATED</Badge>}
-                        {signal.lastUpdated && !signal.error && <Badge colorScheme="green" variant="subtle" fontSize="9px">{signal.lastUpdated}</Badge>}
-                    </HStack>
-                    {latestVal !== null && !signal.error && (
-                        <HStack spacing={1} mt={1}>
-                            <Text fontSize={isFullScreen ? "14px" : "10px"} fontWeight="800" color="blue.600">{String(latestVal)}</Text>
-                            {unit && <Text fontSize={isFullScreen ? "12px" : "9px"} color="gray.400" fontWeight="bold">{unit}</Text>}
-                        </HStack>
-                    )}
-                </VStack>
-                <HStack spacing={3}>
-                    {signal.data?.length > 1 && <Sparkline data={signal.data} color="#3B6FE8" width={isFullScreen ? 120 : 60} height={isFullScreen ? 40 : 22} />}
-                    <IconButton icon={<RotateCcw size={14} />} size="sm" variant="ghost" aria-label="refresh" onClick={(e) => { e.stopPropagation(); onRefresh(); }} />
-                    {collapsed ? <ChevronDown size={18} color="#A0AEC0" /> : <ChevronUp size={18} color="#A0AEC0" />}
-                </HStack>
-            </Flex>
+                <Flex align="center">
+                    <SignalCardHeader signal={signal} isFullScreen={isFullScreen} onRefresh={onRefresh} />
+                    <Box ml={2}>
+                        {collapsed ? <ChevronDown size={18} color="#A0AEC0" /> : <ChevronUp size={18} color="#A0AEC0" />}
+                    </Box>
+                </Flex>
+            </Box>
             <AnimatePresence>
                 {!collapsed && (
                     <motion.div 

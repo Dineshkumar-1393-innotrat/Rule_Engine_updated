@@ -604,6 +604,204 @@ function DeviceIdentityPanel({ state, dispatch }) {
 }
 
 // ─────────────────────────────────────────────
+// SECTION 1B — DEVICE CERTIFICATE CREATION
+// ─────────────────────────────────────────────
+function CertificatePanel({ state, dispatch }) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState(0); // 0=idle, 1=genKey, 2=createCSR, 3=callAPI, 4=done, -1=error
+  const [privateKeyPem, setPrivateKeyPem] = useState('');
+  const [csrPem, setCsrPem] = useState('');
+  const [certPem, setCertPem] = useState('');
+  const [certB64, setCertB64] = useState('');
+  const [deviceJoinPayload, setDeviceJoinPayload] = useState('');
+  const [error, setError] = useState('');
+  const [certLog, setCertLog] = useState([]);
+
+  const addLog = (msg) => setCertLog(l => [...l, `[${new Date().toLocaleTimeString()}] ${msg}`]);
+
+  const { vin, imei, tboxSerial } = state.config;
+  const commonName = `${imei}-${tboxSerial}`;
+
+  const toPem = (buffer, type) => {
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    const lines = b64.match(/.{1,64}/g).join('\n');
+    return `-----BEGIN ${type}-----\n${lines}\n-----END ${type}-----\n`;
+  };
+
+  const buildCsr = async (privateKey, publicKey) => {
+    const spkiDer = await crypto.subtle.exportKey('spki', publicKey);
+    const encode = (str) => new TextEncoder().encode(str);
+    
+    const tlv = (tag, value) => {
+      const arr = Array.isArray(value) ? value : Array.from(value);
+      const len = arr.length;
+      if (len < 128) return new Uint8Array([tag, len, ...arr]);
+      if (len < 256) return new Uint8Array([tag, 0x81, len, ...arr]);
+      return new Uint8Array([tag, 0x82, (len >> 8) & 0xff, len & 0xff, ...arr]);
+    };
+
+    // Attribute builder: SET(SEQUENCE(OID, PrintableString/UTF8String))
+    const attr = (oid, val, tag = 0x13) => tlv(0x31, tlv(0x30, [...tlv(0x06, oid), ...tlv(tag, encode(val))]));
+
+    // OIDs as seen in collection: C, O, CN
+    const OID_C = [0x55, 0x04, 0x06];
+    const OID_O = [0x55, 0x04, 0x0a];
+    const OID_CN = [0x55, 0x04, 0x03];
+
+    // Build subject attributes in order as seen in collection example: C, O, CN
+    const subject = tlv(0x30, [
+      ...attr(OID_C, 'IN'),
+      ...attr(OID_O, 'Tbox_cert'),
+      ...attr(OID_CN, commonName, 0x0c) // CN as UTF8String
+    ]);
+
+    const version = new Uint8Array([0x02, 0x01, 0x00]);
+    const spki = new Uint8Array(spkiDer);
+    const attrs = new Uint8Array([0xa0, 0x00]);
+    const certRequestInfo = tlv(0x30, [...version, ...subject, ...spki, ...attrs]);
+    
+    const sig = await crypto.subtle.sign({ name: 'RSASSA-PKCS1-v1_5' }, privateKey, certRequestInfo);
+    const algoId = new Uint8Array([0x30,0x0d,0x06,0x09,0x2a,0x86,0x48,0x86,0xf7,0x0d,0x01,0x01,0x0b,0x05,0x00]);
+    const bitString = tlv(0x03, [0x00, ...new Uint8Array(sig)]);
+    const csr = tlv(0x30, [...certRequestInfo, ...algoId, ...bitString]);
+    return csr.buffer;
+  };
+
+  const handleGenerate = async () => {
+    setStep(1); setError(''); setCertLog([]);
+    setPrivateKeyPem(''); setCsrPem(''); setCertPem(''); setCertB64(''); setDeviceJoinPayload('');
+    try {
+      addLog('Generating RSA-2048 key pair...');
+      const keyPair = await crypto.subtle.generateKey(
+        { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+        true, ['sign', 'verify']
+      );
+      const privDer = await crypto.subtle.exportKey('pkcs8', keyPair.privateKey);
+      const privPem = toPem(privDer, 'PRIVATE KEY');
+      setPrivateKeyPem(privPem);
+      addLog('✓ Private key generated (RSA-2048)');
+
+      setStep(2);
+      addLog(`Building CSR for CN=${commonName}...`);
+      const csrDer = await buildCsr(keyPair.privateKey, keyPair.publicKey);
+      
+      // Extract raw base64 as seen in Postman Collection
+      const csrBase64 = btoa(String.fromCharCode(...new Uint8Array(csrDer)));
+      const csrP = toPem(csrDer, 'CERTIFICATE REQUEST');
+      setCsrPem(csrP);
+      addLog('✓ CSR created');
+
+      setStep(3);
+      addLog('Calling CVIP Certificate API...');
+      const { TraxoApi } = await import('../../utils/TraxoApi');
+      
+      // Sending raw base64 as per collection example
+      const apiResp = await TraxoApi.createTboxCertificate(commonName, csrBase64);
+      addLog('✓ API responded');
+
+      setStep(4);
+      const certRaw = apiResp?.message || apiResp?.certificate || apiResp?.cert || '';
+      if (!certRaw) throw new Error(`No certificate in API response. Keys: ${Object.keys(apiResp || {}).join(', ')}`);
+      const certBytes = Uint8Array.from(atob(certRaw), c => c.charCodeAt(0));
+      const certPemStr = toPem(certBytes.buffer, 'CERTIFICATE');
+      setCertPem(certPemStr); setCertB64(certRaw);
+      addLog('✓ Certificate extracted and converted to PEM');
+
+      const ts = Date.now();
+      const joinPayload = {
+        vehicleId: vin, TboxSerialNum: tboxSerial, imeiNo: imei,
+        protocolVersion: "2.0.0", TboxOperatingState: "NORMAL",
+        TboxApplicationState: "FACTORY", TboxeSimState: "NORMAL_SIM",
+        CCPUVersion: "MD0.00.01", VMCUVersion: "MD0.00.01",
+        timestamp: ts, certificate: certRaw
+      };
+      setDeviceJoinPayload(JSON.stringify(joinPayload, null, 2));
+      addLog('✓ deviceJoin payload built');
+      addLog('🎉 Certificate creation complete!');
+      dispatch({ type: 'ADD_TOAST', toast: { id: Date.now().toString(), message: '✓ Certificate Created', type: 'success' } });
+    } catch (e) {
+      setStep(-1); setError(e.message || String(e));
+      addLog(`❌ Error: ${e.message}`);
+    }
+  };
+
+  const downloadFile = (content, filename) => {
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const stepLabels = ['Idle', 'Key Gen', 'CSR', 'API Call', 'Done'];
+  const stepColors = ['#718096', '#f59e0b', '#3182ce', '#9333ea', '#38a169'];
+
+  return (
+    <Card>
+      <div
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', marginBottom: open ? 12 : 0 }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <SectionHeader>🔐 Device Certificate</SectionHeader>
+        <motion.span animate={{ rotate: open ? 180 : 0 }} transition={SPRINGS.panelCollapse} style={{ color: T.accent, fontSize: 16, marginTop: -6 }}>▼</motion.span>
+      </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div key="cert-body" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={SPRINGS.panelCollapse} style={{ overflow: 'hidden' }}>
+            <div style={{ background: `${T.accent}11`, border: `1px solid ${T.accent}33`, borderRadius: 8, padding: 10, marginBottom: 12, fontFamily: T.mono, fontSize: 11 }}>
+              <div style={{ color: T.textMut, marginBottom: 4 }}>VIN: <span style={{ color: T.textPri, fontWeight: 700 }}>{vin}</span></div>
+              <div style={{ color: T.textMut, marginBottom: 4 }}>IMEI: <span style={{ color: T.textPri, fontWeight: 700 }}>{imei}</span></div>
+              <div style={{ color: T.textMut }}>CN: <span style={{ color: T.accent, fontWeight: 700 }}>{commonName}</span></div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 3, marginBottom: 12 }}>
+              {stepLabels.map((label, i) => (
+                <div key={i} style={{
+                  flex: 1, textAlign: 'center', fontSize: 9, fontFamily: T.mono, fontWeight: 700,
+                  padding: '4px 2px', borderRadius: 4,
+                  background: step === i ? `${stepColors[i]}22` : step > i ? `${T.pub}11` : 'transparent',
+                  color: step === i ? stepColors[i] : step > i ? T.pub : T.textMut,
+                  border: `1px solid ${step === i ? stepColors[i] : step > i ? T.pub : T.border}`,
+                }}>
+                  {step > i ? '✓' : i + 1} {label}
+                </div>
+              ))}
+            </div>
+
+            <PressButton onClick={handleGenerate} color={step === 4 ? T.pub : T.accent} disabled={step > 0 && step < 4 && step !== -1} style={{ width: '100%', marginBottom: 10 }}>
+              {step === 0 ? '🔐 Generate Certificate' : step === 4 ? '↻ Regenerate' : step === -1 ? '↻ Retry' : '⟳ Working...'}
+            </PressButton>
+
+            {certLog.length > 0 && (
+              <div style={{ background: '#0d1117', borderRadius: 6, padding: 8, marginBottom: 10, fontFamily: T.mono, fontSize: 10, color: '#7ee787', maxHeight: 100, overflowY: 'auto', lineHeight: 1.6 }}>
+                {certLog.map((l, i) => <div key={i}>{l}</div>)}
+              </div>
+            )}
+
+            {error && (
+              <div style={{ background: `${T.error}11`, border: `1px solid ${T.error}`, borderRadius: 6, padding: 8, marginBottom: 10, fontFamily: T.mono, fontSize: 10, color: T.error }}>{error}</div>
+            )}
+
+            {step === 4 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(privateKeyPem, 'device_private.key')}>↓ Private Key (.key)</PressButton>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(csrPem, 'device.csr')}>↓ CSR (.csr)</PressButton>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(certPem, 'device_cert.pem')}>↓ Certificate PEM</PressButton>
+                <PressButton color="#9333ea" style={{ width: '100%' }} onClick={() => downloadFile(deviceJoinPayload, 'device_join_payload.json')}>↓ deviceJoin Payload (.json)</PressButton>
+                <div style={{ marginTop: 6 }}>
+                  <Label>deviceJoin Payload Preview</Label>
+                  <textarea readOnly value={deviceJoinPayload} style={{ width: '100%', height: 140, background: '#0d1117', color: '#e6edf3', fontFamily: T.mono, fontSize: 10, border: `1px solid ${T.border}`, borderRadius: 6, padding: 8, resize: 'vertical', boxSizing: 'border-box' }} />
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
+  );
+}
+
+// ─────────────────────────────────────────────
 // SECTION 2 — MQTT CONNECTION
 // ─────────────────────────────────────────────
 function ConnectionPanel({ state, dispatch }) {
@@ -2344,6 +2542,7 @@ export default function MQTTVirtualDeviceDashboard() {
           scrollbarColor: `${T.border} transparent`,
         }}>
           <DeviceIdentityPanel state={state} dispatch={dispatch} />
+          <CertificatePanel     state={state} dispatch={dispatch} />
           <ConnectionPanel     state={state} dispatch={dispatch} />
           <Card>
             <SectionHeader>⭐ Automation</SectionHeader>

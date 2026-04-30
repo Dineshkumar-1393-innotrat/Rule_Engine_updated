@@ -9,7 +9,9 @@ export const DeviceDetails = ({ deviceState, vin }) => {
             <HStack spacing={2} mb={3}>
                 <Info size={15} color="#3B6FE8" />
                 <Heading size="xs" color="gray.700">Device Details</Heading>
-                <Badge colorScheme={deviceState.deviceConnectedState === 'CONNECTED' ? 'green' : 'red'} variant="solid" fontSize="9px">{deviceState.deviceConnectedState || 'UNKNOWN'}</Badge>
+                <Badge colorScheme={deviceState.deviceConnectedState === 'CONNECTED' ? 'green' : 'red'} variant="solid" fontSize="9px">
+                    T-BOX: {deviceState.deviceConnectedState || 'UNKNOWN'}
+                </Badge>
             </HStack>
             <SimpleGrid columns={{ base: 1, sm: 2, md: 3, lg: 6 }} gap={3}>
                 {[

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     Box,
     Flex,
@@ -22,6 +23,7 @@ import {
     IconButton,
     useToast,
     Divider,
+    Spinner,
     Code,
     Tag,
     Select,
@@ -59,6 +61,12 @@ import {
     AlertTitle,
     AlertDescription,
     Wrap,
+    Popover,
+    PopoverTrigger,
+    PopoverContent,
+    PopoverHeader,
+    PopoverBody,
+    PopoverArrow,
 } from '@chakra-ui/react';
 import {
     Terminal,
@@ -596,7 +604,7 @@ const PROCEDURAL_DOCS = {
             "Tamper Status labels: SECURE, TAMPERED.",
             "To manage specific notifications, enter the notificationId in the variables panel."
         ],
-        tips: "Device Join status is derived from the latest system-level MQTT connectivity heartbeat."
+        tips: "Device Join status is derived from the latest system-level MQTT connectivity heartbeat. NOTE: 403 Forbidden means the VIN is not linked to your current JEEP mobile account."
     }
 };
 
@@ -673,12 +681,19 @@ const ApiPreview = ({ epKey, result }) => {
     }
 
     if (error) {
+        const isForbidden = error.includes('403') || response?.status === 403;
         return (
-            <Alert status="error" borderRadius="md" variant="subtle">
+            <Alert status="error" borderRadius="md" variant="subtle" py={4}>
                 <AlertIcon />
                 <Box>
-                    <AlertTitle fontSize="sm">Execution Failed</AlertTitle>
-                    <AlertDescription fontSize="xs">{error}</AlertDescription>
+                    <AlertTitle fontSize="sm">
+                        {isForbidden ? 'Authorization Required' : 'Execution Failed'}
+                    </AlertTitle>
+                    <AlertDescription fontSize="xs">
+                        {isForbidden 
+                            ? "This VIN is not authorized for the current account. Please ensure you are logged into the correct JEEP account for this vehicle, or use an Admin/Factory endpoint for general status."
+                            : error}
+                    </AlertDescription>
                 </Box>
             </Alert>
         );
@@ -1159,6 +1174,7 @@ const SystemConsolePage = () => {
     const [apiResults, setApiResults] = useState({});
     const [loadingMap, setLoadingMap] = useState({});
     const [searchTerm, setSearchTerm] = useState('');
+    const [globalLoading, setGlobalLoading] = useState(false);
 
     // Help Modal Management
     const { isOpen: isHelpOpen, onOpen: onHelpOpen, onClose: onHelpClose } = useDisclosure();
@@ -1315,9 +1331,22 @@ const SystemConsolePage = () => {
 
     useEffect(() => {
         if (globalVin) {
+            setGlobalLoading(true);
+            const timer = setTimeout(() => {
+                setGlobalLoading(false);
+                toast({
+                    title: 'Diagnostics Initialized',
+                    description: `Targeting VIN: ${globalVin}`,
+                    status: 'success',
+                    duration: 2000,
+                    position: 'top'
+                });
+            }, 1200);
+
             localStorage.setItem('last_vin', globalVin);
             const patterns = globalVin.substring(0, 12);
             setParams(prev => ({ ...prev, pattern: patterns }));
+            return () => clearTimeout(timer);
         }
     }, [globalVin]);
 
@@ -1436,6 +1465,11 @@ const SystemConsolePage = () => {
             console.groupEnd();
         }
     };
+    const handleManualHelp = (e, categoryId) => {
+        e.stopPropagation();
+        setActiveHelpCategory(categoryId);
+        onHelpOpen();
+    };
 
     const handleFetchAll = async () => {
         if (!globalVin) {
@@ -1475,6 +1509,58 @@ const SystemConsolePage = () => {
 
     return (
         <Box p={{ base: 4, md: 8, lg: 10 }} bg="gray.50" minH="100vh">
+            <AnimatePresence>
+                {globalLoading && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed',
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center',
+                            zIndex: 9999
+                        }}
+                    >
+                        <VStack spacing={6}>
+                            <Spinner thickness="4px" speed="0.65s" emptyColor="gray.200" color="blue.500" size="xl" />
+                            <motion.div
+                                initial={{ opacity: 1 }}
+                                animate={{ opacity: 1 }}
+                            >
+                                <VStack spacing={1}>
+                                    <Text fontSize="xs" color="gray.700" textAlign="center" fontWeight="light">
+                                        Good things are taking shape — thanks for your patience
+                                    </Text>
+                                    <Text fontSize="xs" fontWeight="bold" color="blue.500" fontFamily="monospace">TARGET: {globalVin}</Text>
+                                </VStack>
+                            </motion.div>
+
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.8 }}
+                            >
+                                <HStack spacing={2} bg="green.500" px={4} py={1} borderRadius="full">
+                                    <Box w={2} h={2} borderRadius="full" bg="white" />
+                                    <Text color="white" fontWeight="black" fontSize="10px" letterSpacing="1px">DETAILS FETCHED SUCCESSFULLY</Text>
+                                </HStack>
+                            </motion.div>
+                            <Box w="240px" h="3px" bg="gray.100" borderRadius="full" overflow="hidden">
+                                <motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: "100%" }}
+                                    transition={{ duration: 1.2, ease: "easeInOut" }}
+                                    style={{ height: '100%', backgroundColor: '#48BB78' }}
+                                />
+                            </Box>
+                        </VStack>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             {/* Variables Header */}
             <Card mb={8} shadow="lg" borderRadius="2xl" border="1px solid" borderColor="blue.100" bg="white">
                 <CardBody p={{ base: 4, md: 6 }}>
@@ -1486,12 +1572,49 @@ const SystemConsolePage = () => {
                                 <Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">DIAGNOSTIC DASHBOARD</Text>
                             </HStack>
                             <HStack spacing={3} wrap="wrap">
-                                <Badge colorScheme="blue" variant="subtle" px={3} py={1} borderRadius="lg" fontSize="10px">
-                                    READY FOR DIAGNOSTICS
-                                </Badge>
-                                <Tag size="md" colorScheme="purple" variant="subtle" borderRadius="full">
-                                    <Icon as={Shield} mr={2} /> Preprod Environment
-                                </Tag>
+                                <Popover trigger="hover" placement="bottom-end" openDelay={200}>
+                                    <PopoverTrigger>
+                                        <Box cursor="help">
+                                            <Badge colorScheme="blue" variant="subtle" px={3} py={1} borderRadius="lg" fontSize="10px">
+                                                READY FOR DIAGNOSTICS
+                                            </Badge>
+                                        </Box>
+                                    </PopoverTrigger>
+                                    <PopoverContent bg="white" borderColor="blue.100" shadow="xl" borderRadius="xl" p={0}>
+                                        <PopoverArrow bg="white" />
+                                        <PopoverHeader border="none" bg="blue.50" borderTopRadius="xl" py={2} px={4}>
+                                            <HStack><Icon as={Info} color="blue.500" size={14} /><Text fontSize="xs" fontWeight="black" color="blue.700">FAQ: Status Logic</Text></HStack>
+                                        </PopoverHeader>
+                                        <PopoverBody py={3} px={4}>
+                                            <VStack align="flex-start" spacing={2}>
+                                                <Text fontSize="xs" color="gray.600"><b>What is this?</b> This status confirms that a valid VIN has been entered and the system is ready to route API requests.</Text>
+                                                <Text fontSize="xs" color="gray.600"><b>Origin:</b> Derived from the successful validation of the 17-digit VIN against the STLA/Jeep platform registry.</Text>
+                                            </VStack>
+                                        </PopoverBody>
+                                    </PopoverContent>
+                                </Popover>
+
+                                <Popover trigger="hover" placement="bottom-end" openDelay={200}>
+                                    <PopoverTrigger>
+                                        <Box cursor="help">
+                                            <Tag size="md" colorScheme="purple" variant="subtle" borderRadius="full">
+                                                <Icon as={Shield} mr={2} /> Preprod Environment
+                                            </Tag>
+                                        </Box>
+                                    </PopoverTrigger>
+                                    <PopoverContent bg="white" borderColor="purple.100" shadow="xl" borderRadius="xl" p={0}>
+                                        <PopoverArrow bg="white" />
+                                        <PopoverHeader border="none" bg="purple.50" borderTopRadius="xl" py={2} px={4}>
+                                            <HStack><Icon as={Shield} color="purple.500" size={14} /><Text fontSize="xs" fontWeight="black" color="purple.700">FAQ: Environment</Text></HStack>
+                                        </PopoverHeader>
+                                        <PopoverBody py={3} px={4}>
+                                            <VStack align="flex-start" spacing={2}>
+                                                <Text fontSize="xs" color="gray.600"><b>What is this?</b> The current target environment for all diagnostic and remote command APIs.</Text>
+                                                <Text fontSize="xs" color="gray.600"><b>Origin:</b> Pointing to <code>cvip-preprod</code> infrastructure for testing against Jeep 4.1/5.0 platform specifications.</Text>
+                                            </VStack>
+                                        </PopoverBody>
+                                    </PopoverContent>
+                                </Popover>
                             </HStack>
                         </Flex>
 
@@ -1625,18 +1748,49 @@ const SystemConsolePage = () => {
                                         <HStack spacing={2}>
                                             <Heading size="sm" fontSize={{ base: "sm", md: "md" }}>{cat.name}</Heading>
                                             {PROCEDURAL_DOCS[cat.id] && (
-                                                <Tooltip label="How to use this category" placement="right">
-                                                    <IconButton
-                                                        icon={<HelpCircle size={14} />}
-                                                        size="xs"
-                                                        variant="ghost"
-                                                        color="gray.400"
-                                                        _hover={{ color: "blue.500", bg: "blue.50" }}
-                                                        onClick={(e) => handleManualHelp(e, cat.id)}
-                                                        aria-label="Help"
-                                                        borderRadius="full"
-                                                    />
-                                                </Tooltip>
+                                                <Popover trigger="hover" placement="right" openDelay={200}>
+                                                    <PopoverTrigger>
+                                                        <IconButton
+                                                            icon={<HelpCircle size={14} />}
+                                                            size="xs"
+                                                            variant="ghost"
+                                                            color="gray.400"
+                                                            _hover={{ color: "blue.500", bg: "blue.50" }}
+                                                            onClick={(e) => handleManualHelp(e, cat.id)}
+                                                            aria-label="Help"
+                                                            borderRadius="full"
+                                                        />
+                                                    </PopoverTrigger>
+                                                    <PopoverContent bg="white" borderColor="blue.100" shadow="2xl" borderRadius="xl" p={0} w="300px" zIndex={1000}>
+                                                        <PopoverArrow bg="white" />
+                                                        <PopoverHeader border="none" bg="blue.50" borderTopRadius="xl" py={2} px={4}>
+                                                            <HStack><Icon as={HelpCircle} color="blue.500" size={14} /><Text fontSize="xs" fontWeight="black" color="blue.700">{PROCEDURAL_DOCS[cat.id].title}</Text></HStack>
+                                                        </PopoverHeader>
+                                                        <PopoverBody py={3} px={4}>
+                                                            <VStack align="flex-start" spacing={2}>
+                                                                {PROCEDURAL_DOCS[cat.id].steps.slice(0, 3).map((step, i) => (
+                                                                    <HStack key={i} align="flex-start" spacing={2}>
+                                                                        <Badge colorScheme="blue" variant="solid" fontSize="8px" borderRadius="full" boxSize="14px" display="flex" alignItems="center" justifyContent="center">{i + 1}</Badge>
+                                                                        <Text fontSize="10px" color="gray.600" fontWeight="medium">{step}</Text>
+                                                                    </HStack>
+                                                                ))}
+                                                                {PROCEDURAL_DOCS[cat.id].steps.length > 3 && (
+                                                                    <Text 
+                                                                        fontSize="9px" 
+                                                                        color="blue.500" 
+                                                                        fontWeight="bold" 
+                                                                        pl={6} 
+                                                                        cursor="pointer" 
+                                                                        _hover={{ textDecoration: 'underline', color: 'blue.600' }}
+                                                                        onClick={(e) => handleManualHelp(e, cat.id)}
+                                                                    >
+                                                                        + Click here for full guide
+                                                                    </Text>
+                                                                )}
+                                                            </VStack>
+                                                        </PopoverBody>
+                                                    </PopoverContent>
+                                                </Popover>
                                             )}
                                         </HStack>
                                         <Text fontSize="2xs" color="gray.400" fontWeight="bold">{cat.endpoints.length} Endpoints Integrated</Text>
@@ -1654,7 +1808,7 @@ const SystemConsolePage = () => {
                         <Collapse in={expandedCards.includes(cat.id)}>
                             <CardBody p={0} bg="white">
                                 <Box overflowX="auto">
-                                    <Table variant="simple" size="sm">
+                                    <Table variant="simple" size="sm" width="full" style={{ tableLayout: 'fixed' }}>
                                         <Tbody>
                                             {cat.endpoints.map((ep, idx) => {
                                                 const epKey = `${cat.id}-${ep.name}`;
@@ -1664,7 +1818,7 @@ const SystemConsolePage = () => {
                                                 return (
                                                     <React.Fragment key={idx}>
                                                         <Tr _hover={{ bg: "gray.50" }} transition="all 0.2s">
-                                                            <Td minW="200px">
+                                                            <Td width="250px" minW="250px">
                                                                 <HStack>
                                                                     <Badge
                                                                         colorScheme={
@@ -1679,7 +1833,7 @@ const SystemConsolePage = () => {
                                                                 </HStack>
                                                             </Td>
                                                             <Td>
-                                                                <Flex align="center" gap={4}>
+                                                                <Flex align="center" gap={4} w="full">
                                                                     {ep.name === 'Upload Firmware (ZIP)' ? (
                                                                         <FotaParameterManager
                                                                             params={params}

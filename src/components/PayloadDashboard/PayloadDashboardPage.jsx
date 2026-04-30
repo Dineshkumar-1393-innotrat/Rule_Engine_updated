@@ -8,9 +8,17 @@ import {
     useToast,
     SimpleGrid,
     Heading,
-    HStack
+    HStack,
+    Accordion,
+    AccordionItem,
+    AccordionButton,
+    AccordionPanel,
+    AccordionIcon,
+    VStack,
+    Spinner,
+    Badge,
 } from '@chakra-ui/react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, RotateCcw, AlertTriangle, Activity } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,7 +28,8 @@ import { formatFullDate } from './dataUtils';
 // Extracted Components
 import { DashboardHeader } from './DashboardHeader';
 import { VisualView } from './VisualView';
-import { SignalCard } from './SignalCard';
+import { SignalCard, SignalCardHeader } from './SignalCard';
+import { DataTable } from './DataTable';
 import { DeviceEventsList } from './DeviceEventsList';
 import { DeviceDetails, RemoteCommands } from './DeviceControlPanel';
 const THEME = { bg: 'gray.50' };
@@ -31,6 +40,7 @@ const PayloadDashboardPage = () => {
     const toast = useToast();
 
     const [vin, setVin] = useState(urlVin || '');
+    const [tempVin, setTempVin] = useState(urlVin || '');
     const [signals, setSignals] = useState([
         { name: 'Fuel Level', apiName: 'FuelLevel', id: '0x356', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
         { name: 'Total Odometer', apiName: 'TotalOdometer', id: '0x760', isChecked: true, data: [], loading: false, error: null, useVehicleStatus: false },
@@ -70,13 +80,29 @@ const PayloadDashboardPage = () => {
     const [fotaVersion, setFotaVersion] = useState('2314.0');
     const [isFotaUpdating, setIsFotaUpdating] = useState(false);
     const [speedAlert, setSpeedAlert] = useState('');
+    const [nadSwVersion, setNadSwVersion] = useState(null);
+    const [fotaStatusLive, setFotaStatusLive] = useState(null);
     const [lastRefreshTime, setLastRefreshTime] = useState(null);
     const [pollingInterval, setPollingInterval] = useState(10);
+    const [globalLoading, setGlobalLoading] = useState(false);
 
     const savedPollCallback = useRef();
 
     useEffect(() => {
         if (vin) {
+            setGlobalLoading(true);
+            const timer = setTimeout(() => {
+                setGlobalLoading(false);
+                toast({
+                    title: 'Details Fetched',
+                    description: `Successfully retrieved data for ${vin}`,
+                    status: 'success',
+                    duration: 2000,
+                    isClosable: true,
+                    position: 'top'
+                });
+            }, 1200); // Slightly longer to show the "Success" state in UI
+
             if (urlVin !== vin) {
                 navigate(`/payload-dashboard/${vin}`, { replace: true });
             }
@@ -86,6 +112,7 @@ const PayloadDashboardPage = () => {
             (async () => {
                 await Promise.all([fetchCheckedSignals(), fetchOtherData()]);
             })();
+            return () => clearTimeout(timer);
         }
     }, [vin]);
 
@@ -179,7 +206,17 @@ const PayloadDashboardPage = () => {
                 }
             }
 
-            if (s) setDeviceState(s);
+            if (s) {
+                try {
+                    const fota = await TraxoApi.getFotaState(vin);
+                    if (fota) {
+                        const status = fota.fotaStatus || fota.status || fota.otaStatus;
+                        if (status) setFotaStatusLive(status);
+                        s = { ...s, fotaStatus: status };
+                    }
+                } catch (e) { console.warn('FOTA state fetch failed', e); }
+                setDeviceState(s);
+            }
             try {
                 const t = await TraxoApi.getOngoingTrip(vin);
                 if (t) {
@@ -279,6 +316,43 @@ const PayloadDashboardPage = () => {
                     }
                 }
 
+                // Extract NAD_SW_Version from Device Events response
+                if (signal.fetchType === 'events' && Array.isArray(newData)) {
+                    // DEBUG: Log first item to see actual field structure
+                    if (newData.length > 0) {
+                        console.log('[NAD_DEBUG] First event item keys:', Object.keys(newData[0]));
+                        console.log('[NAD_DEBUG] First event item FULL:', JSON.stringify(newData[0], null, 2));
+                    }
+
+                    for (const item of newData) {
+                        // Parse details if it's a JSON string
+                        let details = item?.details || item?.Details || item?.eventDetails || item?.eventPayload || item?.payload || {};
+                        if (typeof details === 'string' && details.trim().startsWith('{')) {
+                            try { details = JSON.parse(details); } catch (e) { details = {}; }
+                        }
+
+                        // Also parse details.payload if it's a JSON string
+                        let payload = details?.payload || {};
+                        if (typeof payload === 'string' && payload.trim().startsWith('{')) {
+                            try { payload = JSON.parse(payload); } catch (e) { payload = {}; }
+                        }
+
+                        // Exhaustively check all locations
+                        const ver = item?.NAD_SW_Version
+                            || details?.NAD_SW_Version
+                            || details?.nad_sw_version
+                            || payload?.NAD_SW_Version
+                            || payload?.nad_sw_version
+                            || details?.nadSwVersion
+                            || payload?.nadSwVersion;
+
+                        if (ver) {
+                            console.log(`[Dashboard] NAD_SW_Version found: ${ver}`);
+                            setNadSwVersion(ver);
+                            break;
+                        }
+                    }
+                }
                 return { name: signal.name, newData };
             } catch (error) {
                 const errMsg = error?.message || String(error) || '';
@@ -578,13 +652,67 @@ const PayloadDashboardPage = () => {
 
     return (
         <Box minH="100vh" bg={THEME.bg}>
+            <AnimatePresence>
+                {globalLoading && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        style={{
+                            position: 'fixed',
+                            top: 0, left: 0, right: 0, bottom: 0,
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            backdropFilter: 'blur(8px)',
+                            display: 'flex', flexDirection: 'column',
+                            alignItems: 'center', justifyContent: 'center',
+                            zIndex: 9999
+                        }}
+                    >
+                        <VStack spacing={6}>
+                            <Spinner thickness="4px" speed="0.65s" emptyColor="gray.200" color="blue.500" size="xl" />
+                                <motion.div
+                                    initial={{ opacity: 1 }}
+                                    animate={{ opacity: 1 }}
+                                >
+                                    <VStack spacing={1}>
+                                        <Text fontSize="xs" color="gray.700" textAlign="center" fontWeight="light">
+                                            Good things are taking shape — thanks for your patience
+                                        </Text>
+                                        <Text fontSize="xs" fontWeight="bold" color="blue.500" fontFamily="monospace">LINKING TO VIN: {vin}</Text>
+                                    </VStack>
+                                </motion.div>
+                                
+                                {/* Overlay "FETCHED" message that appears at the end */}
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.8 }}
+                                >
+                                    <HStack spacing={2} bg="green.500" px={4} py={1} borderRadius="full">
+                                        <Box w={2} h={2} borderRadius="full" bg="white" />
+                                        <Text color="white" fontWeight="black" fontSize="10px" letterSpacing="1px">DETAILS FETCHED SUCCESSFULLY</Text>
+                                    </HStack>
+                                </motion.div>
+                                <Box w="240px" h="3px" bg="gray.100" borderRadius="full" overflow="hidden">
+                                    <motion.div
+                                        initial={{ width: 0 }}
+                                        animate={{ width: "100%" }}
+                                        transition={{ duration: 1.2, ease: "easeInOut" }}
+                                        style={{ height: '100%', backgroundColor: '#48BB78' }} // Green color for success
+                                    />
+                                </Box>
+                            </VStack>
+                    </motion.div>
+                )}
+            </AnimatePresence>
             {/* Header */}
             <DeviceEventsList events={signals.find(s => s.name === 'Device Events')?.data || []} />
 
             <DashboardHeader
                 viewMode={viewMode} setViewMode={setViewMode}
                 searchTerm={searchTerm} setSearchTerm={setSearchTerm}
-                vin={vin} setVin={setVin}
+                vin={tempVin} setVin={setTempVin}
+                handleVinSubmit={() => setVin(tempVin)}
                 pollingInterval={pollingInterval} setPollingInterval={setPollingInterval}
                 isLive={isLive} setIsLive={setIsLive}
                 handleRefresh={handleRefresh}
@@ -593,7 +721,7 @@ const PayloadDashboardPage = () => {
             />
 
             {viewMode === 'visual' ? (
-                <VisualView signals={signals} deviceState={deviceState} highestSpeed={highestSpeed} />
+                <VisualView signals={signals} deviceState={deviceState} ongoingTrip={ongoingTrip} highestSpeed={highestSpeed} nadSwVersion={nadSwVersion} fotaStatusLive={fotaStatusLive} />
             ) : (
                 <Box position="relative">
                     <Box position="absolute" top={0} left={0} right={0} bottom={0} backgroundImage="radial-gradient(circle, #dde4f0 1.5px, transparent 1.5px)" backgroundSize="32px 32px" pointerEvents="none" opacity={0.4} zIndex={0} />
@@ -606,22 +734,49 @@ const PayloadDashboardPage = () => {
                             </HStack>
                             <Text fontSize="10px" color="gray.400" fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px">{filteredSignalsCount} signals shown</Text>
                         </Flex>
-                        <SimpleGrid 
-                            columns={filteredSignals.length === 1 && searchTerm ? 1 : { base: 1, md: 2, xl: 3, "2xl": 4 }} 
-                            spacing={6}
-                        >
+                        <Accordion allowMultiple defaultIndex={[0]} bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" overflow="hidden" boxShadow="sm">
                             {filteredSignals.map((signal, index) => (
-                                <Box key={signal.id + index} gridColumn={filteredSignals.length === 1 && searchTerm ? "span 1" : "auto"}>
-                                    <SignalCard
-                                        signal={signal}
-                                        searchTerm={searchTerm}
-                                        onRefresh={handleRefresh}
-                                        handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }}
-                                        isFullScreen={filteredSignals.length === 1 && searchTerm}
-                                    />
-                                </Box>
+                                <AccordionItem key={signal.id + index} border="none" borderBottom="1px solid" borderColor="gray.50" _last={{ borderBottom: "none" }}>
+                                    {({ isExpanded }) => (
+                                        <>
+                                            <h2>
+                                                <AccordionButton _hover={{ bg: 'blue.50' }} py={3} px={4} transition="all 0.2s">
+                                                    <SignalCardHeader signal={signal} onRefresh={handleRefresh} isExpanded={isExpanded} />
+                                                    <AccordionIcon ml={2} />
+                                                </AccordionButton>
+                                            </h2>
+                                            <AccordionPanel pb={4} bg="gray.50">
+                                                <Box bg="white" borderRadius="lg" border="1px solid" borderColor="gray.200" overflow="hidden" height="350px">
+                                                    {signal.error ? (
+                                                        <Flex align="center" justify="center" h="full" p={6} direction="column" bg="red.50">
+                                                            <AlertTriangle size={32} color="#EF4444" />
+                                                            <Text color="red.700" fontSize="12px" fontWeight="900" fontFamily="monospace" mt={3} textAlign="center">SIGNAL ERROR</Text>
+                                                            <Text color="red.600" fontSize="10px" fontWeight="bold" textAlign="center" maxW="80%" mt={1}>{signal.error}</Text>
+                                                            <IconButton size="xs" mt={3} colorScheme="red" variant="outline" icon={<RotateCcw size={10} />} onClick={handleRefresh} aria-label="Retry" />
+                                                        </Flex>
+                                                    ) : signal.data?.length > 0 ? (
+                                                        <DataTable data={signal.data} name={signal.name} searchTerm={searchTerm} handlers={{ handleDownloadLog, handleDeleteLog, handleNotificationAction }} />
+                                                    ) : signal.loading ? (
+                                                        <Flex align="center" justify="center" h="full">
+                                                            <VStack spacing={3}>
+                                                                <Spinner size="md" color="blue.400" thickness="4px" />
+                                                                <Text color="gray.500" fontSize="12px" fontWeight="bold" fontFamily="monospace">ESTABLISHING LINK...</Text>
+                                                            </VStack>
+                                                        </Flex>
+                                                    ) : (
+                                                        <Flex align="center" justify="center" h="full" direction="column" bg="gray.50">
+                                                            <Activity size={28} color="#CBD5E0" />
+                                                            <Text color="gray.400" fontSize="12px" fontWeight="bold" fontFamily="monospace" mt={2}>NO DATA PACKETS</Text>
+                                                            <Text color="gray.400" fontSize="9px" mt={0.5}>Waiting for telemetry...</Text>
+                                                        </Flex>
+                                                    )}
+                                                </Box>
+                                            </AccordionPanel>
+                                        </>
+                                    )}
+                                </AccordionItem>
                             ))}
-                        </SimpleGrid>
+                        </Accordion>
                     </Box>
                 </Box>
             )}

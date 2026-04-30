@@ -22,12 +22,12 @@ export const StatusToggle = ({ label, description, isOn, icon: Icon, isError = f
 
             <Flex align="center" justify="space-between" position="relative" zIndex={1}>
                 <HStack spacing={{ base: 2, md: 4 }}>
-                    <Box p={{ base: 2, md: 3 }} borderRadius="xl" bg={isError ? "red.500" : (isOn ? `${activeColor}.500` : "gray.100")} transition="all 0.3s">
-                        <Icon size={18} color={(isOn && !isError) || isError ? "white" : "gray.500"} />
+                    <Box p={{ base: 2, md: 3 }} borderRadius="xl" bg={isError ? "red.500" : (isOn ? `${activeColor}.500` : `${activeColor}.50`)} transition="all 0.3s">
+                        <Icon size={18} color={isError || (isOn && !isError) ? "white" : `${activeColor}.500`} />
                     </Box>
-                    <VStack align="flex-start" spacing={0}>
-                        <Text fontWeight="800" color="gray.800" fontSize={{ base: "xs", md: "md" }} letterSpacing="-0.2px" noOfLines={1}>{label}</Text>
-                        <Text fontSize={{ base: "8px", md: "10px" }} color={isError ? "red.500" : "gray.500"} fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px" noOfLines={1}>
+                    <VStack align="flex-start" spacing={0} overflow="visible">
+                        <Text fontWeight="800" color="gray.800" fontSize={{ base: "xs", md: "md" }} letterSpacing="-0.2px">{label}</Text>
+                        <Text fontSize={{ base: "8px", md: "10px" }} color={isError ? "red.500" : "gray.500"} fontWeight="bold" textTransform="uppercase" letterSpacing="0.5px">
                             {isError ? "STREAMS ERR" : description}
                         </Text>
                     </VStack>

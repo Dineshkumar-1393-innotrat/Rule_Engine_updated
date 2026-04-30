@@ -4171,7 +4171,7 @@ const PayloadDashboardModal = ({ isOpen, onClose, vinValue = '' }) => {
                             <HStack spacing={3}>
                                 <InputGroup size="sm" w="200px">
                                     <InputLeftElement pointerEvents="none"><Search size={13} color="#A0AEC0" /></InputLeftElement>
-                                    <Input placeholder="Search signals..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} borderRadius="lg" bg="gray.50" border="none" color="black" fontSize="12px" _focus={{ bg: 'white', boxShadow: 'outline' }} />
+                                    <Input placeholder="Search parameters..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} borderRadius="lg" bg="gray.50" border="none" color="black" fontSize="12px" _focus={{ bg: 'white', boxShadow: 'outline' }} />
                                 </InputGroup>
                                 <HStack spacing={1} align="center">
                                     <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="0.5px">VIN</Text>

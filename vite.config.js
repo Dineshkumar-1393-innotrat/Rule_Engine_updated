@@ -55,7 +55,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/fota-fca/, ''),
       },
       '/api/fota-lb1-fca': {
-        target: 'https://cvipiot-preprod.fca-india.com:40543',
+        target: 'https://lb1.cvip-preprod.citroen.in:40543',
         changeOrigin: true,
         secure: false,
         timeout: 60000,

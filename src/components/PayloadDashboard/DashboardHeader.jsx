@@ -5,7 +5,7 @@ import { LayoutDashboard, Monitor, Search, RotateCcw, Download } from 'lucide-re
 import { isValidVin, formatVin } from '../../utils/validation';
 
 export const DashboardHeader = ({
-    viewMode, setViewMode, searchTerm, setSearchTerm, vin, setVin,
+    viewMode, setViewMode, searchTerm, setSearchTerm, vin, setVin, handleVinSubmit,
     pollingInterval, setPollingInterval, isLive, setIsLive, handleRefresh, handleExport,
     isSimulated = false
 }) => {
@@ -37,58 +37,92 @@ export const DashboardHeader = ({
                     justify={{ base: 'center', lg: 'flex-end' }}
                     flex={1}
                 >
-                    <InputGroup size="sm" maxW={{ base: 'full', md: '220px' }}>
-                        <InputLeftElement pointerEvents="none"><Search size={13} color="#A0AEC0" /></InputLeftElement>
-                        <Input 
-                            placeholder="Search signals..." 
-                            value={searchTerm} 
-                            onChange={e => setSearchTerm(e.target.value)} 
-                            borderRadius="lg" 
-                            bg="gray.50" 
-                            border="none" 
-                            color="black" 
-                            fontSize="12px" 
-                            _focus={{ bg: 'white', boxShadow: 'outline' }} 
-                        />
-                    </InputGroup>
+                    {viewMode === 'console' && (
+                        <InputGroup size="sm" maxW={{ base: 'full', md: '220px' }}>
+                            <InputLeftElement pointerEvents="none"><Search size={13} color="#A0AEC0" /></InputLeftElement>
+                            <Input
+                                placeholder="Search parameters..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                borderRadius="lg"
+                                bg="gray.50"
+                                border="none"
+                                color="black"
+                                fontSize="12px"
+                                _focus={{ bg: 'white', boxShadow: 'outline' }}
+                            />
+                        </InputGroup>
+                    )}
 
-                    <Flex 
-                        direction={{ base: 'column', xs: 'row', md: 'row' }} 
-                        gap={3} 
-                        wrap="wrap" 
+                    <Flex
+                        direction={{ base: 'column', xs: 'row', md: 'row' }}
+                        gap={3}
+                        wrap="wrap"
                         justify={{ base: 'center', md: 'flex-end' }}
                         align="center"
                     >
                         <HStack spacing={3} wrap="wrap" justify="center">
-                            <HStack spacing={1} align="center">
+                            <HStack spacing={2} align="center">
                                 <Text fontSize="9px" fontWeight="black" color="gray.400" letterSpacing="0.5px">VIN</Text>
-                                    <Input 
-                                        value={vin} 
-                                        onChange={e => setVin(formatVin(e.target.value))} 
-                                        size="sm" 
-                                        w={{ base: "full", xs: "140px", md: "155px" }} 
-                                        borderRadius="lg" 
-                                        color={vin.length > 0 && !isValidVin(vin) ? "red.600" : "black"} 
-                                        fontWeight="bold" 
-                                        fontSize="11px" 
-                                        bg={vin.length > 0 && !isValidVin(vin) ? "red.50" : "gray.50"} 
+                                <Box position="relative">
+                                    <Input
+                                        placeholder="Enter your VIN number"
+                                        value={vin}
+                                        onChange={e => setVin(formatVin(e.target.value))}
+                                        size="sm"
+                                        w={{ base: "full", xs: "140px", md: "185px" }}
+                                        borderRadius="lg"
+                                        color={vin.length > 0 && !isValidVin(vin) ? "red.600" : "black"}
+                                        fontWeight="bold"
+                                        fontSize="11px"
+                                        bg={vin.length > 0 && !isValidVin(vin) ? "red.50" : "gray.50"}
                                         border={vin.length > 0 && !isValidVin(vin) ? "1px solid" : "none"}
                                         borderColor={vin.length > 0 && !isValidVin(vin) ? "red.200" : "transparent"}
+                                        maxLength={17}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && isValidVin(vin)) {
+                                                handleVinSubmit();
+                                            }
+                                        }}
                                     />
-                                    {isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="8px">VIRTUAL</Badge>}
-                                </HStack>
+                                    {vin.length > 0 && !isValidVin(vin) && (
+                                        <Text 
+                                            position="absolute" 
+                                            bottom="-14px" 
+                                            left="0" 
+                                            fontSize="8px" 
+                                            color="red.500" 
+                                            fontWeight="bold" 
+                                            whiteSpace="nowrap"
+                                        >
+                                            VIN must be exactly 17 alphanumeric characters ({vin.length}/17)
+                                        </Text>
+                                    )}
+                                </Box>
+                                <Button
+                                    size="xs"
+                                    colorScheme="blue"
+                                    onClick={handleVinSubmit}
+                                    isDisabled={!isValidVin(vin)}
+                                    borderRadius="lg"
+                                    px={4}
+                                >
+                                    Submit
+                                </Button>
+                                {isSimulated && <Badge colorScheme="purple" variant="solid" fontSize="8px">VIRTUAL</Badge>}
+                            </HStack>
 
                             <HStack spacing={1}>
                                 <Text fontSize="9px" color="gray.400" fontWeight="bold">Poll</Text>
-                                <Select 
-                                    size="xs" 
-                                    value={pollingInterval} 
-                                    onChange={e => setPollingInterval(Number(e.target.value))} 
-                                    w="70px" 
-                                    borderRadius="md" 
-                                    bg="gray.50" 
-                                    border="none" 
-                                    color="black" 
+                                <Select
+                                    size="xs"
+                                    value={pollingInterval}
+                                    onChange={e => setPollingInterval(Number(e.target.value))}
+                                    w="70px"
+                                    borderRadius="md"
+                                    bg="gray.50"
+                                    border="none"
+                                    color="black"
                                     fontSize="11px"
                                 >
                                     <option value={5}>5s</option><option value={10}>10s</option><option value={30}>30s</option><option value={60}>60s</option>
@@ -103,13 +137,13 @@ export const DashboardHeader = ({
                             </HStack>
 
                             <HStack spacing={1}>
-                                <IconButton 
-                                    icon={<RotateCcw size={14} />} 
-                                    aria-label="Refresh" 
-                                    size="sm" 
-                                    variant="ghost" 
-                                    onClick={handleRefresh} 
-                                    borderRadius="full" 
+                                <IconButton
+                                    icon={<RotateCcw size={14} />}
+                                    aria-label="Refresh"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleRefresh}
+                                    borderRadius="full"
                                     isDisabled={!isValidVin(vin)}
                                 />
                                 <IconButton icon={<Download size={14} />} aria-label="Export JSON" size="sm" variant="ghost" onClick={handleExport} borderRadius="full" title="Export data as JSON" />

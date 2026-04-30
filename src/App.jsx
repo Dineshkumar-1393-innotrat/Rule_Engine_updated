@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import { ChakraProvider, Box, Text } from "@chakra-ui/react";
 import { AuthProvider } from "./contexts/AuthContext";
 import { ProjectProvider } from "./contexts/ProjectContext";
@@ -18,23 +18,16 @@ const SystemConsolePage = React.lazy(() => import("./components/SystemOverview/S
 const MQTTVirtualDeviceDashboard = React.lazy(() => import("./components/MQTTVirtualDevice/MQTTVirtualDeviceDashboard"));
 
 
+// Auth components
+const AuthPage = React.lazy(() => import("./components/Auth/AuthPage"));
+
 const App = () => {
-
-
   // Initialize auto-save system and cleanup old data on app start
   useEffect(() => {
-    // Clean up old auto-save data (older than 7 days)
     autoSaveManager.cleanup(7 * 24 * 60 * 60 * 1000);
-
-    // Start global auto-save
     autoSaveManager.startGlobalAutoSave();
-
-    // console.log("[App] Auto-save system initialized");
-
     return () => {
-      // Save all data before app unmounts
       autoSaveManager.saveAll({ parallel: false });
-      // console.log("[App] Auto-save cleanup completed");
     };
   }, []);
 
@@ -43,26 +36,33 @@ const App = () => {
       <ProjectProvider>
         <WorkspaceStateProvider>
           <AuthProvider>
+            <React.Suspense fallback={
+              <Box display="flex" alignItems="center" justifyContent="center" height="100vh">
+                <Text fontWeight="800" color="blue.500" letterSpacing="1px">LOADING ENGINE...</Text>
+              </Box>
+            }>
+              <Routes>
+                {/* Auth Routes - No MainLayout */}
+                <Route path="/login" element={<AuthPage />} />
+                <Route path="/signup" element={<AuthPage />} />
 
-            <MainLayout>
-              <React.Suspense fallback={
-                <Box display="flex" alignItems="center" justifyContent="center" height="100vh">
-                  <Text fontWeight="800" color="blue.500" letterSpacing="1px">LOADING ENGINE...</Text>
-                </Box>
-              }>
-                <Routes>
-                  <Route path="/" element={<RuleEngineDashboard />} />
-                  <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
-                  <Route path="/historical-analysis" element={<HistoricalDataPage />} />
-                  <Route path="/bulk-provision" element={<BulkProvisionPage />} />
-                  <Route path="/system-console/:vin?" element={<SystemConsolePage />} />
-                  <Route path="/payload-dashboard/:vin" element={<PayloadDashboardPage />} />
-                  <Route path="/mqtt-virtual-device" element={<MQTTVirtualDeviceDashboard />} />
-                </Routes>
-              </React.Suspense>
-            </MainLayout>
-
-
+                {/* App Routes - With MainLayout */}
+                <Route path="/*" element={
+                  <MainLayout>
+                    <Routes>
+                      <Route path="/" element={<Navigate to="/login" replace />} />
+                      <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
+                      <Route path="/historical-analysis" element={<HistoricalDataPage />} />
+                      <Route path="/bulk-provision" element={<BulkProvisionPage />} />
+                      <Route path="/system-console/:vin?" element={<SystemConsolePage />} />
+                      <Route path="/payload-dashboard/:vin?" element={<PayloadDashboardPage />} />
+                      <Route path="/mqtt-virtual-device" element={<MQTTVirtualDeviceDashboard />} />
+                      <Route path="*" element={<Navigate to="/payload-dashboard" replace />} />
+                    </Routes>
+                  </MainLayout>
+                } />
+              </Routes>
+            </React.Suspense>
           </AuthProvider>
         </WorkspaceStateProvider>
       </ProjectProvider>

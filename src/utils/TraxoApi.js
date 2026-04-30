@@ -4,6 +4,7 @@ const BASE_URL = '/api/traxo';
 const PLATFORM_BASE_URL = '/api/platform'; // For lb2 endpoints
 const JEEP_BASE_URL = '/api/jeep'; // For trip and JEEP-specific APIs
 const FOTA_FCA_BASE_URL = '/api/fota-fca'; // For new FOTA download & lb1 endpoints
+const FOTA_LB1_BASE_URL = '/api/fota-lb1-fca'; // For LB1 endpoints
 const AWS_BASE_URL = '/api/aws/jeep';
 console.warn("TraxoApi Loaded - MultiAccount Version - If you do not see this, restart the server");
 
@@ -59,8 +60,8 @@ const ACCOUNTS = {
         userName: "admin",
         password: "0[%62&Db$Z:J",
         accountId: "pkijeeptenant",
-        clientId: "UGTtoib0yvQ8vnfv3CoXLahqfAMa",
-        clientSecret: "NqxJBwd236LrlXuVPb4afQBIRfka"
+        clientId: "oWXMoTG9yKyaTjZjuFin8kJmPXUa",
+        clientSecret: "XF3Cdm5NlkJr0NVRQ0vOZWkqmxEa"
     },
     RUN: {
         userName: "admin",
@@ -127,8 +128,16 @@ const flattenStates = (data) => {
 
     // 2. Flatten and Normalize
     return records.map(record => {
-        const flat = { ...record };
+        let flat = { ...record };
         
+        // Handle individual record nesting (common in some 5.0 states)
+        if (record.data && typeof record.data === 'object' && !Array.isArray(record.data)) {
+            flat = { ...flat, ...record.data };
+        }
+        if (record.payload && typeof record.payload === 'object' && !Array.isArray(record.payload)) {
+            flat = { ...flat, ...record.payload };
+        }
+
         // Handle Signal Name/Value (Jeep /states endpoint)
         if ((record.signalname || record.signalName) && (record.signalvalue !== undefined || record.signalValue !== undefined)) {
             const name = record.signalname || record.signalName;
@@ -136,8 +145,17 @@ const flattenStates = (data) => {
             flat[name] = val;
         }
 
-        // Normalize timestamp discovery
-        const ts = record.timestamp || record.sourcetimestamp || record.updatetimestamp || record.updatedtimestamp || record.eventtime || record.currentTime;
+        // Normalize timestamp discovery (expanded for 5.0)
+        const ts = record.timestamp || 
+                   record.sourcetimestamp || 
+                   record.updatetimestamp || 
+                   record.updatedtimestamp || 
+                   record.updatedTimeStamp ||
+                   record.eventtime || 
+                   record.eventTime ||
+                   record.eventTimeStamp ||
+                   record.currentTime ||
+                   record.sourcetimestamp_val;
         if (ts) flat.timestamp = ts;
         
         return flat;
@@ -351,15 +369,17 @@ export const TraxoApi = {
      * Fetch structured location/telemetry history over a time range
      * Default subcategory: LocationTelemetry
      */
-    getHistoricalTelemetry: async (vin, startTime, endTime, count = 1000, subcategory = 'LocationTelemetry') => {
+    getHistoricalTelemetry: async (vin, starttime, endtime, limit = 1000, subcategory = 'LocationTelemetry') => {
         return withRetry(async () => {
             if (!authTokens.FACTORY) await TraxoApi.login('FACTORY');
             const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/devices/vin/${vin}/states`, {
                 params: {
                     subcategory,
-                    startTime,
-                    endTime,
-                    count
+                    starttime,
+                    endtime,
+                    startTime: starttime,
+                    endTime: endtime,
+                    limit
                 },
                 headers: {
                     'Authorization': `Bearer ${authTokens.FACTORY}`,
@@ -369,6 +389,32 @@ export const TraxoApi = {
             });
             return flattenStates(response.data);
         }, 'FACTORY');
+    },
+
+    /**
+     * Fetch trip-specific states from the v2 trip endpoint (Uses JEEP auth)
+     * Commonly used for tripCurrent, tripStart, tripEnd
+     */
+    getTripStates: async (vin, starttime, endtime, limit = 500, subcategory = 'tripCurrent') => {
+        return withRetry(async () => {
+            if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+            const response = await axios.get(`${JEEP_BASE_URL}/trip/v2/vin/${vin}/states`, {
+                params: {
+                    subcategory,
+                    starttime,
+                    endtime,
+                    startTime: starttime,
+                    endTime: endtime,
+                    limit
+                },
+                headers: {
+                    'Authorization': `${authTokens.JEEP}`,
+                    'Accept': 'application/json'
+                },
+                timeout: 60000
+            });
+            return flattenStates(response.data);
+        }, 'JEEP');
     },
 
     // Get raw location telemetry array for console view
@@ -656,19 +702,36 @@ export const TraxoApi = {
 
     downloadFirmwareFile: async (filename, releaseVersion, fileType, category, fotaId) => withRetry(async () => {
         if (!authTokens.FOTA) await TraxoApi.login('FOTA');
-        // Collection 4.0 Path: /jeep/files/device/downloadfirmware
-        return (await axios.get(`${FOTA_FCA_BASE_URL}/jeep/files/device/downloadfirmware`, {
-            params: { 
-                filename, 
-                releaseversion: releaseVersion, 
-                filetype: fileType, 
-                category, 
-                fotaid: fotaId 
-            },
-            headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
-            responseType: 'blob',
-            timeout: 120000
-        })).data;
+        try {
+            const response = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/files/device/downloadfirmware`, {
+                params: { 
+                    filename, 
+                    fileName: filename,
+                    releaseversion: releaseVersion, 
+                    releaseVersion: releaseVersion,
+                    filetype: fileType, 
+                    fileType: fileType,
+                    category, 
+                    fotaid: fotaId,
+                    fotaId: fotaId
+                },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+                responseType: 'blob',
+                timeout: 120000
+            });
+            return response.data;
+        } catch (err) {
+            if (err.response?.data instanceof Blob) {
+                const text = await err.response.data.text();
+                try {
+                    const json = JSON.parse(text);
+                    throw new Error(json.message || json.error || text);
+                } catch (e) {
+                    throw new Error(text || err.message);
+                }
+            }
+            throw err;
+        }
     }, 'FOTA'),
 
     downloadFirmwareFromRepo: async (category, releaseVersion, fotaIdOverride = null) => {
@@ -781,13 +844,17 @@ export const TraxoApi = {
                 console.log(`📥 Downloading: ${fileName} (type: ${normalizedFileType})`);
 
                 try {
-                    const blob = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/files/device/downloadfirmware`, {
+                    const response = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/files/device/downloadfirmware`, {
                         params: {
                             filename: fileName,
+                            fileName: fileName,
                             releaseversion: resolvedVersion,
+                            releaseVersion: resolvedVersion,
                             filetype: normalizedFileType,
+                            fileType: normalizedFileType,
                             category: targetCategory,
-                            fotaid: fotaId
+                            fotaid: fotaId,
+                            fotaId: fotaId
                         },
                         headers: {
                             'Authorization': `Bearer ${authTokens.FOTA}`,
@@ -797,7 +864,8 @@ export const TraxoApi = {
                         timeout: 120000
                     });
 
-                    const url = window.URL.createObjectURL(new Blob([blob.data]));
+                    const blob = response.data;
+                    const url = window.URL.createObjectURL(new Blob([blob]));
                     const link = document.createElement('a');
                     link.href = url;
                     link.setAttribute('download', fileName);
@@ -807,7 +875,19 @@ export const TraxoApi = {
                     window.URL.revokeObjectURL(url);
                     console.log(`✅ Downloaded: ${fileName}`);
                 } catch (err) {
-                    const errMsg = err.response?.data?.message || err.message;
+                    let errMsg = err.message;
+                    if (err.response?.data instanceof Blob) {
+                        const text = await err.response.data.text();
+                        try {
+                            const json = JSON.parse(text);
+                            errMsg = json.message || json.error || text;
+                        } catch (e) {
+                            errMsg = text || err.message;
+                        }
+                    } else if (err.response?.data?.message) {
+                        errMsg = err.response.data.message;
+                    }
+                    
                     console.error(`❌ Failed to download ${fileName}:`, err.response?.status, errMsg);
                     throw new Error(`Download failed for ${fileName} (${normalizedFileType}): ${errMsg}`);
                 }
@@ -930,19 +1010,28 @@ export const TraxoApi = {
     createTboxCertificate: async (commonName, csr) => {
         return withRetry(async () => {
             if (!authTokens.PKI) await TraxoApi.login('PKI');
-            const response = await axios.post(`${BASE_URL}/csr/createCertificate`, {
+            const payload = {
                 commonName,
                 timeStamp: Math.floor(Date.now() / 1000),
                 csr
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${authTokens.PKI}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 30000
-            });
-            console.log('🔐 Tbox Certificate Created:', response.data);
-            return response.data;
+            };
+            console.log('🔐 [CERT_DEBUG] Sending CSR Request:', { ...payload, csr: payload.csr?.substring(0, 50) + '...' });
+            
+            try {
+                // Using BASE_URL as seen in the collection example
+                const response = await axios.post(`${BASE_URL}/csr/createCertificate`, payload, {
+                    headers: {
+                        'Authorization': `Bearer ${authTokens.PKI}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                console.log('🔐 [CERT_DEBUG] Certificate Created:', response.data);
+                return response.data;
+            } catch (error) {
+                console.error('🔐 [CERT_DEBUG] API Error:', error.response?.data || error.message);
+                throw error;
+            }
         }, 'PKI');
     },
 
@@ -1230,6 +1319,18 @@ export const TraxoApi = {
             const isDeviceRemoved = connectionStatus === 'DISCONNECTED' || connectionStatus === 'REMOVED' || tamperStatus === 'TAMPERED';
             return { isDeviceRemoved, connectionStatus, tamperStatus, raw };
         }, 'JEEP');
+    },
+
+    getFotaState: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+            const response = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/ota/fotastate`, {
+                params: { vinNo: vin },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'FOTA');
     },
 
     // ========== FOTA VIN OPERATIONS (JEEP 4.0) ==========

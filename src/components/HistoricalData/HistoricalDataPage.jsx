@@ -58,6 +58,36 @@ import { TraxoApi } from '../../utils/TraxoApi';
 import { processHistoricalData, prepareExcelData } from '../../utils/dataProcessing';
 import { isValidVin, formatVin } from '../../utils/validation';
 
+const toDateTimeLocalValue = (date) => {
+    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+    return localDate.toISOString().slice(0, 16);
+};
+
+const parseDateTimeLocal = (value) => {
+    if (!value) return null;
+    const date = new Date(value.replace(' ', 'T'));
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const formatForApi = (value) => {
+    const date = parseDateTimeLocal(value);
+    if (!date) return '';
+
+    const pad = (num) => String(num).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
+const isWithinRange = (record, startMs, endMs) => {
+    // If timestamp is a numeric string, parse it as a number first
+    let tsRaw = record.timestamp;
+    if (typeof tsRaw === 'string' && /^\d+$/.test(tsRaw)) {
+        tsRaw = Number(tsRaw);
+    }
+    const timestamp = new Date(tsRaw).getTime();
+    const isIn = Number.isFinite(timestamp) && timestamp >= startMs && timestamp <= endMs;
+    return isIn;
+};
+
 const HistoricalDataPage = () => {
     const toast = useToast();
     const { isOpen, onOpen, onClose } = useDisclosure();
@@ -65,9 +95,9 @@ const HistoricalDataPage = () => {
     const [startTime, setStartTime] = useState(() => {
         const d = new Date();
         d.setHours(d.getHours() - 24);
-        return d.toISOString().slice(0, 16);
+        return toDateTimeLocalValue(d);
     });
-    const [endTime, setEndTime] = useState(() => new Date().toISOString().slice(0, 16));
+    const [endTime, setEndTime] = useState(() => toDateTimeLocalValue(new Date()));
     const [isLoading, setIsLoading] = useState(false);
     const [historyData, setHistoryData] = useState([]);
     const [selectedRecord, setSelectedRecord] = useState(null);
@@ -78,10 +108,21 @@ const HistoricalDataPage = () => {
             return;
         }
 
+        const startDate = parseDateTimeLocal(startTime);
+        const endDate = parseDateTimeLocal(endTime);
+        if (!startDate || !endDate) {
+            toast({ title: 'Invalid Range', description: 'Select both start and end date-times.', status: 'warning', duration: 2500 });
+            return;
+        }
+
+        if (startDate > endDate) {
+            toast({ title: 'Invalid Range', description: 'Start Range must be before End Range.', status: 'warning', duration: 2500 });
+            return;
+        }
+
         setIsLoading(true);
         setHistoryData([]); // Clear previous data to show loading state
         try {
-            const formatForApi = (val) => val.replace('T', ' ') + ':00';
             const start = formatForApi(startTime);
             const end = formatForApi(endTime);
 
@@ -99,7 +140,10 @@ const HistoricalDataPage = () => {
                 genResp,
                 stdResp,
                 tripResp,
-                diagResp
+                diagResp,
+                tripStartResp,
+                tripCurrentResp,
+                tripEndResp
             ] = await Promise.allSettled([
                 TraxoApi.getDeviceState(vin), // Seed Baseline
                 TraxoApi.getJeepEventsAudit(vin, start, end, 500),
@@ -111,30 +155,61 @@ const HistoricalDataPage = () => {
                 TraxoApi.getHistoricalTelemetry(vin, start, end, 500, 'GenericTelemetry'),
                 TraxoApi.getHistoricalTelemetry(vin, start, end, 500, 'StandardTelemetry'),
                 TraxoApi.getHistoricalTelemetry(vin, start, end, 500, 'TripTelemetry'),
-                TraxoApi.getHistoricalTelemetry(vin, start, end, 500, 'DiagnosticTelemetry')
+                TraxoApi.getHistoricalTelemetry(vin, start, end, 500, 'DiagnosticTelemetry'),
+                TraxoApi.getTripStates(vin, start, end, 500, 'tripStart'),
+                TraxoApi.getTripStates(vin, start, end, 500, 'tripCurrent'),
+                TraxoApi.getTripStates(vin, start, end, 500, 'tripEnd')
+
             ]);
 
             // 1. Extract Seed Values (Deep search in payload/data wrappers)
             const getSeed = (obj, keys, fallback = 0) => {
+                const extractValue = (v) => {
+                    if (v === undefined || v === null || v === '') return undefined;
+                    if (typeof v === 'number') return v;
+                    if (typeof v === 'string') {
+                        const parsed = parseFloat(v);
+                        return isNaN(parsed) ? v : parsed;
+                    }
+                    if (typeof v === 'object') {
+                        const inner = v.value ?? v.val ?? v.signalValue ?? v.signal_value ?? v.eventValue;
+                        return extractValue(inner);
+                    }
+                    return v;
+                };
+
                 const search = (target) => {
-                    if (!target) return undefined;
-                    for (const k of keys) {
-                        if (target[k] !== undefined && target[k] !== null) return target[k];
+                    if (!target || typeof target !== 'object') return undefined;
+                    const targetKeys = Object.keys(target);
+                    const lowKeys = keys.map(k => k.toLowerCase().replace(/[\s_]/g, ''));
+                    for (const tk of targetKeys) {
+                        if (lowKeys.includes(tk.toLowerCase().replace(/[\s_]/g, ''))) {
+                            const val = extractValue(target[tk]);
+                            if (val !== undefined && val !== null && val !== '') return val;
+                        }
                     }
                     return undefined;
                 };
                 const raw = baselineResp.status === 'fulfilled' ? baselineResp.value : {};
-                return search(raw) || search(raw.payload) || search(raw.data) || fallback;
+                // Search in common wrappers
+                const found = search(raw) || 
+                       search(raw.payload) || 
+                       search(raw.data) || 
+                       search(raw.vehicleStatus) || 
+                       search(raw.result);
+                
+                return found !== undefined ? found : fallback;
             };
 
             const initialState = {
-                fuel: Number(getSeed({}, ['fuelPercentage', 'fuelLevel', 'fuel'])),
-                odometer: Number(getSeed({}, ['odometer', 'totalOdometer', 'total_odometer'])),
-                rpm: Number(getSeed({}, ['engineSpeed', 'rpm', 'engine_rpm'])),
-                battery: Number(getSeed({}, ['batteryVoltage', 'battery', 'voltage'])),
-                coolant: Number(getSeed({}, ['coolant', 'engineTemp', 'coolant_temp'])),
-                ignition: getSeed({}, ['ignitionStatus', 'engineState', 'ign_stat', 'CmdIgnSts'], 'N/A')
+                fuel: Number(getSeed({}, ['fuelPercentage', 'fuelLevel', 'FuelLevel', 'fuel', 'fuel_level', 'fuel_level_pct', 'fuel_consumed', 'fuelConsumed'])),
+                odometer: Number(getSeed({}, ['odometer', 'totalOdometer', 'TotalOdometer', 'total_odometer', 'odo', 'odm', 'tripDistance', 'km_total', 'distance'])),
+                rpm: Number(getSeed({}, ['engineSpeed', 'EngineSpeed', 'rpm', 'EngineRPM', 'engineRpm', 'engine_rpm', 'engine_speed'])),
+                battery: Number(getSeed({}, ['batteryVoltage', 'BatteryVoltage', 'voltage', 'batt_volt', 'battery', 'vbat', 'BatteryVoltageLevel', 'battery_voltage'])),
+                coolant: Number(getSeed({}, ['coolant', 'engineTemp', 'coolant_temp', 'engineWaterTemp', 'EngineWaterTemp', 'coolant_temp'])),
+                ignition: getSeed({}, ['ignitionStatus', 'ignition_status', 'ign_stat', 'engineState', 'engine_state', 'CmdIgnSts'], 'N/A')
             };
+
 
             console.log('Seeding Historical Data with Baseline:', initialState);
 
@@ -149,12 +224,15 @@ const HistoricalDataPage = () => {
             const stdData = stdResp.status === 'fulfilled' ? (stdResp.value || []) : [];
             const tripData = tripResp.status === 'fulfilled' ? (tripResp.value || []) : [];
             const diagData = diagResp.status === 'fulfilled' ? (diagResp.value || []) : [];
+            const tripStartData = tripStartResp.status === 'fulfilled' ? (tripStartResp.value || []) : [];
+            const tripCurrentData = tripCurrentResp.status === 'fulfilled' ? (tripCurrentResp.value || []) : [];
+            const tripEndData = tripEndResp.status === 'fulfilled' ? (tripEndResp.value || []) : [];
 
             // Merge all data streams
             const combined = [
                 ...events, ...locData, ...vehData, ...vehDataCaps, 
                 ...statData, ...engData, ...genData, ...stdData, 
-                ...tripData, ...diagData
+                ...tripData, ...diagData, ...tripStartData, ...tripCurrentData, ...tripEndData
             ];
             
             if (combined.length === 0) {
@@ -162,12 +240,39 @@ const HistoricalDataPage = () => {
                 return;
             }
 
-            const processed = processHistoricalData(combined, initialState);
+            const startMs = startDate.getTime();
+            const endMs = endDate.getTime();
+            
+            console.log(`⏱️ Filtering Range: ${startDate.toISOString()} (${startMs}) to ${endDate.toISOString()} (${endMs})`);
+            
+            const processed = processHistoricalData(combined, initialState)
+                .filter((record) => {
+                    const inRange = isWithinRange(record, startMs, endMs);
+                    if (!inRange) {
+                        // Log a few out-of-range records for debugging
+                        // console.log(`🚫 Record out of range: ${record.displayTime} (${record.timestamp})`);
+                    }
+                    return inRange;
+                });
+
+            console.log(`✅ Filter complete. ${processed.length} records in range.`);
+
+            if (processed.length === 0) {
+                toast({
+                    title: 'No Data In Selected Range',
+                    description: `Fetched ${combined.length} records, but none were between ${startDate.toLocaleString()} and ${endDate.toLocaleString()}.`,
+                    status: 'info',
+                    duration: 5000
+                });
+                setHistoryData([]);
+                return;
+            }
+
             setHistoryData(processed);
             
             toast({ 
                 title: 'Data Loaded', 
-                description: `Merged ${combined.length} records across 4 subcategories.`, 
+                description: `Showing ${processed.length} in-range records from ${combined.length} fetched records.`, 
                 status: 'success' 
             });
         } catch (error) {
@@ -241,11 +346,11 @@ const HistoricalDataPage = () => {
                             </FormControl>
                             <FormControl>
                                 <FormLabel fontSize="xs" fontWeight="800">Start Range</FormLabel>
-                                <Input type="datetime-local" value={startTime} onChange={(e) => setStartTime(e.target.value)} bg="gray.50" />
+                                <Input type="datetime-local" value={startTime} max={endTime} onChange={(e) => setStartTime(e.target.value)} bg="gray.50" />
                             </FormControl>
                             <FormControl>
                                 <FormLabel fontSize="xs" fontWeight="800">End Range</FormLabel>
-                                <Input type="datetime-local" value={endTime} onChange={(e) => setEndTime(e.target.value)} bg="gray.50" />
+                                <Input type="datetime-local" value={endTime} min={startTime} onChange={(e) => setEndTime(e.target.value)} bg="gray.50" />
                             </FormControl>
                             <Button 
                                 leftIcon={isLoading ? <Spinner size="sm" /> : <Search size={18} />} 
@@ -323,7 +428,7 @@ const HistoricalDataPage = () => {
                                                 </Tr>
                                             </Thead>
                                             <Tbody>
-                                                {historyData.map((row, i) => (
+                                                {[...historyData].reverse().map((row, i) => (
                                                     <Tr key={i} _hover={{ bg: 'gray.50' }}>
                                                         <Td fontSize="xs" whiteSpace="nowrap">{row.displayTime}</Td>
                                                         <Td>

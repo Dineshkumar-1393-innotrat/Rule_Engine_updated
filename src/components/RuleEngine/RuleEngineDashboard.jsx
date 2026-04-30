@@ -747,9 +747,9 @@ const RuleEngineDashboard = () => {
             eventid: eventId,
             messageId: messageId,
             eventdetails: eventdetails,
-            type: "",
-            userId: "",
-            version: "",
+            type: eventType,
+            userId: "admin",
+            version: deviceVariables.current.ccpuVersion || "2.0.0",
             accountId: 65, // Default account ID
             sourcetimestamp: new Date().toISOString().replace('T', ' ').substring(0, 23),
             eventsubcategory: "jeep",
