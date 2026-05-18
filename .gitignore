@@ -90,8 +90,18 @@ tmp_cert_steps*
 certificates_unzipped/
 device_cert/
 
-# System generated document formats
+# System generated document formats and root level ignore rules
 *.pdf
 *.docx
 *.txt
 *.md
+!/README.md
+!/docs/**/*.md
+*.xlsx
+*.csv
+/*.json
+!/package.json
+!/package-lock.json
+/*.cjs
+!/eslint.config.js
+/*.py
