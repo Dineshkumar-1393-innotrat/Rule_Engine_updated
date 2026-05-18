@@ -105,3 +105,12 @@ device_cert/
 /*.cjs
 !/eslint.config.js
 /*.py
+
+# User specific ignored files
+/Alert api collection (1) (1)
+/Jeep APIs Collection 4.1_SB_Preprod.postman_collection
+/inoview_auth_animated.html
+/test_api.mjs
+/test_api_primary.mjs
+/tmp_read.js
+/~*
