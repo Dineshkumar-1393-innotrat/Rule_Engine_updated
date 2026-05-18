@@ -109,6 +109,8 @@ const PayloadDashboardPage = () => {
             setSignals(prev => prev.map(s => ({ ...s, data: [], loading: false, error: null, hasFetched: false })));
             setDeviceState(null);
             setOngoingTrip(null);
+            setNadSwVersion(null);
+            setFotaStatusLive(null);
             (async () => {
                 await Promise.all([fetchCheckedSignals(), fetchOtherData()]);
             })();
@@ -189,7 +191,11 @@ const PayloadDashboardPage = () => {
     const fetchOtherData = async () => {
         if (!vin) return;
         try {
-            let s = await TraxoApi.getDeviceState(vin);
+            // Fetch device state and FOTA state independently to ensure one doesn't block the other
+            let s = null;
+            try {
+                s = await TraxoApi.getDeviceState(vin);
+            } catch (e) { console.warn('Device state fetch failed', e); }
             
             // Fallback for device state from virtual device
             if ((!s || Object.keys(s).length === 0)) {
@@ -206,17 +212,30 @@ const PayloadDashboardPage = () => {
                 }
             }
 
-            if (s) {
-                try {
-                    const fota = await TraxoApi.getFotaState(vin);
-                    if (fota) {
-                        const status = fota.fotaStatus || fota.status || fota.otaStatus;
-                        if (status) setFotaStatusLive(status);
-                        s = { ...s, fotaStatus: status };
+            // Independent FOTA fetch
+            try {
+                const fota = await TraxoApi.getFotaState(vin);
+                if (fota) {
+                    console.log('[FOTA_DEBUG] Response:', JSON.stringify(fota, null, 2));
+                    const fotaData = Array.isArray(fota) ? fota[0] : fota;
+                    const status = fotaData?.fotaStatus || fotaData?.status || fotaData?.otaStatus || fotaData?.commandStatus;
+                    const version = fotaData?.version || fotaData?.releaseVersion || fotaData?.firmwareVersion;
+                    
+                    if (status) setFotaStatusLive(status);
+                    if (version) setNadSwVersion(version);
+                    
+                    if (s) {
+                        s = { 
+                            ...s, 
+                            fotaStatus: status || s.fotaStatus,
+                            fotaVersion: version || s.fotaVersion || s.releaseVersion
+                        };
                     }
-                } catch (e) { console.warn('FOTA state fetch failed', e); }
-                setDeviceState(s);
-            }
+                }
+            } catch (e) { console.warn('FOTA state fetch failed', e); }
+
+            if (s) setDeviceState(s);
+
             try {
                 const t = await TraxoApi.getOngoingTrip(vin);
                 if (t) {
@@ -316,40 +335,73 @@ const PayloadDashboardPage = () => {
                     }
                 }
 
-                // Extract NAD_SW_Version from Device Events response
-                if (signal.fetchType === 'events' && Array.isArray(newData)) {
-                    // DEBUG: Log first item to see actual field structure
-                    if (newData.length > 0) {
-                        console.log('[NAD_DEBUG] First event item keys:', Object.keys(newData[0]));
-                        console.log('[NAD_DEBUG] First event item FULL:', JSON.stringify(newData[0], null, 2));
-                    }
+                // Extract software version from various signal types
+                // Note: 'notification' type might return an object with a 'raw' array
+                const itemsToProcess = Array.isArray(newData) ? newData : (newData?.raw && Array.isArray(newData.raw) ? newData.raw : (newData ? [newData] : []));
+                
+                if ((signal.fetchType === 'events' || signal.fetchType === 'notification' || signal.fetchType === 'ignition') && itemsToProcess.length > 0) {
+                    let foundVersion = false;
+                    let foundFStatus = false;
 
-                    for (const item of newData) {
+                    for (const item of itemsToProcess) {
+                        if (!item || typeof item !== 'object') continue;
+
                         // Parse details if it's a JSON string
-                        let details = item?.details || item?.Details || item?.eventDetails || item?.eventPayload || item?.payload || {};
+                        let details = item?.details || item?.Details || item?.eventdetails || item?.eventDetails || item?.eventPayload || item?.payload || {};
                         if (typeof details === 'string' && details.trim().startsWith('{')) {
                             try { details = JSON.parse(details); } catch (e) { details = {}; }
                         }
 
                         // Also parse details.payload if it's a JSON string
-                        let payload = details?.payload || {};
+                        let payload = details?.payload || item?.payload || {};
                         if (typeof payload === 'string' && payload.trim().startsWith('{')) {
                             try { payload = JSON.parse(payload); } catch (e) { payload = {}; }
                         }
 
-                        // Exhaustively check all locations
+                        // Exhaustively check all locations for version information
                         const ver = item?.NAD_SW_Version
+                            || item?.nad_sw_version
+                            || item?.nadSwVersion
+                            || item?.fotaVersion
+                            || item?.releaseVersion
                             || details?.NAD_SW_Version
                             || details?.nad_sw_version
+                            || details?.nadSwVersion
+                            || details?.fotaVersion
+                            || details?.releaseVersion
                             || payload?.NAD_SW_Version
                             || payload?.nad_sw_version
-                            || details?.nadSwVersion
-                            || payload?.nadSwVersion;
+                            || payload?.nadSwVersion
+                            || payload?.fotaVersion
+                            || payload?.releaseVersion
+                            || payload?.MCU_SW_Version
+                            || details?.MCU_SW_Version;
 
-                        if (ver) {
-                            console.log(`[Dashboard] NAD_SW_Version found: ${ver}`);
+                        if (!foundVersion && ver && ver !== '-') {
+                            console.log(`[Dashboard] Software Version found (${signal.fetchType}): ${ver}`);
                             setNadSwVersion(ver);
-                            break;
+                            foundVersion = true;
+                        }
+
+                        // Also extract FOTA status if available in events
+                        const fStatus = item?.fotaStatus
+                            || item?.fota_status
+                            || details?.fotaStatus
+                            || details?.fota_status
+                            || payload?.fotaStatus
+                            || payload?.fota_status
+                            || details?.commandStatus
+                            || payload?.commandStatus;
+                        
+                        if (!foundFStatus && fStatus && fStatus !== '-') {
+                            console.log(`[Dashboard] FOTA Status found in ${signal.fetchType}: ${fStatus}`);
+                            setFotaStatusLive(fStatus);
+                            foundFStatus = true;
+                        }
+
+                        if (foundVersion && foundFStatus) {
+                            // If we found both the most recent version and status, we can stop
+                            break; 
                         }
                     }
                 }

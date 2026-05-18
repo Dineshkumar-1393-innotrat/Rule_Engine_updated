@@ -1,0 +1,48 @@
+// JEEP - Connected Vehicle India Plaform - command message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+option java_outer_classname = "StlaJeepCommand";
+
+import "jeep_common.proto";
+import "timestamp.proto";
+import "jeep_ota_command.proto";
+
+enum commandSubType {
+	unknown_command = 0;
+	WakeupCommand = 1;	
+	TBOXStateUpdateCommand = 3;
+	FetchLogsCommand = 4;
+	UserDefinedSpeedCommand = 6;
+	RemoteDoorLockCommand=9;
+	RemoteDoorUnLockCommand=10;
+	RemoteBlinkerOnCommand =23;
+	RemoteBlinkerOffCommand =24;
+	RemoteHonkCommand =25;
+}
+
+message CommandPayload{
+	oneof commandPayload {
+		WakeupCommandPayload wakeupCommandPayload = 1;
+		TBOXStateUpdateCommandPayload tboxStateUpdateCommandPayload = 3;
+		FetchlogsCommandPayload fetchlogsCommandPayload = 4;
+		UserDefinedSpeedCommandPayload userDefinedSpeedCommandPayload = 6;
+		RemoteDoorLockCommandPayload remoteDoorLockCommandPayload=9;
+		RemoteDoorUnLockCommandPayload remoteDoorUnLockCommandPayload =10;
+		RemoteBlinkerOnCommandPayload remoteBlinkerOnCommandPayload =23;
+		RemoteBlinkerOffCommandPayload remoteBlinkerOffCommandPayload =24;
+		RemoteHonkCommandPayload remoteHonkCommandPayload=25;
+	}
+}
+message CommandMessage {
+    string message_id = 1;
+    commandSubType subtype = 2;
+    eTboxOperatingState tbox_operating_state = 3;
+    eTboxApplicationState e_tbox_application_state = 4;
+    eTboxeSimState tbox_esim_state = 5;
+    string version = 6;
+    google.protobuf.Timestamp time_stamp = 7;
+    CommandPayload command_payload = 8;
+}

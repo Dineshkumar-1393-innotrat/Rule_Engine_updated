@@ -1,0 +1,37 @@
+// JEEP - Connected Vehicle India Plaform - CAN data payload
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+import "timestamp.proto";
+
+//
+// [START CANData_MessageType_Definition]
+//
+message CANDataPayload {
+	CANData canData = 1;
+}
+
+message CANData {
+		uint32 noOfIdentifier = 1 [json_name = "noi"];
+		repeated CANDataPacket canDataPacket = 2 [json_name = "candt"];
+}
+
+message CData {
+		bytes pdu = 1 [json_name = "pdu"];
+		google.protobuf.Timestamp timestamp = 2 [json_name = "ts"];
+}
+
+message CANDataPacket {
+		uint32 identifier = 1 [json_name = "id"];
+		uint32 dlc = 2 [json_name = "dlc"];
+		repeated CData cData = 3 [json_name = "cdata"];	
+}
+
+//
+// [END CANData_MessageType_Definition]
+/////////////////////////////////////////////////////////////

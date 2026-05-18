@@ -63,12 +63,46 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/fota-lb1-fca/, ''),
       },
       '/api/aws': {
-        target: 'https://gp98o9kt3c.execute-api.ap-south-1.amazonaws.com',
+        target: 'https://1jp9u7p9pl.execute-api.ap-south-1.amazonaws.com',
         changeOrigin: true,
         secure: false,
         timeout: 60000,
         proxyTimeout: 60000,
         rewrite: (path) => path.replace(/^\/api\/aws/, ''),
+      },
+      '/api/device': {
+        target: 'http://localhost:5173', // Dummy target
+        bypass: (req, res) => {
+          if (req.url === '/api/device/verify-certificate' && req.method === 'POST') {
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({
+              status: "SUCCESS",
+              message: "Certificate verified successfully",
+              timestamp: new Date().toISOString(),
+              checks: {
+                caVerified: true,
+                cnMatch: true,
+                issuerValid: true,
+                signatureValid: true,
+                timestampValid: true
+              }
+            }));
+            return false; // Don't proxy, return the mock response directly
+          }
+          if (req.url === '/api/device/download' && req.method === 'POST') {
+            let body = '';
+            req.on('data', chunk => { body += chunk; });
+            req.on('end', () => {
+              const params = new URLSearchParams(body);
+              const content = params.get('content') || '';
+              const filename = params.get('filename') || 'file.txt';
+              res.setHeader('Content-Type', 'application/octet-stream');
+              res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+              res.end(content);
+            });
+            return false;
+          }
+        }
       }
     }
   },

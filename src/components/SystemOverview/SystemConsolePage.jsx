@@ -690,7 +690,7 @@ const ApiPreview = ({ epKey, result }) => {
                         {isForbidden ? 'Authorization Required' : 'Execution Failed'}
                     </AlertTitle>
                     <AlertDescription fontSize="xs">
-                        {isForbidden 
+                        {isForbidden
                             ? "This VIN is not authorized for the current account. Please ensure you are logged into the correct JEEP account for this vehicle, or use an Admin/Factory endpoint for general status."
                             : error}
                     </AlertDescription>
@@ -1329,26 +1329,7 @@ const SystemConsolePage = () => {
         };
     }, []);
 
-    useEffect(() => {
-        if (globalVin) {
-            setGlobalLoading(true);
-            const timer = setTimeout(() => {
-                setGlobalLoading(false);
-                toast({
-                    title: 'Diagnostics Initialized',
-                    description: `Targeting VIN: ${globalVin}`,
-                    status: 'success',
-                    duration: 2000,
-                    position: 'top'
-                });
-            }, 1200);
-
-            localStorage.setItem('last_vin', globalVin);
-            const patterns = globalVin.substring(0, 12);
-            setParams(prev => ({ ...prev, pattern: patterns }));
-            return () => clearTimeout(timer);
-        }
-    }, [globalVin]);
+    // Removed auto-execution on globalVin change. Triggered via Submit button instead.
 
     const toggleCard = (id) => {
         const isOpening = !expandedCards.includes(id);
@@ -1477,15 +1458,21 @@ const SystemConsolePage = () => {
             return;
         }
 
-        // Just save and confirm, don't execute everything automatically
+        setGlobalLoading(true);
+        setTimeout(() => {
+            setGlobalLoading(false);
+            toast({
+                title: 'VIN submitted successfully',
+                description: `Targeting VIN: ${globalVin}`,
+                status: 'success',
+                duration: 2000,
+                position: 'top'
+            });
+        }, 1200);
+
         localStorage.setItem('last_vin', globalVin);
-        toast({
-            title: 'VIN Updated',
-            description: `Ready to run diagnostics for ${globalVin}`,
-            status: 'success',
-            duration: 2000,
-            position: 'top'
-        });
+        const patterns = globalVin.substring(0, 12);
+        setParams(prev => ({ ...prev, pattern: patterns }));
     };
 
     const filteredCategories = API_CATEGORIES.map(cat => ({
@@ -1569,7 +1556,7 @@ const SystemConsolePage = () => {
                         <Flex w="full" justify="space-between" align={{ base: "flex-start", sm: "center" }} direction={{ base: "column", sm: "row" }} gap={4}>
                             <HStack spacing={3}>
                                 <Icon as={Terminal} color="blue.500" />
-                                <Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">DIAGNOSTIC DASHBOARD</Text>
+                                <Text fontWeight="black" fontSize="xs" color="gray.500" letterSpacing="widest">VIN DETAILS</Text>
                             </HStack>
                             <HStack spacing={3} wrap="wrap">
                                 <Popover trigger="hover" placement="bottom-end" openDelay={200}>
@@ -1775,12 +1762,12 @@ const SystemConsolePage = () => {
                                                                     </HStack>
                                                                 ))}
                                                                 {PROCEDURAL_DOCS[cat.id].steps.length > 3 && (
-                                                                    <Text 
-                                                                        fontSize="9px" 
-                                                                        color="blue.500" 
-                                                                        fontWeight="bold" 
-                                                                        pl={6} 
-                                                                        cursor="pointer" 
+                                                                    <Text
+                                                                        fontSize="9px"
+                                                                        color="blue.500"
+                                                                        fontWeight="bold"
+                                                                        pl={6}
+                                                                        cursor="pointer"
                                                                         _hover={{ textDecoration: 'underline', color: 'blue.600' }}
                                                                         onClick={(e) => handleManualHelp(e, cat.id)}
                                                                     >

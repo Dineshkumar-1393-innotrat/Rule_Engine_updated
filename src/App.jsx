@@ -16,6 +16,7 @@ const HistoricalDataPage = React.lazy(() => import("./components/HistoricalData/
 const BulkProvisionPage = React.lazy(() => import("./components/BulkProvision/BulkProvisionPage"));
 const SystemConsolePage = React.lazy(() => import("./components/SystemOverview/SystemConsolePage"));
 const MQTTVirtualDeviceDashboard = React.lazy(() => import("./components/MQTTVirtualDevice/MQTTVirtualDeviceDashboard"));
+const CertificateVerificationPage = React.lazy(() => import("./pages/CertificateVerificationPage"));
 
 
 // Auth components
@@ -57,6 +58,7 @@ const App = () => {
                       <Route path="/system-console/:vin?" element={<SystemConsolePage />} />
                       <Route path="/payload-dashboard/:vin?" element={<PayloadDashboardPage />} />
                       <Route path="/mqtt-virtual-device" element={<MQTTVirtualDeviceDashboard />} />
+                      <Route path="/certificate-verification" element={<CertificateVerificationPage />} />
                       <Route path="*" element={<Navigate to="/payload-dashboard" replace />} />
                     </Routes>
                   </MainLayout>

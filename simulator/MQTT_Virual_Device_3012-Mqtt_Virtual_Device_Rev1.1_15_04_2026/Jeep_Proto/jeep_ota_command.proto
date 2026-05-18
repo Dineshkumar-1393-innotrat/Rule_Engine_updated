@@ -1,0 +1,123 @@
+// JEEP - Connected Vehicle India Plaform - command and command response message format
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+import "timestamp.proto";
+import "jeep_common.proto";
+
+
+enum CommandStatus {
+	unknown_status = 0;
+	success = 1;
+	failure = 2;
+	command_initiated =3;
+}
+
+enum TBOXState {
+	UNKNOWN_STATE = 0;
+	AUTHORIZED = 1;
+	CUSTOMER = 3;
+}
+
+enum FetchlogsErrorCode{
+	invalidErrorCode=0;
+	fileUploadFailure_accessTokenExpired=1;
+	fileUploadFailure_networkFailure=2;
+	fileUploadFailure_urlError=3;
+}
+
+
+// Identifies a Refresh command sent to the tbox
+message WakeupCommandPayload {
+	//empty
+}
+
+// Identifies a Refresh command sent to the tbox
+message WakeupCommandResponsePayload {
+	CommandStatus commandStatus = 1 [json_name = "rcs"];
+}
+
+
+message TBOXStateUpdateCommandPayload {
+    TBOXState tboxState = 1[json_name = "ts"];
+}
+
+message TBOXStateUpdateCommandResponsPayload {
+    CommandStatus commandStatus = 1 [json_name = "ras"];
+    TBOXState currentTboxState = 2[json_name = "cts"];
+}
+
+message FetchlogsCommandPayload {
+	string url = 1 [json_name = "url"];
+	string accessToken = 2 [json_name = "actkn"];
+}
+
+message FetchlogsCommandResponsePayload {
+	CommandStatus commandStatus = 1 [json_name = "fls"];
+	FetchlogsErrorCode fetchlogserrorcode = 2 [json_name = "ec"];
+}
+
+message UserDefinedSpeedCommandPayload {
+	google.protobuf.Timestamp time_stamp = 1; 
+	string speed = 2[json_name="spd"];   
+}
+
+message UserDefinedSpeedCommandResponsePayload {
+	CommandStatus commandStatus = 1 [json_name = "rus"];
+	string definedSpeed = 2 [json_name = "uds"];
+}
+
+message RemoteBlinkerOnCommandPayload {	
+	RemoteBlinkerEventType BlinkerOnEventStatus =1 [json_name = "rmtbon"];
+	google.protobuf.Timestamp time_stamp=2;
+	
+}
+message RemoteBlinkerOffCommandPayload {	
+	RemoteBlinkerEventType BlinkerOffEventStatus =1 [json_name = "rmtboff"];
+	google.protobuf.Timestamp time_stamp=2;
+	
+}
+
+message RemoteBlinkerOnCommandResponsePayload {
+    CommandStatus commandStatus = 1 [json_name = "rltr"];
+	RemoteCommandFailureCodes returnFailureCodes = 2[json_name = "rmtfal"];
+	RemoteBlinkerEventType BlinkerOnEventStatus =3 [json_name = "rmteb"];
+	
+}
+message RemoteBlinkerOffCommandResponsePayload {
+    CommandStatus commandStatus = 1 [json_name = "rltr"];
+	RemoteCommandFailureCodes returnFailureCodes = 2[json_name = "rmtfal"];
+	RemoteBlinkerEventType BlinkerOffEventStatus =3 [json_name = "rmteb"];
+	
+}
+
+message RemoteDoorLockCommandPayload {
+		google.protobuf.Timestamp time_stamp=1;
+
+}
+message RemoteDoorUnLockCommandPayload {
+	google.protobuf.Timestamp time_stamp=1;
+}
+
+message RemoteDoorLockCommandResponsePayload{
+	CommandStatus commandStatus = 1 [json_name = "lkrstd"];
+	RemoteCommandFailureCodes remoteFailureCodes =2[json_name="rlkukc"];
+}	
+message RemoteDoorUnLockCommandResponsePayload{
+	CommandStatus commandStatus = 1 [json_name = "unlktrs"];
+	RemoteCommandFailureCodes remoteFailureCodes =2[json_name="rlkukfc"];
+}
+
+message RemoteHonkCommandPayload {
+		google.protobuf.Timestamp time_stamp=1;
+}
+
+message RemoteHonkCommandResponsePayload{
+	CommandStatus commandStatus = 1 [json_name = "rhk"];
+	RemoteCommandFailureCodes remoteFailureCodes =2[json_name="rhkfc"];
+}
+
+
+

@@ -1,0 +1,102 @@
+// JEEP - Connected Vehicle India Plaform - Alert
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+import "jeep_common.proto";
+import "timestamp.proto";
+
+//
+// [START Alert_MessageType_Definition]
+//
+message Alerts {
+	google.protobuf.Timestamp time_stamp = 1;
+		AlertState alertState = 2 [json_name = "alr"];
+		AlertType alertType = 3 [json_name = "alt"];
+		string alertID = 4 [json_name = "ali"];
+		bool isLive = 5 [json_name = "ilv"];
+	oneof alertMetadata {
+		DefaultAlertPayload DefaulltAlert = 6;
+    	SpeedAlertPayload SpeedAlert = 7;
+    	TowAwayAlertPayload TowAwayAlert = 10;
+		DongleStatusAlertPayload DongleStatusAlert =17;
+		EngineIdlingAlertPayload EngineIdlingAlert =18;
+		ParkingDisturbanceAlertPayload ParkingDisturbanceAlert = 19;
+	}
+	
+}
+
+//////////////////////////////////////////////////////////////
+//
+// [START VehicleAlert_MessageType_Definition]
+//
+//
+// Payload format for default alert 
+message DefaultAlertPayload {
+	
+}
+// GPS Payload
+message GPSPayload{
+
+		double gpsLat  = 1 [json_name = "lat"];
+		double gpsLong  = 2 [json_name = "lng"];
+		float gpsAlt  = 3 [json_name = "alt"];
+		float gpsAccLat = 4 [json_name = "ala"];
+		float gpsAccLon = 5 [json_name = "alo"];
+		float gpsAccAlt = 6 [json_name = "aal"];
+		float gpsCourseAngle = 7 [json_name = "coa"];
+		float gpsSignalQuality = 8 [json_name = "siq"];
+		int32 gpsFixedStatus = 9 [json_name = "gpfist"];
+}
+
+message AlertPayload {
+	repeated Alerts AlertsData = 1;
+}
+
+// Payload format for over speed alert 
+message SpeedAlertPayload {
+	
+		float vehicleSpeed  = 1 [json_name = "vsp"];
+		GPSPayload gpsPayload = 2 [json_name = "gps"];
+
+}
+
+// Payload format for Tow away alert 
+message TowAwayAlertPayload {
+
+		float vehicleSpeed  = 1 [json_name = "vsp"];
+		GPSPayload gpsPayload = 2 [json_name = "gps"];
+
+}
+
+message DongleStatusAlertPayload {
+
+		DongleStatus dongleStatus = 1 [json_name = "dnglSts"];
+		GPSPayload gpsPayload = 2 [json_name = "gps"];
+
+}
+
+message EngineIdlingAlertPayload {
+		
+		EngineIdling engineIdling = 1 [json_name = "engidl"];
+		GPSPayload gpsPayload = 2 [json_name = "gps"];
+		int32 engineIdlingMinutes = 3 [json_name = "engidlmin"];
+
+
+}
+
+message ParkingDisturbanceAlertPayload {
+
+		ParkingDisturbance parkingDisturbance = 1 [json_name = "prkdstalt"];
+		GPSPayload gpsPayload = 2 [json_name = "gps"];
+
+}
+
+
+//
+// [END Alert_MessageType_Definition]
+/////////////////////////////////////////////////////////////

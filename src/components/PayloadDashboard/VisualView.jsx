@@ -22,7 +22,7 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                 return result;
             }
         }
-        
+
         // Fallback: Jeep Vehicle Status API
         if (vsData) {
             if (name === 'Fuel Level') {
@@ -81,8 +81,8 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
 
     const ignitionSignal = signals.find(s => s.name === "Ignition Status");
     // Prioritize Ignition Status from events if available, otherwise fallback to vehicleStatus API or deviceState
-    const ignition = (ignitionSignal && ignitionSignal.data && ignitionSignal.data.length > 0) 
-        ? getVal("Ignition Status") 
+    const ignition = (ignitionSignal && ignitionSignal.data && ignitionSignal.data.length > 0)
+        ? getVal("Ignition Status")
         : (vsData?.ignitionStatus ?? deviceState?.ignition ?? "OFF");
 
     const locationData = getComplexVal("Location");
@@ -139,9 +139,10 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
     const ignitionDisplay = (() => {
         const val = String(ignition || '').toUpperCase();
         if (val === 'IGN_LK') return 'PARKED';
-        if (val === 'RUN') return 'DRIVING';
+        if (val === 'RUN') return 'RUN';
         if (val === 'START') return 'START';
-        if (val === 'CONNECTED' || val === 'TRUE' || val === '1') return 'ON';
+        if (val === 'CONNECTED') return 'CONNECTED';
+        if (val === 'TRUE' || val === '1') return 'ON';
         return val || 'OFF';
     })();
 
@@ -191,17 +192,19 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                         label="Ignition Status"
                         description="ENGINE POWER STATE"
                         isOn={ignOn}
-                        icon={Zap}
+                        videoIcon="/Ignition-Status.webm"
+                        videoSize="48px"
                         isError={isSigError("Ignition Status")}
-                        color="green"
-                        statusText={ignOn ? "ON" : "OFF"}
+                        color="blue"
+                        statusText={ignitionDisplay}
                     />
                     <StatusToggle
                         label="Device Join"
                         description="TBOX STATE"
                         isOn={deviceState?.deviceConnectedState === 'CONNECTED'}
                         statusText={deviceState?.deviceConnectedState === 'CONNECTED' ? 'CONNECTED' : 'OFFLINE'}
-                        icon={Activity}
+                        videoIcon="/Device-join.webm"
+                        videoSize="48px"
                         color="green"
                         isSimulated={deviceState?.isSimulated}
                     />
@@ -209,44 +212,64 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                         label="Trip Active"
                         description="ONGOING TRIP STATUS"
                         isOn={!!(ongoingTrip && (ongoingTrip.tripId || ongoingTrip.journeyId))}
-                        icon={Navigation}
-                        color="green"
+                        videoIcon="/trip-icon.webm"
+                        videoSize="48px"
+                        color="orange"
                         statusText={ongoingTrip && (ongoingTrip.tripId || ongoingTrip.journeyId) ? "ACTIVE" : "IDLE"}
                     />
                     <Box
                         bg="white" p={{ base: 3, md: 5 }} borderRadius="2xl" border="1px solid"
-                        borderColor="gray.100" boxShadow="sm" display="flex" alignItems="center"
+                        borderColor="gray.100" boxShadow="sm" h="full"
+                        _hover={{ bg: "purple.50", borderColor: "purple.200", boxShadow: "lg" }}
+                        transition="all 0.3s cubic-bezier(0.4, 0, 0.2, 1)"
                     >
-                        <HStack spacing={4}>
-                            <Box p={3} borderRadius="xl" bg="blue.50">
-                                <Clock size={18} color="#3182CE" />
-                            </Box>
-                            <VStack align="flex-start" spacing={0}>
-                                <Text fontWeight="800" color="gray.800" fontSize={{ base: "xs", md: "md" }} letterSpacing="-0.2px">Last Updated</Text>
-                                <Text fontSize={{ base: "10px", md: "12px" }} color="gray.900" fontWeight="900" letterSpacing="0.5px">
+                        <Flex align="center" justify="space-between" h="full">
+                            <HStack spacing={3}>
+                                <Box
+                                    p={2}
+                                    borderRadius="lg"
+                                    bg="purple.50"
+                                    w="48px" h="48px"
+                                    display="flex" align="center" justify="center"
+                                    overflow="hidden"
+                                >
+                                    <Box as="video" src="/Last-updated.webm" autoPlay loop muted playsInline w="48px" h="48px" objectFit="contain" />
+                                </Box>
+                                <VStack align="flex-start" spacing={0}>
+                                    <Text fontWeight="800" color="gray.800" fontSize="xs" letterSpacing="-0.2px">Last Updated</Text>
+                                    <Text fontSize="8px" color="gray.400" fontWeight="black" textTransform="uppercase" letterSpacing="0.5px">
+                                        STATION TIME
+                                    </Text>
+                                </VStack>
+                            </HStack>
+                            <VStack align="flex-end" spacing={0}>
+                                <Text fontSize="10px" color="gray.900" fontWeight="900" letterSpacing="0.5px">
                                     {formattedTime}
                                 </Text>
+                                <Text fontSize="7px" color="gray.400" fontWeight="bold">
+                                    {formattedDate}
+                                </Text>
                             </VStack>
-                        </HStack>
+                        </Flex>
                     </Box>
                 </Grid>
 
                 {/* Middle Grid Layout */}
-                <Grid 
-                    templateColumns={{ base: "1fr", lg: "1.2fr 0.8fr 1.5fr" }} 
-                    gap={6} 
-                    mb={8} 
+                <Grid
+                    templateColumns={{ base: "1fr", lg: "1.2fr 0.8fr 1.5fr" }}
+                    gap={6}
+                    mb={8}
                     h={{ base: "auto", lg: "300px" }}
                 >
                     {/* Left: Map Card */}
-                    <Box 
+                    <Box
                         h={{ base: "300px", lg: "full" }}
-                        bg="white" 
-                        borderRadius="2xl" 
-                        overflow="hidden" 
-                        position="relative" 
-                        border="1px solid" 
-                        borderColor="rgba(0,0,0,0.06)" 
+                        bg="white"
+                        borderRadius="2xl"
+                        overflow="hidden"
+                        position="relative"
+                        border="1px solid"
+                        borderColor="rgba(0,0,0,0.06)"
                         boxShadow="sm"
                     >
                         {lat && long ? (
@@ -326,7 +349,7 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                             <SimpleGrid columns={2} spacing={2}>
                                 <Box p={3} bg="blue.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">FUEL</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="blue.700">
+                                    <Text fontSize="13px" fontWeight="900" color="blue.700">
                                         {(() => {
                                             const fuelSignal = signals.find(s => s.name === 'Fuel Level');
                                             const val = fuelSignal?.data?.[0]?.signalValue || fuelSignal?.data?.[0]?.value || '--';
@@ -336,25 +359,25 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                                 </Box>
                                 <Box p={3} bg="green.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">BATTERY</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="green.700">{batteryRaw || '--'}V</Text>
+                                    <Text fontSize="13px" fontWeight="900" color="green.700">{batteryRaw || '--'}V</Text>
                                 </Box>
                                 <Box p={3} bg="orange.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">COOLANT</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="orange.700">{engineTemp || '--'}°C</Text>
+                                    <Text fontSize="13px" fontWeight="900" color="orange.700">{engineTemp || '--'}°C</Text>
                                 </Box>
                                 <Box p={3} bg="purple.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">ODOMETER</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="purple.700">{(odometer || 0).toLocaleString()} km</Text>
+                                    <Text fontSize="13px" fontWeight="900" color="purple.700">{(odometer || 0).toLocaleString()} km</Text>
                                 </Box>
                                 <Box p={3} bg="cyan.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">FOTA VERSION</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="cyan.700">
+                                    <Text fontSize="10px" fontWeight="900" color="cyan.700" whiteSpace="nowrap">
                                         {nadSwVersion || deviceState?.firmwareVersion || deviceState?.releaseVersion || '--'}
                                     </Text>
                                 </Box>
                                 <Box p={3} bg="teal.50" borderRadius="xl">
                                     <Text fontSize="8px" color="gray.400" fontWeight="black">FOTA STATUS</Text>
-                                    <Text fontSize="15px" fontWeight="900" color="teal.700" textTransform="uppercase">
+                                    <Text fontSize="10px" fontWeight="900" color="teal.700" textTransform="uppercase" whiteSpace="nowrap">
                                         {fotaStatusLive || deviceState?.fotaStatus || '--'}
                                     </Text>
                                 </Box>
@@ -378,14 +401,14 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                     </VStack>
 
                     {/* Right: Car Visualization */}
-                    <Box 
+                    <Box
                         h={{ base: "300px", lg: "full" }}
-                        bg="#ebebeb" 
-                        borderRadius="2xl" 
-                        border="1px solid" 
-                        borderColor="rgba(0,0,0,0.06)" 
-                        boxShadow="sm" 
-                        overflow="hidden" 
+                        bg="#ebebeb"
+                        borderRadius="2xl"
+                        border="1px solid"
+                        borderColor="rgba(0,0,0,0.06)"
+                        boxShadow="sm"
+                        overflow="hidden"
                         position="relative"
                         display="flex"
                         alignItems="center"

@@ -1,0 +1,57 @@
+// JEEP - Connected Vehicle India Plaform - Emergency
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option csharp_namespace = "stla.cvip.jeep";
+option cc_enable_arenas = true;
+option objc_class_prefix = "Jeep";
+
+import "jeep_common.proto";
+import "timestamp.proto";
+//
+// [START Emergency_MessageType_Definition]
+//
+message EmergencyAlert {
+
+		google.protobuf.Timestamp time_stamp = 1;
+		EmergencyAlertType emergencyalertType = 2 [json_name = "emr"];
+    		CrashInfoPayload CrashInfo = 3;
+		
+}
+
+message EmergencyPayload {
+	repeated EmergencyAlert EmergencyAlertData = 1;
+}
+
+
+//////////////////////////////////////////////////////////////
+//
+// [START VehicleEmergencyAlert_MessageType_Definition]
+//
+//
+
+
+
+
+// Payload format for Crash Info 
+message CrashInfoPayload {
+	
+		double gpsLat  = 1 [json_name = "lat"];
+		double gpsLong  = 2 [json_name = "lng"];
+		float gpsAlt  = 3 [json_name = "alt"];
+		float gpsAccLat = 4 [json_name = "ala"];
+		float gpsAccLon = 5 [json_name = "alo"];
+		float gpsAccAlt = 6 [json_name = "aal"];
+		float gpsCourseAngle = 7 [json_name = "coa"];
+		float gpsSignalQuality = 8 [json_name = "siq"];
+		int32 gpsFixedStatus = 9 [json_name = "gpfist"];
+
+}
+
+
+
+
+//
+// [END EmergencyAlert_MessageType_Definition]
+/////////////////////////////////////////////////////////////

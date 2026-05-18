@@ -60,8 +60,8 @@ const ACCOUNTS = {
         userName: "admin",
         password: "0[%62&Db$Z:J",
         accountId: "pkijeeptenant",
-        clientId: "oWXMoTG9yKyaTjZjuFin8kJmPXUa",
-        clientSecret: "XF3Cdm5NlkJr0NVRQ0vOZWkqmxEa"
+        clientId: "UGTtoib0yvQ8vnfv3CoXLahqfAMa",
+        clientSecret: "NqxJBwd236LrlXuVPb4afQBIRfka"
     },
     RUN: {
         userName: "admin",
@@ -991,19 +991,27 @@ export const TraxoApi = {
     createCommonCertificate: async (commonName, csr) => {
         return withRetry(async () => {
             if (!authTokens.PKI) await TraxoApi.login('PKI');
-            const response = await axios.post(`${BASE_URL}/csr/createCertificate`, {
+            const payload = {
                 commonName,
                 timeStamp: Math.floor(Date.now() / 1000),
                 csr
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${authTokens.PKI}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 30000
-            });
-            console.log('🔐 Common Certificate Created:', response.data);
-            return response.data;
+            };
+            console.log('🔐 [PKI_DEBUG] Creating Common Certificate:', { ...payload, csr: payload.csr?.substring(0, 32) + '...' });
+            
+            try {
+                const response = await axios.post(`${BASE_URL}/csr/createCertificate`, payload, {
+                    headers: {
+                        'Authorization': `Bearer ${authTokens.PKI}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                console.log('🔐 [PKI_DEBUG] Success:', response.data);
+                return response.data;
+            } catch (error) {
+                console.error('🔐 [PKI_DEBUG] API Error:', error.response?.data || error.message);
+                throw error;
+            }
         }, 'PKI');
     },
 
@@ -1015,10 +1023,10 @@ export const TraxoApi = {
                 timeStamp: Math.floor(Date.now() / 1000),
                 csr
             };
-            console.log('🔐 [CERT_DEBUG] Sending CSR Request:', { ...payload, csr: payload.csr?.substring(0, 50) + '...' });
+            console.log('🔐 [PKI_DEBUG] Creating TBOX Certificate:', { ...payload, csr: payload.csr?.substring(0, 32) + '...' });
             
             try {
-                // Using BASE_URL as seen in the collection example
+                // Using BASE_URL (cvipiot-preprod) as per Jeep 5.0 Collection
                 const response = await axios.post(`${BASE_URL}/csr/createCertificate`, payload, {
                     headers: {
                         'Authorization': `Bearer ${authTokens.PKI}`,
@@ -1026,10 +1034,16 @@ export const TraxoApi = {
                     },
                     timeout: 30000
                 });
-                console.log('🔐 [CERT_DEBUG] Certificate Created:', response.data);
+                console.log('🔐 [PKI_DEBUG] Success:', response.data);
                 return response.data;
             } catch (error) {
-                console.error('🔐 [CERT_DEBUG] API Error:', error.response?.data || error.message);
+                const errorData = error.response?.data;
+                console.error('🔐 [PKI_DEBUG] API Error:', errorData || error.message);
+                // If the error data contains a specific message, wrap it in the error
+                if (errorData) {
+                    const msg = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
+                    throw new Error(`${error.message}: ${msg}`);
+                }
                 throw error;
             }
         }, 'PKI');
@@ -1039,23 +1053,56 @@ export const TraxoApi = {
     updateTboxState: async (vin, status = 'CUSTOMER') => {
         return withRetry(async () => {
             if (!authTokens.RUN) await TraxoApi.login('RUN');
-            const response = await axios.post(`${BASE_URL}/concurrentcommands/vinno`, {
+            const payload = {
                 deviceVinno: vin,
                 actionType: 'tboxstateupdate',
                 command: { status }
-            }, {
-                headers: {
-                    'Authorization': `Bearer ${authTokens.RUN}`,
-                    'Content-Type': 'application/json'
-                },
-                timeout: 30000
-            });
-            console.log('🔄 Tbox State Update Response:', response.data);
-            return response.data;
+            };
+            console.log('🔄 [RUN_DEBUG] Updating TBOX State:', payload);
+            
+            try {
+                const response = await axios.post(`${BASE_URL}/concurrentcommands/vinno`, payload, {
+                    headers: {
+                        'Authorization': `Bearer ${authTokens.RUN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                console.log('🔄 [RUN_DEBUG] Success:', response.data);
+                return response.data;
+            } catch (error) {
+                const errorData = error.response?.data;
+                console.error('🔄 [RUN_DEBUG] API Error:', errorData || error.message);
+                if (errorData) {
+                    const msg = typeof errorData === 'string' ? errorData : JSON.stringify(errorData);
+                    throw new Error(`${error.message}: ${msg}`);
+                }
+                throw error;
+            }
         }, 'RUN');
     },
 
     // Portal device state (alias for getDeviceState with RUN token context)
+    getDeviceStateByVin: async (vin) => {
+        return withRetry(async () => {
+            if (!authTokens.RUN) await TraxoApi.login('RUN');
+            console.log('🔍 [RUN_DEBUG] Fetching Device State:', vin);
+            try {
+                const response = await axios.get(`${BASE_URL}/portal/vin/${vin}`, {
+                    headers: {
+                        'Authorization': `Bearer ${authTokens.RUN}`,
+                        'Accept': 'application/json'
+                    },
+                    timeout: 30000
+                });
+                return response.data;
+            } catch (error) {
+                console.error('🔍 [RUN_DEBUG] Fetch Error:', error.response?.data || error.message);
+                throw error;
+            }
+        }, 'RUN');
+    },
+
     getPortalDeviceState: async (vin) => {
         return withRetry(async () => {
             if (!authTokens.RUN) await TraxoApi.login('RUN');
@@ -1189,7 +1236,12 @@ export const TraxoApi = {
             });
             return response.data;
         } catch (error) {
-            console.error("AWS Reset State Error:", error.message);
+            const errorMsg = error.response?.data?.message || error.response?.data || error.message;
+            console.error("AWS Reset State Error:", errorMsg);
+            if (error.response?.data) {
+                const msg = typeof error.response.data === 'string' ? error.response.data : JSON.stringify(error.response.data);
+                throw new Error(`${error.message}: ${msg}`);
+            }
             throw error;
         }
     },
@@ -1374,6 +1426,18 @@ export const TraxoApi = {
         }, 'JEEP_PRIMARY');
     },
 
+    getFotaCommandValidity: async (commandId, username) => {
+        return withRetry(async () => {
+            if (!authTokens.FOTA) await TraxoApi.login('FOTA');
+            const response = await axios.get(`${FOTA_FCA_BASE_URL}/jeep/ota/commandvalidity`, {
+                params: { commandid: commandId, username },
+                headers: { 'Authorization': `Bearer ${authTokens.FOTA}` },
+                timeout: 30000
+            });
+            return response.data;
+        }, 'FOTA');
+    },
+
     resetFotaState: async (vin, commandName = 'firmwaredownloadcommand') => {
         return withRetry(async () => {
             if (!authTokens.FOTA) await TraxoApi.login('FOTA');
@@ -1441,6 +1505,19 @@ export const TraxoApi = {
             return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         } catch (error) {
             console.error('Checksum calculation failed:', error);
+            throw error;
+        }
+    },
+
+    resetDeviceStateAWS: async (vin) => {
+        try {
+            const response = await axios.post(`${AWS_BASE_URL}/jeep/reset-device-state`, { vin }, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 30000
+            });
+            return response.data;
+        } catch (error) {
+            console.error('AWS Reset Error:', error.response?.data || error.message);
             throw error;
         }
     }

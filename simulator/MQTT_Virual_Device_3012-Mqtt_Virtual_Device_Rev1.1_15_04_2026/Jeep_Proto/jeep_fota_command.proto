@@ -1,0 +1,126 @@
+// JEEP - Connected Vehicle India Plaform - FOTA c message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+
+
+enum DownloadAndInstallFirmwareCommandState{
+	Default = 0;
+	MCU_Download_in_Progress = 1;
+	NAD_Download_in_Progress = 2;
+	MCU_Download_Successful= 3;
+	NAD_Download_Successful=4;
+	MCU_Ready_to_Install=5;
+	NAD_Ready_to_Install=6;
+	MCU_Installation_in_Progress=7;
+	Rollback_in_progress_MCU=8;
+	Rollback_Successful_MCU=9;
+	Installation_successful_MCU=10;
+	CheckTboxCondition = 11;
+	FOTAWaiting = 12;
+	CheckTboxCondition2 = 13;
+	
+}
+
+
+enum FotaFailureCode{
+	InvalidFailureCode = 0;
+	DownloadInProgressMCUDownloadRetryFailure=100;
+	DownloadInProgressNADDownloadRetryFailure=101;
+	DownloadInProgressMCUDownloadTimeout=102;
+	DownloadInProgressNADDownloadTimeout=103;
+	DownloadInProgressMCUFileValidationFailure=104;
+	DownloadInProgressNADFileValidationFailure=105;
+	DownloadInProgressMCUFilesizeNomatched=106;
+	DownloadInProgressNADFilesizeNomatched=107;
+	DownloadInProgressInvalidWrongPayload=108;
+	RollbackInProgressMCURollbackIsSuccessful=109;
+	RollbackInProgressMCURollbackIsUnSuccessful=110;
+	DownloadMCUHTTPCommonErr=111;
+	DownloadNADHTTPCommonErr=112;
+	CheckTBoxConditionLowVoltage = 113;
+	CheckTBoxConditionInvalidGoldenImage = 114;
+	CheckTBoxConditionInvalidMCUVersion = 115;
+	CheckTBoxConditionInvalidNADVersion =116;
+	CheckTboxConditionCommonError = 117;
+	DecodeMCUMismatchHash = 118;
+	DecodeNADMismatchHash = 119;
+	DecodeMCUWrongEncryptionFile = 120;
+	DecodeNADWrongEncryptionFile = 121;
+	DecodeMCUSignatureAuthenticFailure = 122;
+	DecodeNADSignatureAuthenticFailure = 123;
+	SigningKeyMismatch = 124;
+	EncryptionKeyMismatch = 125;
+}
+
+enum FirmwareType{
+	InvalidFirmwareType=0;
+	mcu=1;
+	nad=2;
+}
+enum InstallType{
+	InvalidInstallType=0;
+	Delta=1;
+	Full=2;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+
+
+///Identifies the url and accessToken class for firmwareDownloadCommand
+message FirmwareDownloadPayload{
+	FirmwareType firmwareType = 1 [json_name = "fwty"];
+	string url = 2 [json_name = "url"];
+	string accessToken = 3 [json_name = "actkn"];
+    bool updateRollbackFirmware = 4 [json_name = "uprlfw"];
+	string checkSum = 5 [json_name = "cksu"];
+	string rawCheckSum = 6 [json_name = "rwcksu"];
+	string softwareSize = 7 [json_name = "swsz"];
+	InstallType installType = 8 [json_name = "inty"];
+	string releaseVersion = 9 [json_name = "rlv"];
+	string rawSize = 10 [json_name = "rwsz"];
+	string encryptionKeyVersion = 11 [json_name="enkv"];
+	string signingKeyVersion = 12 [json_name="skv"];
+	string signature = 13 [json_name="sig"];
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////
+// Identifies a Firmware Download command sent to the vehicle
+message FirmwareDownloadCommandPayload {
+	repeated FirmwareDownloadPayload firmwareDownloadPayload = 1 [json_name = "fdp"];
+}
+
+// Identifies a Firmware Download command response from the vehicle
+message FirmwareDownloadCommandResponsePayload {
+	DownloadAndInstallFirmwareCommandState downloadAndInstallFirmwareCommandState = 1 [json_name = "dfc"];
+	FotaFailureCode returnFailureCode = 2 [json_name = "erc"];
+	
+}
+
+enum KeyCommandState{
+	DefaultState = 0;
+	KeyPackage_Download_in_Progress = 1;
+	KeyPackage_Download_Success= 2;
+	KeyPackage_Verification_Success =3;
+	KeyPackage_Verification_Failure =4;
+	KeyPackage_Flashing_Successful=5;
+	KeyPackage_Flashing_Failure=6;
+	
+  
+}
+
+enum KeyFailureCode{
+	InvalidKeyFailureCode = 0;
+	DownloadInProgressKeyPackageTimeout=101;
+	DownloadInProgressKeyPackageInvalidWrongPayload=102;
+	DownloadKeyPackageHTTPCommonErr=103;
+	KeyDecryptionFaliure=104;
+	KeyVerificationFailure=105;
+	KeyFlashingFailure=106;
+
+}
+//////////////////////////////////////////////////////////////////////////////////////////////////
+

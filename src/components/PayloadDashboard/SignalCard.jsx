@@ -96,7 +96,7 @@ export const SignalCard = ({ signal, searchTerm, onRefresh, handlers, isFullScre
                         exit={{ height: 0, opacity: 0 }} 
                         transition={{ duration: 0.3 }}
                     >
-                        <Box height={isFullScreen ? "600px" : "260px"} overflow="auto" transition="height 0.3s ease">
+                        <Box height={isFullScreen ? "600px" : "260px"} overflow="hidden" transition="height 0.3s ease">
                             {signal.error ? (
                                 <Flex align="center" justify="center" h="full" p={6} direction="column" bg="red.50">
                                     <AlertTriangle size={isFullScreen ? 48 : 32} color="#EF4444" />

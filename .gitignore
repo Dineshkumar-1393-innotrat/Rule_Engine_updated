@@ -83,3 +83,9 @@ releases/
 **/release/
 **/releases/
 **/downloads/
+
+# Custom testing files
+tmp.csr
+tmp_cert_steps*
+certificates_unzipped/
+device_cert/

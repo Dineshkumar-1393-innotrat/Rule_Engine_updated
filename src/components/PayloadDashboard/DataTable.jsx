@@ -15,7 +15,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
 
     if (name === 'Remote Commands') {
         return (
-            <Box w="100%" overflowX="auto">
+            <Box w="100%" h="100%" overflow="auto">
                 <Table size="sm" variant="simple">
                     <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
                         <Tr>{['Command ID', 'Action', 'Status', 'Time', 'Details'].map(k => <Th key={k} fontSize="10px" color="gray.600" textTransform="uppercase" px={3} py={2} borderBottom="2px solid" borderColor="gray.200" fontWeight="800">{k}</Th>)}</Tr>
@@ -51,7 +51,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
         })));
         const keys = allK.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return 0; }).slice(0, 15);
         return (
-            <Box w="100%" overflowX="auto">
+            <Box w="100%" h="100%" overflow="auto">
                 <Table size="sm" variant="simple">
                     <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
                         <Tr>
@@ -81,7 +81,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                         if (typeof val === 'object' && val !== null) {
                                             return (
                                                 <Td key={key} fontSize="10px" py={2} px={3}>
-                                                    <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                                    <Box maxH="200px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
                                                         <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(val, null, 2)}</pre>
                                                     </Box>
                                                 </Td>
@@ -91,7 +91,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                         return <Td key={key} fontSize="11px" py={2} px={3} fontFamily="monospace" fontWeight={isEV ? '700' : '500'} color={isEV && isOn ? 'green.600' : 'gray.800'} bg={isEV && isOn ? 'green.50' : 'transparent'} whiteSpace="nowrap">{val !== null && val !== undefined ? String(val) : '-'}</Td>;
                                     })}
                                     <Td fontSize="10px" py={2} px={3}>
-                                        <Box maxH="120px" maxW="400px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                        <Box maxH="200px" maxW="400px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
                                             <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(item, null, 2)}</pre>
                                         </Box>
                                     </Td>
@@ -108,7 +108,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
         const priority = ['fileName', 'fileSize', 'createdTime', 'status'];
         const keys = allKeys.sort((a, b) => { const ia = priority.indexOf(a), ib = priority.indexOf(b); if (ia !== -1 && ib !== -1) return ia - ib; if (ia !== -1) return -1; if (ib !== -1) return 1; return a.localeCompare(b); }).slice(0, 6);
         return (
-            <Box w="100%" overflowX="auto">
+            <Box w="100%" h="100%" overflow="auto">
                 <Table size="sm" variant="simple">
                     <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
                         <Tr>
@@ -124,7 +124,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                     if (typeof v === 'object' && v !== null) {
                                         return (
                                             <Td key={k} fontSize="10px" py={2} px={3}>
-                                                <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                                <Box maxH="200px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
                                                     <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(v, null, 2)}</pre>
                                                 </Box>
                                             </Td>
@@ -172,7 +172,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
     const rows = nameMatch ? arr.slice(0, 50) : arr.filter(item => keys.some(k => String(item[k] ?? '').toLowerCase().includes(term))).slice(0, 50);
     if (!rows.length) return <Flex align="center" justify="center" h="full" p={4}><Text fontSize="12px" color="gray.500">No matching records.</Text></Flex>;
     return (
-        <Box w="100%" overflowX="auto">
+        <Box w="100%" h="100%" overflow="auto">
             <Table size="sm" variant="simple">
                 <Thead position="sticky" top={0} bg="gray.50" zIndex={1}>
                     <Tr>
@@ -190,7 +190,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                     const formattedObj = deepFormatDates(v);
                                     return (
                                         <Td key={k} fontSize="10px" py={2} px={3}>
-                                            <Box maxH="120px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md">
+                                            <Box maxH="200px" maxW="300px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md">
                                                 <pre style={{ margin: 0, fontFamily: 'monospace' }}>{JSON.stringify(formattedObj, null, 2)}</pre>
                                             </Box>
                                         </Td>
@@ -216,7 +216,7 @@ export const DataTable = ({ data, name, searchTerm = '', handlers = {} }) => {
                                 </Td>
                             )}
                             <Td fontSize="10px" py={2} px={3}>
-                                <Box maxH="120px" maxW="400px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
+                                <Box maxH="200px" maxW="400px" overflow="auto" bg="gray.100" p={1.5} borderRadius="md" border="1px solid" borderColor="gray.200">
                                     <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: '10px' }}>{JSON.stringify(item, null, 2)}</pre>
                                 </Box>
                             </Td>

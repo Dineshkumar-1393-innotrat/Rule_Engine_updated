@@ -1,12 +1,10 @@
 [[redirects]]
-  from = "/api/traxo/*"
-  to = "/.netlify/functions/traxo-proxy"
+  from = "/api/*"
+  to = "/.netlify/functions/api-proxy"
   status = 200
   force = true
-  
 
 [[redirects]]
-  from = "/api/jeep/*"
-  to = "/.netlify/functions/jeep-proxy"
+  from = "/*"
+  to = "/index.html"
   status = 200
-  force = true
