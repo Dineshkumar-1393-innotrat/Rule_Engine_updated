@@ -114,3 +114,4 @@ device_cert/
 /test_api_primary.mjs
 /tmp_read.js
 /~*
+/mqtt-virtual-device-documentation.html
