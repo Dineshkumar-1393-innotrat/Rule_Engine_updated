@@ -89,3 +89,9 @@ tmp.csr
 tmp_cert_steps*
 certificates_unzipped/
 device_cert/
+
+# System generated document formats
+*.pdf
+*.docx
+*.txt
+*.md
