@@ -1520,5 +1520,108 @@ export const TraxoApi = {
             console.error('AWS Reset Error:', error.response?.data || error.message);
             throw error;
         }
-    }
+    },
+
+    tboxStateUpdate: async (vin, status) => withRetry(async () => {
+        if (!authTokens.RUN) await TraxoApi.login('RUN');
+        return (await axios.post(`${PLATFORM_BASE_URL}/jeep/concurrentcommands/vinno`, {
+            deviceVinno: vin,
+            actionType: 'tboxstateupdate',
+            command: { status: status }
+        }, { headers: { 'Authorization': `Bearer ${authTokens.RUN}` }, timeout: 30000 })).data;
+    }, 'RUN'),
+
+    getVehicleTelemetrySignalList: async (deviceType = "356") => withRetry(async () => {
+        if (!authTokens.PRIMARY) await TraxoApi.login('PRIMARY');
+        const response = await axios.get(`${PLATFORM_BASE_URL}/jeep/can/decoder/signallist/${deviceType}`, {
+            headers: { 'Authorization': `Bearer ${authTokens.PRIMARY}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'PRIMARY'),
+
+    getTripDetails: async (vin, pageNo = 0) => withRetry(async () => {
+        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+        const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/details`, {
+            params: { pageNo },
+            headers: { 'Authorization': `${authTokens.JEEP}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'JEEP'),
+
+    getTripByTripId: async (vin, tripId) => withRetry(async () => {
+        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+        const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/tripId/${tripId}`, {
+            headers: { 'Authorization': `${authTokens.JEEP}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'JEEP'),
+
+    getTripSummary: async (vin, starttime, endtime) => withRetry(async () => {
+        if (!authTokens.JEEP) await TraxoApi.login('JEEP');
+        const response = await axios.get(`${JEEP_BASE_URL}/trip/${vin}/summary`, {
+            params: { starttime, endtime },
+            headers: { 'Authorization': `${authTokens.JEEP}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'JEEP'),
+
+    fetchLogsCommand: async (vin) => withRetry(async () => {
+        if (!authTokens.RUN) await TraxoApi.login('RUN');
+        return (await axios.post(`${PLATFORM_BASE_URL}/jeep/concurrentcommands/vinno`, {
+            deviceVinno: vin,
+            actionType: 'fetchlogs'
+        }, { headers: { 'Authorization': `Bearer ${authTokens.RUN}` }, timeout: 30000 })).data;
+    }, 'RUN'),
+
+    downloadLogFile: async (vin, filename) => withRetry(async () => {
+        if (!authTokens.RUN) await TraxoApi.login('RUN');
+        const response = await axios.get(`${PLATFORM_BASE_URL}/fileupload/download`, {
+            params: { vin, filename },
+            headers: { 'Authorization': `Bearer ${authTokens.RUN}` },
+            responseType: 'blob',
+            timeout: 120000
+        });
+        return response.data;
+    }, 'RUN'),
+
+    getAvailableLogs: async (vin) => withRetry(async () => {
+        if (!authTokens.RUN) await TraxoApi.login('RUN');
+        const response = await axios.get(`${PLATFORM_BASE_URL}/fileupload`, {
+            params: { vin },
+            headers: { 'Authorization': `Bearer ${authTokens.RUN}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'RUN'),
+
+    deleteLogFile: async (vin, filename) => withRetry(async () => {
+        if (!authTokens.RUN) await TraxoApi.login('RUN');
+        const response = await axios.delete(`${PLATFORM_BASE_URL}/fileupload`, {
+            params: { vin, filename },
+            headers: { 'Authorization': `Bearer ${authTokens.RUN}`, 'Accept': 'application/json' },
+            timeout: 30000
+        });
+        return response.data;
+    }, 'RUN'),
+
+    uploadFotaFirmware: async (formData) => withRetry(async () => {
+        if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+        return (await axios.post(`${FOTA_FCA_BASE_URL}/jeep/fota/firmware`, formData, {
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}`, 'Content-Type': 'multipart/form-data' },
+            timeout: 120000
+        })).data;
+    }, 'FOTA_UPLOAD'),
+
+    deleteFotaFirmware: async (category, releaseVersion) => withRetry(async () => {
+        if (!authTokens.FOTA_UPLOAD) await TraxoApi.login('FOTA_UPLOAD');
+        return (await axios.delete(`${FOTA_FCA_BASE_URL}/jeep/fota/firmware`, {
+            params: { category, releaseVersion },
+            headers: { 'Authorization': `Bearer ${authTokens.FOTA_UPLOAD}` },
+            timeout: 30000
+        })).data;
+    }, 'FOTA_UPLOAD')
 };
