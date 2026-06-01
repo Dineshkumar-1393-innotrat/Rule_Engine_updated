@@ -22,6 +22,17 @@ const CertificateVerificationPage = React.lazy(() => import("./pages/Certificate
 // Auth components
 const AuthPage = React.lazy(() => import("./components/Auth/AuthPage"));
 
+// Manufacturing Portal components
+const ManufacturingLoginPage = React.lazy(() => import("./components/ManufacturingPortal/ManufacturingLoginPage"));
+const ManufacturingPortalLayout = React.lazy(() => import("./components/ManufacturingPortal/ManufacturingPortalLayout"));
+const ManufacturingDashboardPage = React.lazy(() => import("./components/ManufacturingPortal/DashboardPage"));
+const UploadImeiPage = React.lazy(() => import("./components/ManufacturingPortal/UploadImeiPage"));
+const UploadSupplierFeedPage = React.lazy(() => import("./components/ManufacturingPortal/UploadSupplierFeedPage"));
+const DeviceListPage = React.lazy(() => import("./components/ManufacturingPortal/DeviceListPage"));
+const DeviceSearchPage = React.lazy(() => import("./components/ManufacturingPortal/DeviceSearchPage"));
+const DeviceDetailPage = React.lazy(() => import("./components/ManufacturingPortal/DeviceDetailPage"));
+const UploadHistoryPage = React.lazy(() => import("./components/ManufacturingPortal/UploadHistoryPage"));
+
 const App = () => {
   // Initialize auto-save system and cleanup old data on app start
   useEffect(() => {
@@ -46,6 +57,19 @@ const App = () => {
                 {/* Auth Routes - No MainLayout */}
                 <Route path="/login" element={<AuthPage />} />
                 <Route path="/signup" element={<AuthPage />} />
+
+                {/* Manufacturing Portal */}
+                <Route path="/manufacturing/login" element={<ManufacturingLoginPage />} />
+                <Route path="/manufacturing" element={<ManufacturingPortalLayout />}>
+                  <Route index element={<Navigate to="/manufacturing/dashboard" replace />} />
+                  <Route path="dashboard" element={<ManufacturingDashboardPage />} />
+                  <Route path="upload/imei" element={<UploadImeiPage />} />
+                  <Route path="upload/supplier-feed" element={<UploadSupplierFeedPage />} />
+                  <Route path="devices" element={<DeviceListPage />} />
+                  <Route path="devices/search" element={<DeviceSearchPage />} />
+                  <Route path="devices/:vin" element={<DeviceDetailPage />} />
+                  <Route path="history" element={<UploadHistoryPage />} />
+                </Route>
 
                 {/* App Routes - With MainLayout */}
                 <Route path="/*" element={

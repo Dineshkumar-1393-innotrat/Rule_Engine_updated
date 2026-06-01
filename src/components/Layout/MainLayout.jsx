@@ -17,7 +17,7 @@ import {
   Spacer,
   Tooltip,
 } from '@chakra-ui/react';
-import { Menu, LayoutDashboard, Zap, Settings, Activity, ChevronRight, ChevronLeft, Car, History, UploadCloud, Terminal, Radio } from 'lucide-react';
+import { Menu, LayoutDashboard, Zap, Settings, Activity, ChevronRight, ChevronLeft, Car, History, UploadCloud, Terminal, Radio, Factory } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const navItems = [
@@ -25,6 +25,7 @@ const navItems = [
   { label: 'Bulk Provisioning', icon: UploadCloud, path: '/bulk-provision' },
   { label: ' VIN Details', icon: Terminal, path: '/system-console' },
   { label: 'MQTT Physical Device', icon: Radio, path: '/mqtt-virtual-device' },
+  { label: 'Manufacturing Portal', icon: Factory, path: '/manufacturing/login' },
 ];
 
 const SidebarContent = ({ onClose, currentPath, isCollapsed, onToggle, ...rest }) => {

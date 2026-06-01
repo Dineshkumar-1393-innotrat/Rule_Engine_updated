@@ -430,8 +430,13 @@ const PayloadDashboardPage = () => {
             let newData = result?.newData;
             let error = result?.error;
 
-            // If no API data or error, try virtual fallback
-            if ((!newData || (Array.isArray(newData) && newData.length === 0)) && virtualData) {
+            const isSimulatedDevice = deviceState?.isSimulated;
+            const hasApiData = newData && Array.isArray(newData) && newData.length > 0;
+            const hasEmptySignal = hasApiData && (newData[0].signalValue === "" || newData[0].signalValue === null || newData[0].signalValue === undefined);
+            const shouldUseVirtualFallback = virtualData && (isSimulatedDevice || !hasApiData || hasEmptySignal);
+
+            // Use virtual fallback
+            if (shouldUseVirtualFallback) {
                 const { telemetry, log, lastUpdate } = virtualData;
                 
                 // Map telemetry fields

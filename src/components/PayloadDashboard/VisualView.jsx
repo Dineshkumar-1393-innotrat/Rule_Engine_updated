@@ -229,8 +229,7 @@ export const VisualView = ({ signals, deviceState, ongoingTrip, highestSpeed, na
                                     p={2}
                                     borderRadius="lg"
                                     bg="purple.50"
-                                    w="48px" h="48px"
-                                    display="flex" align="center" justify="center"
+                                    display="flex" alignItems="center" justifyContent="center"
                                     overflow="hidden"
                                 >
                                     <Box as="video" src="/Last-updated.webm" autoPlay loop muted playsInline w="48px" h="48px" objectFit="contain" />
