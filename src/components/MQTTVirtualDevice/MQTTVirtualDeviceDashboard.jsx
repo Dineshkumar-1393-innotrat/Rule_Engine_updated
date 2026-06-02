@@ -1086,6 +1086,7 @@ function AnimatedNumber({ value, decimals = 0, suffix = "", isHex = true }) {
 // SECTION 5 — LIVE TELEMETRY CARDS
 // ─────────────────────────────────────────────
 function TelemetryCards({ state }) {
+  const [open, setOpen] = useState(true);
   const { telemetry: tel, telemetryHistory: hist } = state;
   const cards = [
     { key: "fuelLevel", label: "Fuel Level", value: tel.fuelLevel, suffix: " %", decimals: 0, color: "#f59e0b", isHex: true },
@@ -1097,52 +1098,77 @@ function TelemetryCards({ state }) {
   ];
 
   return (
-    <div>
-      <SectionHeader>⊙ Live Telemetry</SectionHeader>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-        {cards.map((card, i) => {
-          const history = hist[card.key] || [];
-          const trend = getTrendArrow(history);
-          const trendColor = trend === "↑" ? T.pub : trend === "↓" ? T.error : T.textMut;
-          const isUpdated = history.length >= 2 && history[history.length - 1] !== history[history.length - 2];
-          return (
-            <motion.div
-              key={card.key}
-              animate={{ boxShadow: isUpdated ? `0 0 14px ${card.color}55` : "0 0 0px transparent" }}
-              transition={SPRINGS.cardGlow}
-              style={{
-                background: T.bgCard,
-                border: `1px solid ${T.border}`,
-                borderRadius: 8,
-                padding: 12,
-              }}
-            >
-              <Label>{card.label}</Label>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
-                <span style={{
-                  color: card.color,
-                  fontFamily: T.mono,
-                  fontSize: 18,
-                  fontWeight: 700,
-                }}>
-                  <AnimatedNumber value={card.value} decimals={card.decimals} isHex={card.isHex} />
-                  <span style={{ fontSize: 11, color: T.textMut }}>{card.suffix}</span>
-                </span>
-                <motion.span
-                  key={trend}
-                  initial={{ y: -4, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  transition={SPRINGS.telemetryNum}
-                  style={{ color: trendColor, fontSize: 14, fontWeight: 700 }}
-                >
-                  {trend}
-                </motion.span>
-              </div>
-            </motion.div>
-          );
-        })}
+    <Card>
+      <div
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: open ? 12 : 0 }}
+        onClick={() => setOpen(o => !o)}
+      >
+        <div style={{ flex: 1, marginRight: 16 }}>
+          <SectionHeader>⊙ Live Telemetry</SectionHeader>
+        </div>
+        <motion.span
+          animate={{ rotate: open ? 180 : 0 }}
+          transition={SPRINGS.panelCollapse}
+          style={{ color: T.accent, fontSize: 16, marginTop: -6 }}
+        >▼</motion.span>
       </div>
-    </div>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={SPRINGS.panelCollapse}
+            style={{ overflow: "hidden" }}
+          >
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+              {cards.map((card, i) => {
+                const history = hist[card.key] || [];
+                const trend = getTrendArrow(history);
+                const trendColor = trend === "↑" ? T.pub : trend === "↓" ? T.error : T.textMut;
+                const isUpdated = history.length >= 2 && history[history.length - 1] !== history[history.length - 2];
+                return (
+                  <motion.div
+                    key={card.key}
+                    animate={{ boxShadow: isUpdated ? `0 0 14px ${card.color}55` : "0 0 0px transparent" }}
+                    transition={SPRINGS.cardGlow}
+                    style={{
+                      background: T.bgCard,
+                      border: `1px solid ${T.border}`,
+                      borderRadius: 8,
+                      padding: 12,
+                    }}
+                  >
+                    <Label>{card.label}</Label>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                      <span style={{
+                        color: card.color,
+                        fontFamily: T.mono,
+                        fontSize: 18,
+                        fontWeight: 700,
+                      }}>
+                        <AnimatedNumber value={card.value} decimals={card.decimals} isHex={card.isHex} />
+                        <span style={{ fontSize: 11, color: T.textMut }}>{card.suffix}</span>
+                      </span>
+                      <motion.span
+                        key={trend}
+                        initial={{ y: -4, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={SPRINGS.telemetryNum}
+                        style={{ color: trendColor, fontSize: 14, fontWeight: 700 }}
+                      >
+                        {trend}
+                      </motion.span>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
   );
 }
 
@@ -1880,6 +1906,7 @@ function DiagnosticsTab({ state, onPublish }) {
 
 // Publish Panel — Tabbed
 function PublishPanel({ state, dispatch, onPublish }) {
+  const [isFullScreen, setIsFullScreen] = useState(false);
   const tabs = [
     { key: "vehicleTelemetry", label: "Vehicle Tel" },
     { key: "locationTelemetry", label: "Location" },
@@ -1893,9 +1920,23 @@ function PublishPanel({ state, dispatch, onPublish }) {
 
   const active = state.activePublishTab;
 
-  return (
-    <Card>
-      <SectionHeader>↑ Publish MQTT Messages</SectionHeader>
+  const innerContent = (
+    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ flex: 1, marginRight: 16 }}>
+          <SectionHeader style={{ marginBottom: 0 }}>↑ Publish MQTT Messages</SectionHeader>
+        </div>
+        <motion.span
+          onClick={() => setIsFullScreen(prev => !prev)}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          style={{ cursor: "pointer", color: T.accent, fontSize: 16, padding: "4px", marginTop: -6 }}
+          title={isFullScreen ? "Collapse" : "Expand to Fullscreen"}
+        >
+          {isFullScreen ? "⤡" : "⤢"}
+        </motion.span>
+      </div>
+
       {/* Tab Bar — horizontally scrollable, no wrap */}
       <div
         style={{
@@ -1932,25 +1973,62 @@ function PublishPanel({ state, dispatch, onPublish }) {
         ))}
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={active}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={SPRINGS.logEntry}
-        >
-          {active === "vehicleTelemetry" && <VehicleTelemetryTab state={state} dispatch={dispatch} onPublish={onPublish} />}
-          {active === "locationTelemetry" && <LocationTelemetryTab state={state} dispatch={dispatch} onPublish={onPublish} />}
-          {active === "events" && <EventsTab state={state} onPublish={onPublish} />}
-          {active === "alerts" && <AlertsTab state={state} onPublish={onPublish} />}
-          {active === "trips" && <TripsTab state={state} onPublish={onPublish} />}
-          {active === "deviceJoin" && <DeviceJoinTab state={state} dispatch={dispatch} onPublish={onPublish} />}
-          {active === "fota" && <FotaTab state={state} dispatch={dispatch} onPublish={onPublish} />}
-          {active === "diagnostics" && <DiagnosticsTab state={state} dispatch={dispatch} onPublish={onPublish} />}
-        </motion.div>
+      <div style={{ flex: 1, overflowY: "auto", minHeight: 0 }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={active}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={SPRINGS.logEntry}
+          >
+            {active === "vehicleTelemetry" && <VehicleTelemetryTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+            {active === "locationTelemetry" && <LocationTelemetryTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+            {active === "events" && <EventsTab state={state} onPublish={onPublish} />}
+            {active === "alerts" && <AlertsTab state={state} onPublish={onPublish} />}
+            {active === "trips" && <TripsTab state={state} onPublish={onPublish} />}
+            {active === "deviceJoin" && <DeviceJoinTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+            {active === "fota" && <FotaTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+            {active === "diagnostics" && <DiagnosticsTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  );
+
+  return (
+    <>
+      {/* Placeholder to reserve space when in full-screen */}
+      {isFullScreen && <div style={{ height: "100%", minHeight: 200 }} />}
+      
+      {/* Backdrop */}
+      <AnimatePresence>
+        {isFullScreen && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }} 
+            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, background: "rgba(0,0,0,0.6)", zIndex: 9998, backdropFilter: "blur(4px)" }} 
+            onClick={() => setIsFullScreen(false)}
+          />
+        )}
       </AnimatePresence>
-    </Card>
+
+      {/* Actual Panel */}
+      <div
+        style={isFullScreen ? {
+          position: "fixed",
+          top: 40, left: 40, right: 40, bottom: 40,
+          zIndex: 9999,
+          display: "flex",
+          flexDirection: "column"
+        } : {}}
+      >
+        <Card style={isFullScreen ? { flex: 1, overflow: "hidden", display: "flex", flexDirection: "column", margin: 0, boxShadow: "0 10px 40px rgba(0,0,0,0.4)" } : {}}>
+          {innerContent}
+        </Card>
+      </div>
+    </>
   );
 }
 
@@ -2212,6 +2290,7 @@ function LogEntry({ entry, onToggle }) {
 }
 
 function MessageLog({ state, dispatch }) {
+  const [open, setOpen] = useState(true);
   const [filterDir, setFilterDir] = useState("ALL");
   const [filterType, setFilterType] = useState("");
   const [filterStatus, setFilterStatus] = useState("ALL");
@@ -2219,8 +2298,10 @@ function MessageLog({ state, dispatch }) {
   const logEndRef = useRef(null);
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [state.log.length]);
+    if (open) {
+      logEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [state.log.length, open]);
 
   const filtered = state.log.filter(e => {
     if (filterDir !== "ALL" && e.direction !== filterDir) return false;
@@ -2252,72 +2333,99 @@ function MessageLog({ state, dispatch }) {
   const uniqueTypes = [...new Set(state.log.map(e => e.messageType))];
 
   return (
-    <div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
-        <SectionHeader>≡ Message Log ({filtered.length})</SectionHeader>
-        <div style={{ display: "flex", gap: 6 }}>
-          <PressButton onClick={handleClear} color={T.error} style={{ fontSize: 11, padding: "4px 10px" }}>Clear</PressButton>
-          <PressButton onClick={handleExport} color={T.sub} style={{ fontSize: 11, padding: "4px 10px" }}>Export JSON</PressButton>
+    <Card style={{ flex: open ? 1 : 'none', minHeight: open ? 280 : 'auto', display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: open ? 12 : 0, flexWrap: "wrap", gap: 8 }}>
+        <div 
+          style={{ display: "flex", alignItems: "center", cursor: "pointer", flex: 1, marginRight: 16 }}
+          onClick={() => setOpen(o => !o)}
+        >
+          <div style={{ flex: 1 }}>
+            <SectionHeader>≡ Message Log ({filtered.length})</SectionHeader>
+          </div>
+          <motion.span
+            animate={{ rotate: open ? 180 : 0 }}
+            transition={SPRINGS.panelCollapse}
+            style={{ color: T.accent, fontSize: 16, marginTop: -6, marginRight: 8 }}
+          >▼</motion.span>
         </div>
+        
+        {open && (
+          <div style={{ display: "flex", gap: 6 }}>
+            <PressButton onClick={handleClear} color={T.error} style={{ fontSize: 11, padding: "4px 10px" }}>Clear</PressButton>
+            <PressButton onClick={handleExport} color={T.sub} style={{ fontSize: 11, padding: "4px 10px" }}>Export JSON</PressButton>
+          </div>
+        )}
       </div>
 
-      {/* Filters */}
-      <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
-        {["ALL", "PUB", "SUB"].map(v => (
-          <button key={v} onClick={() => setFilterDir(v)}
-            style={{
-              padding: "4px 10px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, cursor: "pointer",
-              background: filterDir === v ? `${T.accent}22` : "transparent",
-              border: `1px solid ${filterDir === v ? T.accent : T.border}`,
-              color: filterDir === v ? T.accent : T.textMut,
-            }}>{v}</button>
-        ))}
-        <input
-          placeholder="filter type..."
-          value={filterType}
-          onChange={e => setFilterType(e.target.value)}
-          style={{
-            background: T.bgPrimary, border: `1px solid ${T.border}`, color: T.textPri,
-            padding: "4px 8px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, outline: "none",
-          }}
-        />
-        {["ALL", "SUCCESS", "FAILED", "PENDING"].map(v => (
-          <button key={v} onClick={() => setFilterStatus(v)}
-            style={{
-              padding: "4px 8px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, cursor: "pointer",
-              background: filterStatus === v ? `${T.accent}22` : "transparent",
-              border: `1px solid ${filterStatus === v ? T.accent : T.border}`,
-              color: filterStatus === v ? T.accent : T.textMut,
-            }}>{v}</button>
-        ))}
-      </div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={SPRINGS.panelCollapse}
+            style={{ overflow: "hidden", display: "flex", flexDirection: "column", flex: 1 }}
+          >
+            {/* Filters */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+              {["ALL", "PUB", "SUB"].map(v => (
+                <button key={v} onClick={() => setFilterDir(v)}
+                  style={{
+                    padding: "4px 10px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, cursor: "pointer",
+                    background: filterDir === v ? `${T.accent}22` : "transparent",
+                    border: `1px solid ${filterDir === v ? T.accent : T.border}`,
+                    color: filterDir === v ? T.accent : T.textMut,
+                  }}>{v}</button>
+              ))}
+              <input
+                placeholder="filter type..."
+                value={filterType}
+                onChange={e => setFilterType(e.target.value)}
+                style={{
+                  background: T.bgPrimary, border: `1px solid ${T.border}`, color: T.textPri,
+                  padding: "4px 8px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, outline: "none",
+                }}
+              />
+              {["ALL", "SUCCESS", "FAILED", "PENDING"].map(v => (
+                <button key={v} onClick={() => setFilterStatus(v)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 4, fontFamily: T.mono, fontSize: 10, cursor: "pointer",
+                    background: filterStatus === v ? `${T.accent}22` : "transparent",
+                    border: `1px solid ${filterStatus === v ? T.accent : T.border}`,
+                    color: filterStatus === v ? T.accent : T.textMut,
+                  }}>{v}</button>
+              ))}
+            </div>
 
-      <div style={{ maxHeight: 380, overflowY: "auto" }}>
-        <AnimatePresence>
-          {filtered.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              style={{ color: T.textMut, fontSize: 11, fontFamily: T.mono, textAlign: "center", padding: 30 }}
-            >
-              No log entries
-            </motion.div>
-          )}
-          {filtered.map((entry) => (
-            <LogEntry
-              key={entry.id}
-              entry={entry}
-              onToggle={() => {
-                dispatch({ type: "CLEAR_LOG" });
-                const updated = state.log.map(e => e.id === entry.id ? { ...e, expanded: !e.expanded } : e);
-                updated.forEach(e => dispatch({ type: "ADD_LOG", entry: e }));
-              }}
-            />
-          ))}
-        </AnimatePresence>
-        <div ref={logEndRef} />
-      </div>
-    </div>
+            <div style={{ maxHeight: 380, overflowY: "auto", flex: 1 }}>
+              <AnimatePresence>
+                {filtered.length === 0 && (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    style={{ color: T.textMut, fontSize: 11, fontFamily: T.mono, textAlign: "center", padding: 30 }}
+                  >
+                    No log entries
+                  </motion.div>
+                )}
+                {filtered.map((entry) => (
+                  <LogEntry
+                    key={entry.id}
+                    entry={entry}
+                    onToggle={() => {
+                      dispatch({ type: "CLEAR_LOG" });
+                      const updated = state.log.map(e => e.id === entry.id ? { ...e, expanded: !e.expanded } : e);
+                      updated.forEach(e => dispatch({ type: "ADD_LOG", entry: e }));
+                    }}
+                  />
+                ))}
+              </AnimatePresence>
+              <div ref={logEndRef} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </Card>
   );
 }
 
@@ -2765,12 +2873,8 @@ export default function MQTTVirtualDeviceDashboard() {
           scrollbarWidth: "thin",
           scrollbarColor: `${T.border} transparent`,
         }}>
-          <Card>
-            <TelemetryCards state={state} />
-          </Card>
-          <Card style={{ flex: 1, minHeight: 280 }}>
-            <MessageLog state={state} dispatch={dispatch} />
-          </Card>
+          <TelemetryCards state={state} />
+          <MessageLog state={state} dispatch={dispatch} />
         </div>
       </div>
 
