@@ -76,7 +76,7 @@ const App = () => {
                   <MainLayout>
                     <Routes>
                       <Route path="/" element={<Navigate to="/login" replace />} />
-                      <Route path="/iot-rule-engine" element={<IoTRuleEnginePage />} />
+                      <Route path="/iot-rule-engine/:domainId?" element={<IoTRuleEnginePage />} />
                       <Route path="/historical-analysis" element={<HistoricalDataPage />} />
                       <Route path="/bulk-provision" element={<BulkProvisionPage />} />
                       <Route path="/system-console/:vin?" element={<SystemConsolePage />} />

@@ -13,6 +13,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
     Box, VStack, HStack, Grid, GridItem, Text, Badge, Button,
     Select, Input, IconButton, Tabs, TabList, Tab, TabPanels, TabPanel,
@@ -322,6 +323,9 @@ const DomainRuleBuilder = ({ domain, onAdd }) => {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 const MultiDomainRuleEngine = () => {
+    const { domainId } = useParams();
+    const navigate = useNavigate();
+
     const [selectedDomainId, setSelectedDomainId] = useState('jeep_proto_5');
     const [isRunning, setIsRunning] = useState(false);
     const [liveData, setLiveData] = useState({});
@@ -336,32 +340,27 @@ const MultiDomainRuleEngine = () => {
     const toast = useToast();
     const bgCard = useColorModeValue('white', 'gray.800');
 
+    // Determine target domain based on route parameter
+    const targetDomainId = domainId && DOMAINS[domainId] ? domainId : 'jeep_proto_5';
+
     const domain = getDomain(selectedDomainId);
     const allRules = [...domain.defaultRules, ...customRules.filter(r => r._domainId === selectedDomainId)];
 
-    // Switch domain
+    // Switch domain via URL navigation
     const handleDomainChange = useCallback((newId) => {
-        setSelectedDomainId(newId);
+        navigate(`/iot-rule-engine/${newId}`);
+    }, [navigate]);
+
+    // Synchronize selectedDomainId state with route parameter changes
+    useEffect(() => {
+        setSelectedDomainId(targetDomainId);
         setLiveData({});
         setDataHistory({});
         setAlerts([]);
         setTickCount(0);
-        const initialData = simulateDomain(newId);
+        const initialData = simulateDomain(targetDomainId);
         setLiveData(initialData);
-        toast({
-            title: `Switched to ${getDomain(newId).label}`,
-            description: `${getDomain(newId).description}`,
-            status: 'info',
-            duration: 2000,
-            isClosable: true,
-        });
-    }, [toast]);
-
-    // Init on mount
-    useEffect(() => {
-        const initialData = simulateDomain(selectedDomainId);
-        setLiveData(initialData);
-    }, []);
+    }, [targetDomainId]);
 
     // Simulation tick
     useEffect(() => {
@@ -486,86 +485,16 @@ const MultiDomainRuleEngine = () => {
                 </Flex>
             </Box>
 
-            <Grid templateColumns={{ base: "1fr", lg: "320px 1fr" }} gap={6} px={{ base: 3, md: 5 }}>
-                {/* ── Left Sidebar: Domain Selection ── */}
-                <GridItem>
-                    <VStack align="stretch" spacing={6}>
-                        <Box bg="white" p={6} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
-                            <HStack mb={5}>
-                                <Layers size={18} color="blue.500" />
-                                <Text fontWeight="800" fontSize="sm" color="gray.700" letterSpacing="0.5px">ACTIVE DOMAINS</Text>
-                                <Spacer />
-                                <Badge colorScheme="gray" variant="subtle" borderRadius="md">{DOMAIN_LIST.length}</Badge>
-                            </HStack>
-
-                            <VStack align="stretch" spacing={2.5} maxH="75vh" overflowY="auto" pr={2}
-                                sx={{
-                                    '&::-webkit-scrollbar': { width: '4px' },
-                                    '&::-webkit-scrollbar-track': { background: 'transparent' },
-                                    '&::-webkit-scrollbar-thumb': { background: 'gray.200', borderRadius: '10px' },
-                                }}>
-                                {DOMAIN_LIST.map(d => (
-                                    <Box
-                                        key={d.id} p={3.5} borderRadius="xl" cursor="pointer"
-                                        bg={selectedDomainId === d.id ? "blue.50" : "white"}
-                                        border="1px solid"
-                                        borderColor={selectedDomainId === d.id ? "blue.100" : "gray.50"}
-                                        _hover={{ bg: selectedDomainId === d.id ? "blue.50" : "gray.50", borderColor: "blue.100" }}
-                                        onClick={() => handleDomainChange(d.id)}
-                                        transition="all 0.2s"
-                                    >
-                                        <HStack spacing={4}>
-                                            {typeof d.icon === 'string' ? (
-                                                <Text fontSize="lg" w="18px" textAlign="center">{d.icon}</Text>
-                                            ) : (
-                                                <Icon as={d.icon || Radio} color={selectedDomainId === d.id ? "blue.500" : "gray.400"} boxSize={5} />
-                                            )}
-                                            <VStack align="start" spacing={0} flex={1}>
-                                                <Text fontWeight="800" fontSize="xs" color={selectedDomainId === d.id ? "blue.700" : "gray.700"}>
-                                                    {d.label.toUpperCase()}
-                                                </Text>
-                                                <Text fontSize="10px" color="gray.400" noOfLines={1} fontWeight="500">
-                                                    {d.description}
-                                                </Text>
-                                            </VStack>
-                                            {selectedDomainId === d.id && <ChevronRight size={16} color="blue.500" />}
-                                        </HStack>
-                                    </Box>
-                                ))}
-                            </VStack>
-                        </Box>
-
-                        <Box bg="white" p={6} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm">
-                            <VStack align="start" spacing={4}>
-                                <HStack>
-                                    <Settings size={16} color="gray.400" />
-                                    <Text fontWeight="800" fontSize="xs" color="gray.600" letterSpacing="0.5px">DOMAIN METRICS</Text>
-                                </HStack>
-                                <SimpleGrid columns={2} spacing={3} width="100%">
-                                    <Stat bg="gray.50" p={3} borderRadius="xl">
-                                        <StatLabel fontSize="10px" color="gray.500" fontWeight="800">FACTORS</StatLabel>
-                                        <StatNumber fontSize="lg" color="gray.800" fontWeight="800">{domain.facts.length}</StatNumber>
-                                    </Stat>
-                                    <Stat bg="gray.50" p={3} borderRadius="xl">
-                                        <StatLabel fontSize="10px" color="gray.500" fontWeight="800">POLICIES</StatLabel>
-                                        <StatNumber fontSize="lg" color="gray.800" fontWeight="800">{allRules.length}</StatNumber>
-                                    </Stat>
-                                </SimpleGrid>
-                            </VStack>
-                        </Box>
-                    </VStack>
-                </GridItem>
-
-                {/* ── Main Content Area ── */}
-                <GridItem>
-                    <VStack align="stretch" spacing={6}>
-                        {/* Domain Title Bar */}
-                        <HStack spacing={4}>
-                            <Box
-                                flex={1} bg="white" p={5} borderRadius="xl" border="1px solid"
-                                borderColor="gray.100" boxShadow="sm" borderLeft="4px solid" borderLeftColor={domain.color.hex}
-                            >
-                                <HStack spacing={5}>
+            <Box px={{ base: 3, md: 5 }}>
+                <VStack align="stretch" spacing={6}>
+                    {/* Domain Title Bar */}
+                    <HStack spacing={4}>
+                        <Box
+                            flex={1} bg="white" p={5} borderRadius="xl" border="1px solid"
+                            borderColor="gray.100" boxShadow="sm" borderLeft="4px solid" borderLeftColor={domain.color.hex}
+                        >
+                            <HStack spacing={5} wrap="wrap" justify="space-between">
+                                <HStack spacing={4}>
                                     <Box p={2.5} bg={`${domain.color.hex}10`} borderRadius="xl">
                                         {typeof domain.icon === 'string' ? (
                                             <Text fontSize="2xl">{domain.icon}</Text>
@@ -577,18 +506,26 @@ const MultiDomainRuleEngine = () => {
                                         <Heading size="sm" color="gray.800">{domain.label.toUpperCase()}</Heading>
                                         <Text fontSize="10px" color="gray.500" fontWeight="800" letterSpacing="1px">REAL-TIME TELEMETRY STREAM</Text>
                                     </VStack>
-                                    <Spacer />
-                                    <Badge colorScheme="blue" variant="subtle" borderRadius="lg" px={4} py={1} fontSize="11px" fontWeight="800">
+                                </HStack>
+                                <HStack spacing={3}>
+                                    <Badge colorScheme="purple" variant="subtle" borderRadius="lg" px={3} py={1} fontSize="11px" fontWeight="800">
+                                        FACTORS: {domain.facts.length}
+                                    </Badge>
+                                    <Badge colorScheme="orange" variant="subtle" borderRadius="lg" px={3} py={1} fontSize="11px" fontWeight="800">
+                                        POLICIES: {allRules.length}
+                                    </Badge>
+                                    <Badge colorScheme="blue" variant="subtle" borderRadius="lg" px={3} py={1} fontSize="11px" fontWeight="800">
                                         TICK: {tickCount}
                                     </Badge>
                                 </HStack>
-                            </Box>
-
-                            <HStack bg="white" p={2} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm" spacing={2}>
-                                <IconButton size="md" variant="ghost" icon={<RefreshCcw size={18} />} aria-label="Reset" onClick={handleRefresh} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
-                                <IconButton size="md" variant="ghost" icon={<Download size={18} />} aria-label="Export" onClick={handleDownload} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
                             </HStack>
+                        </Box>
+
+                        <HStack bg="white" p={2} borderRadius="xl" border="1px solid" borderColor="gray.100" boxShadow="sm" spacing={2}>
+                            <IconButton size="md" variant="ghost" icon={<RefreshCcw size={18} />} aria-label="Reset" onClick={handleRefresh} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
+                            <IconButton size="md" variant="ghost" icon={<Download size={18} />} aria-label="Export" onClick={handleDownload} borderRadius="lg" _hover={{ bg: "gray.50", color: "blue.500" }} />
                         </HStack>
+                    </HStack>
 
                         <Tabs variant="unstyled" index={activeTabIndex} onChange={setActiveTabIndex} isLazy>
                             <TabList
@@ -828,8 +765,7 @@ const MultiDomainRuleEngine = () => {
                             </TabPanels>
                         </Tabs>
                     </VStack>
-                </GridItem>
-            </Grid>
+            </Box>
             </VStack>
         </Box>
     );
