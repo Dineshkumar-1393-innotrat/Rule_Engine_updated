@@ -1,0 +1,21 @@
+// JEEP - Connected Vehicle India Plaform - Event message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+option java_outer_classname = "StlaJeepEvent";
+
+import "jeep_event.proto";
+import "jeep_common.proto";
+import "timestamp.proto";
+
+message EventMessage {
+	string message_id = 1;
+	eTboxOperatingState tbox_operating_state = 2;
+	eTboxApplicationState e_tbox_application_state = 3;
+    eTboxeSimState tbox_esim_state = 4;
+	string version = 5;
+	google.protobuf.Timestamp time_stamp = 6;
+	EventPayload eventPayload = 7;
+}

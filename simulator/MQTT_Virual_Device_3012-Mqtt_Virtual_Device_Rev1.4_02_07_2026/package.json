@@ -1,0 +1,19 @@
+{
+  "name": "mqtt_virtual_device_3012",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.13.6",
+    "dotenv": "^17.2.3",
+    "fs": "^0.0.1-security",
+    "mqtt": "5.8.0",
+    "protobufjs": "^8.0.0"
+  },
+  "description": ""
+}

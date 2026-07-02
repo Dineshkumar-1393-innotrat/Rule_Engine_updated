@@ -1,0 +1,21 @@
+// JEEP - Connected Vehicle India Plaform - CAN data message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+option java_outer_classname = "StlaJeepCANData";
+
+import "jeep_candata.proto";
+import "jeep_common.proto";
+import "timestamp.proto";
+
+message CANDataMessage {
+	string message_id = 1;
+	eTboxOperatingState tbox_operating_state = 2;
+	eTboxApplicationState e_tbox_application_state = 3;
+    	eTboxeSimState tbox_esim_state = 4;
+	string version = 5;
+	google.protobuf.Timestamp time_stamp = 6;
+	CANDataPayload canDataPayload = 7;
+}

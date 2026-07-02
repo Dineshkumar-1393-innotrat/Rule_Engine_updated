@@ -1,0 +1,43 @@
+// JEEP - Connected Vehicle India Plaform - command response message
+// Protocol definition files using Protocol Buffers - Google's data interchange format
+
+syntax = "proto3";
+package stla.cvip.jeep;
+option java_package = "stla.cvip.jeep";
+option java_outer_classname = "StlaJeepFotaCommandResponse";
+
+import "timestamp.proto";
+import "jeep_common.proto";
+import "jeep_fota_command.proto";
+
+enum fota_eReturnCode {
+	unknown_return_code = 0;
+	fota_succeeded = 1;
+	fota_failed = 2;
+	fota_update = 3;
+	fota_waiting = 4;
+}
+
+enum fotacommandResponseSubType {
+	unknown_fota_response = 0;
+	FirmwareDownloadCommandResponse = 2;
+}
+
+message fotaCommandResponsePayloadType{
+	oneof fotacommandResponsePayload {
+		FirmwareDownloadCommandResponsePayload firmwareDownloadCommandResponse = 2;  
+	}
+}
+
+message fotaCommandResponseMessage {
+	string message_id = 1;
+	string correlation_id = 2;
+	fotacommandResponseSubType subtype = 3;
+	eTboxOperatingState tbox_operating_state = 4;
+	eTboxApplicationState e_tbox_application_state = 5;
+    eTboxeSimState tbox_esim_state = 6;
+	string version = 7;
+	google.protobuf.Timestamp time_stamp = 8;
+	fota_eReturnCode return_code = 9;
+	fotaCommandResponsePayloadType fotacommandResponsePayload = 10;
+}

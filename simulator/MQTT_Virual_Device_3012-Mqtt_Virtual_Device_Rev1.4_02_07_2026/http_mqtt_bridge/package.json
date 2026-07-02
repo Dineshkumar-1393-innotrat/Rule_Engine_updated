@@ -1,0 +1,13 @@
+{
+  "name": "http-mqtt-bridge",
+  "version": "1.0.0",
+  "description": "HTTP-to-MQTT bridge for CVIP hardware devices",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "mqtt": "5.8.0"
+  }
+}

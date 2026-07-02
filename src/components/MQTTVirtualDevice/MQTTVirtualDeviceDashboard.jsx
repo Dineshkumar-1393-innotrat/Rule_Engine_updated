@@ -642,6 +642,7 @@ function DeviceIdentityPanel({ state, dispatch }) {
   };
 
   const brokerOptions = [
+    { value: "mqtts://cvipiot.fca-india.com:18883", label: "FCA India Prod" },
     { value: "mqtts://cvipiot-preprod.fca-india.com:18883", label: "FCA India Preprod" },
     { value: "mqtts://lb2.cvip-preprod.citroen.in:48883", label: "Citroen Preprod" },
   ];
@@ -738,12 +739,81 @@ function DeviceIdentityPanel({ state, dispatch }) {
 // ─────────────────────────────────────────────
 // SECTION 1B — DEVICE CERTIFICATE CREATION
 // ─────────────────────────────────────────────
+
+const ROOT_CA_PEM = `-----BEGIN CERTIFICATE-----
+MIIFszCCBBugAwIBAgIRAOHNW/n+kRTV5Qs2pkK9R7EwDQYJKoZIhvcNAQELBQAw
+ajEQMA4GA1UEBxMHQ2hlbm5haTELMAkGA1UECBMCVE4xEDAOBgNVBAsTB0NpdHJv
+ZW4xEzARBgNVBAoTClN0ZWxsYW50aXMxCzAJBgNVBAYTAklOMRUwEwYDVQQDEwxD
+VklQIFJvb3QgQ0EwIBcNMjIwNzI2MDcwMzAwWhgPMjA2MjA3MTYwNzAzMDBaMGox
+EDAOBgNVBAcTB0NoZW5uYWkxCzAJBgNVBAgTAlROMRAwDgYDVQQLEwdDaXRyb2Vu
+MRMwEQYDVQQKEwpTdGVsbGFudGlzMQswCQYDVQQGEwJJTjEVMBMGA1UEAxMMQ1ZJ
+UCBSb290IENBMIIBojANBgkqhkiG9w0BAQEFAAOCAY8AMIIBigKCAYEAunwRsFZA
+OAHfSvAGVOngV0K0D33nSWSMXYGBxekhHgK6SuzXOqG/a4B3aye7zY9HD4L++BCK
+t8YLpNf3uSzltM5qWih0XOVDy54Yj7XeCZgXoKOddNPIuoc44UsFOPKvtCguucAr
+sLwBwYGUbBd+91QAYwuiZFopCI06Zj8oTjlP3dWkfpIpFZZ+yKAPVZUzEvQHdM5R
+JUlk3oS87Mb+HNhdsq10p0uZYkz9mBB9mVKZqPssB8adBBfeLgyfQb46oztwx4pL
+2HDTmCaPpcEMqLCoW239NlUBg1jC0KVaHTcjQ0FWj3IMeHOHiDyw0YnIp5ZkAAUg
+pOGa9fNkTYyU3zaqj1Ece6qbHE/rcZZ/07GCYIV86k5L7EHfWCbsZfAadhEc+Faa
+V0FbYvAkp5isRyGwGBAeD4nNwfMq2oCiSfYKLcBZdy6wY+b8djNX92SYsR2Cotn8
+2IoODsoZ7iWD1oYuL3kpNGY079Jn9hkQUR8QRaXPGjQIKMMMMTDsSHjAgMBAAGj
+ggFQMIIBTDAPBgNVHRMECDAGAQH/AgEBMAsGA1UdDwQEAwIBBjAfBgNVHSMEGDAW
+gBQgu7e/HAn7NquleBnf0TXmDt5VETAdBgNVHQ4EFgQUILu3vxwJ+zarpXgZ39E1
+5g7eVREwTAYDVR0fBEUwQzBBoD+gPYY7aHR0cHM6Ly9tcGtpLWludC5lbXVkaHJh
+LmNvbS9lbUNBL1zaXRvcnkvQ1ZJUFJvb3RDQS5jcmwwgZ0GA1UdIASBlTCB
+kjCBjwYHYIJkZAEIAjCBgzCBgAYIKwYBBQUHAgIwdB5yAGgAdAB0AHAAcwA6AC8A
+LwBtAHAAawBpAC0AawBpAHQALgBlAG0AdQBkAGgAcgBhAC4AYwBvAG0ALwBlAG0A
+QwBBAC8AUgBlAHAAbwBzAGkAdABvAHIAeQAvAGMAYQBwAG8AbABpAGMAeQAuAHAA
+ZABmMA0GCSqGSIb3DQEBCwUAA4IBgQCwTq71VSZslVvFl/DmwiRvP/qvJZdCNZSv
+GAHqp0h0/JWwUELs7O9jHP8nHf8/4ckBQJ17rFCnvvlF+Yf27b1T0YEmtT1IYGDn
+P5sX/05kTXijWQ21TMDYfxZ2qmEML8fcKUyoT1XeMXTzokyki2BjWaokzPXhBpve
+TzQZ2djPCwtOtqKaxdZzHbWyFI5JmpmkpuLNIvnC1o52lP6fJkJnZpueL3OO5xR7
+X631siTwBJmloN1ac4hEML9RcgOammUmGUiqRa5LDaLc/JIXD6jWGqYYUdaBK2NF
+O6yGsjv7kjs+LEobYjH94Sppbq7U51Md/uJcSf57GiT51lMXIAEIjaG5rU49GU8R
+IbK9DJ0G5Qf4NzvElUvgl6ZEdA1NGRCFdJzuwrBWB07oDesB6ncHeo3Wm/dSLcgv
+02IwQz+l9NwxVH7HVsvpgA+ydVxnf8K22iOmD54HHcjKfSd/tAPZ38RWVfFHTFUF
+ykdotBB9wXLwKodWsybDDQUxlFGuxyY=
+-----END CERTIFICATE-----`;
+
+const INTERMEDIATE_CA_PEM = `-----BEGIN CERTIFICATE-----
+MIIFpDCCBAygAwIBAgIQciqdKLoATqD54dZAQ6CVDDANBgkqhkiG9w0BAQsFADBq
+MRAwDgYDVQQHEwdDaGVubmFpMQswCQYDVQQIEwJUTjEQMA4GA1UECxMHQ2l0cm9l
+bjETMBEGA1UEChMKU3RlbGxhbnRpczELMAkGA1UEBhMCSU4xFTATBgNVBAMTDENW
+SVAgUm9vdCBDQTAgFw0yMjA3MjYwNzEwMzVaGA8yMDYyMDcxMTA3MTAzNVowVDEQ
+MA4GA1UECxMHQ2l0cm9lbjETMBEGA1UEChMKU3RlbGxhbnRpczELMAkGA1UEBhMC
+SU4xHjAcBgNVBAMTFUNWSVAgVGJveCBQcmVwcm9kIElDQTCCAaIwDQYJKoZIhvcN
+AQEBBQADggGPADCCAYoCggGBALaJqpaF9+jlgzeVSDlJThXx561ln8BJ9Vxa0o1d
+fblccUqzXzHD669sgrAujG4rq1Y6hZVcevHFgAQOOvqPt1Q/GPUu6r2sF570vTsf
+R7RpVvMkX+TeNFO7hfPwzzXJMn5mOXyR02djnkCSgLuauVvQ+2lIZkcWEgSzc46m
+cMapMwQ+bFroA1BZDgF1OvEIMEv0SrPw38kdPfpEwLwsvQn07I3hoBKb2FJ1+HYZ
+5UlTLU4PyIX37n5reZUjL3dG/N+paaTRRbC7/fcjdUmGzgNgNYY9QdbyIARasTfs
+1KuwkSv8oAMLg+jd2lviy532acxtKMhYAyZZtsN+yfiDjJVwgox86ntXsARgOS+C
+HGlMQGOiF1fVEIP6/v9rk8JgVxyc7arCV/0zy5VyGMjEaaEhLFgJOKn9fhWK+nvp
+uUY5O2Uvd2Zk6TS6+puYN6nOqQTnwtqDpPlahaQ1u7geh0CFCJiMiMQ6z8rHZuo8
+npFgFBEbdEO5wVCYCJKx+AkkfwIDAQABo4IBWDCCAVQwDwYDVR0TBAgwBgEB/wIB
+ADALBgNVHQ8EBAMCAQYwHwYDVR0jBBgwFoAUILu3vxwJ+zarpXgZ39E15g7eVREw
+HQYDVR0OBBYEFFQogLfkpJU8a4lRvZ6A/37ruHswMFQGA1UdHwRNMEswSaBHoEWG
+Q2h0dHBzOi8vbXBraS1pbnQuZW11ZGhyYS5jb20vZW1DQS9SZXBvc2l0b3J5L0NW
+SVBUYm94UHJlcHJvZElDQS5jcmwwgZ0GA1UdIASBlTCBkjCBjwYHYIJkZAEIAjCB
+gzCBgAYIKwYBBQUHAgIwdB5yAGgAdAB0AHAAcwA6AC8ALwBtAHAAawBpAC0AaW50
+LmVtdWRocmEuY29tL2VtQ0EvUmVwb3NpdG9yeS9jYXBvbGljeS5wZGYwDQYJKoZI
+hvcNAQELBQADggGBACHFD8V3wELYa9RBX6DFL3UEubG4usp9Ff2oqrUXQWljQUNO
+GCjIz3z8u/M+qkiKO2lDUnWGHpJXbjeKmkiBO8djYThp4751g3cHoyisHGyhIoJD
+7YnNlpCIkhwkMGX6fE45G/h41EarE8ofqxFOwPHiY0poG0h3twFni39+XpiRHQ0Y
+224eUOoVMHxO563O9ToM4IQUWJmZKOYDREwjaIlRpvhJowYTp7adeQSrdV8aYOG
+LaHsPtSAsS+L7++MDTnOFrmtgn5f/nmtiyflww1xHeSjfB/QmG9kfi4Jpw2x7iw
+4nMqrRcQHu2OR+MqDkDk0h88/pAOKBIWA9OUCM16GtaHis+Y0oQamKhj6vHr0rJO
+DxPfZowj3hxA6zpmH00stVDPMweQotkgl4EgD7lrPVHrAf+l9al60+1f5apantI
+xIv/ze4NDrwPtLBwQrDM8JVJRYE9N3uwAUl+gOYq/73phtAs50xBkY/b9dVenGx
+DQ1avVwgQDFTDyIkAe97/M=
+-----END CERTIFICATE-----`;
+
 function CertificatePanel({ state, dispatch }) {
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0); // 0=idle, 1=genKey, 2=createCSR, 3=callAPI, 4=done, -1=error
   const [privateKeyPem, setPrivateKeyPem] = useState('');
   const [csrPem, setCsrPem] = useState('');
   const [certPem, setCertPem] = useState('');
+  const [bundlePem, setBundlePem] = useState('');
   const [certB64, setCertB64] = useState('');
   const [deviceJoinPayload, setDeviceJoinPayload] = useState('');
   const [error, setError] = useState('');
@@ -801,7 +871,7 @@ function CertificatePanel({ state, dispatch }) {
 
   const handleGenerate = async () => {
     setStep(1); setError(''); setCertLog([]);
-    setPrivateKeyPem(''); setCsrPem(''); setCertPem(''); setCertB64(''); setDeviceJoinPayload('');
+    setPrivateKeyPem(''); setCsrPem(''); setCertPem(''); setBundlePem(''); setCertB64(''); setDeviceJoinPayload('');
     try {
       addLog('Generating RSA-2048 key pair...');
       const keyPair = await crypto.subtle.generateKey(
@@ -838,6 +908,11 @@ function CertificatePanel({ state, dispatch }) {
       const certPemStr = toPem(certBytes.buffer, 'CERTIFICATE');
       setCertPem(certPemStr); setCertB64(certRaw);
       addLog('✓ Certificate extracted and converted to PEM');
+
+      // Create CA Bundle (Entity -> Intermediate -> Root)
+      const bundle = `${certPemStr}\n${INTERMEDIATE_CA_PEM}\n${ROOT_CA_PEM}`;
+      setBundlePem(bundle);
+      addLog('✓ CA Bundle (Full Chain) generated');
 
       const ts = Date.now();
       const joinPayload = {
@@ -916,10 +991,36 @@ function CertificatePanel({ state, dispatch }) {
 
             {step === 4 && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(privateKeyPem, 'device_private.key')}>↓ Private Key (.key)</PressButton>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(privateKeyPem, 'device-key.key')}>↓ Private Key (.key)</PressButton>
                 <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(csrPem, 'device.csr')}>↓ CSR (.csr)</PressButton>
-                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(certPem, 'device_cert.pem')}>↓ Certificate PEM</PressButton>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(certPem, 'device-cert.crt')}>↓ Certificate PEM</PressButton>
+                <PressButton color={T.pub} style={{ width: '100%' }} onClick={() => downloadFile(bundlePem, 'cvip-ca-bundle.crt')}>↓ CA Bundle Chain (.crt)</PressButton>
                 <PressButton color="#9333ea" style={{ width: '100%' }} onClick={() => downloadFile(deviceJoinPayload, 'device_join_payload.json')}>↓ deviceJoin Payload (.json)</PressButton>
+                <PressButton
+                  onClick={() => {
+                    const bundle = {
+                      config: {
+                        vin: state.config.vin,
+                        imei: state.config.imei,
+                        tboxSerial: state.config.tboxSerial,
+                        broker: state.config.broker,
+                      },
+                      privateKeyPem,
+                      csrPem,
+                      certPem,
+                      bundlePem,
+                      deviceJoinPayload,
+                      exportedAt: new Date().toISOString(),
+                    };
+                    downloadFile(JSON.stringify(bundle, null, 2), 'cert-bundle.json');
+                    dispatch({ type: 'ADD_TOAST', toast: { id: Date.now().toString(), message: '✓ cert-bundle.json exported! Run: node sync-certs.js in simulator folder.', type: 'success' } });
+                  }}
+                  color="#7c3aed"
+                  style={{ width: '100%' }}
+                  title="Export cert-bundle.json for Simulator"
+                >
+                  🔗 Sync Simulator
+                </PressButton>
                 <div style={{ marginTop: 6 }}>
                   <Label>deviceJoin Payload Preview</Label>
                   <textarea readOnly value={deviceJoinPayload} style={{ width: '100%', height: 140, background: '#0d1117', color: '#e6edf3', fontFamily: T.mono, fontSize: 10, border: `1px solid ${T.border}`, borderRadius: 6, padding: 8, resize: 'vertical', boxSizing: 'border-box' }} />
