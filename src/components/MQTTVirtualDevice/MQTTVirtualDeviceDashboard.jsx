@@ -145,6 +145,7 @@ import React, {
 import { motion, AnimatePresence, useSpring, useTransform, animate } from "framer-motion";
 import { v4 as uuidv4 } from "uuid";
 import protobuf from "protobufjs";
+import { TraxoApi } from "../../utils/TraxoApi";
 
 // ─────────────────────────────────────────────
 // SPRING CONFIGS (Antigravity / Framer Motion)
@@ -185,10 +186,10 @@ const T = {
 // ─────────────────────────────────────────────
 const initialState = {
   config: {
-    vin: "T123ZTZT867657777",
-    imei: "356741396798769",
-    tboxSerial: "T123ZTZT1396798769",
-    clientId: "T123ZTZT867657777",
+    vin: "MCANJPEY4RFB08124",
+    imei: "356741360423858",
+    tboxSerial: "T123ZTZT1396723853",
+    clientId: "MCANJPEY4RFB08124",
     messageId: "dd52bab1-c64a-431b-a945-1602f26e9f4e",
     correlationId: "9b2e3f4c-6a78-4d1b-8e9f-3c4d5a6b7e81",
     broker: "mqtts://cvipiot-preprod.fca-india.com:18883",
@@ -600,6 +601,7 @@ function DeviceIdentityPanel({ state, dispatch }) {
 
   const mockDevices = [
     { value: "", label: "-- Select a Mock Device --" },
+    { value: "Real Test Device", label: "Test Device (MCANJPEY4RFB08124)", imei: "356741360423858", vin: "MCANJPEY4RFB08124", tboxSerial: "T123ZTZT1396723853", clientId: "MCANJPEY4RFB08124" },
     { value: "Mock Device 1", label: "Mock Device 1 (356741360383500)", imei: "356741360383500", vin: "MOCKVIN123ABC0001", tboxSerial: "2g123abc", clientId: "MOCKVIN123ABC0001" },
     { value: "Mock Device 2", label: "Mock Device 2 (356741360383501)", imei: "356741360383501", vin: "MOCKVIN124ABC0002", tboxSerial: "2g124abc", clientId: "MOCKVIN124ABC0002" },
     { value: "Mock Device 3", label: "Mock Device 3 (356741360383502)", imei: "356741360383502", vin: "MOCKVIN125ABC0003", tboxSerial: "2g125abc", clientId: "MOCKVIN125ABC0003" },
@@ -644,7 +646,6 @@ function DeviceIdentityPanel({ state, dispatch }) {
   const brokerOptions = [
     { value: "mqtts://cvipiot.fca-india.com:18883", label: "FCA India Prod" },
     { value: "mqtts://cvipiot-preprod.fca-india.com:18883", label: "FCA India Preprod" },
-    { value: "mqtts://lb2.cvip-preprod.citroen.in:48883", label: "Citroen Preprod" },
   ];
 
   return (
@@ -1072,16 +1073,43 @@ function ConnectionPanel({ state, dispatch }) {
     return () => clearInterval(timerRef.current);
   }, [status]);
 
-  const handleToggle = () => {
+  useEffect(() => {
+    if (state.config.broker) {
+      localStorage.setItem('selected_broker', state.config.broker);
+    }
+  }, [state.config.broker]);
+
+  const handleToggle = async () => {
     if (status === "CONNECTED") {
       dispatch({ type: "SET_CONNECTION", payload: { status: "DISCONNECTED", connectedAt: null, uptimeSeconds: 0 } });
       dispatch({ type: "ADD_TOAST", toast: { id: uuidv4(), message: "MQTT Disconnected", type: "error" } });
     } else if (status === "DISCONNECTED" || status === "ERROR") {
       dispatch({ type: "SET_CONNECTION", payload: { status: "CONNECTING" } });
-      setTimeout(() => {
+      try {
+        localStorage.setItem('selected_broker', state.config.broker);
+        const result = await TraxoApi.getDeviceJoinStatus(state.config.vin);
         dispatch({ type: "SET_CONNECTION", payload: { status: "CONNECTED", connectedAt: new Date().toISOString() } });
-        dispatch({ type: "ADD_TOAST", toast: { id: uuidv4(), message: "✓ MQTT Connected", type: "success" } });
-      }, 850);
+        dispatch({
+          type: "ADD_TOAST",
+          toast: {
+            id: uuidv4(),
+            message: `✓ Connected! Real API Status: ${result.connectionStatus || 'N/A'} (Tamper: ${result.tamperStatus || 'N/A'})`,
+            type: "success"
+          }
+        });
+      } catch (err) {
+        console.error("Connect API Error:", err);
+        // Fall back to successful simulated connection so mock VINs/auth issues do not block simulation
+        dispatch({ type: "SET_CONNECTION", payload: { status: "CONNECTED", connectedAt: new Date().toISOString() } });
+        dispatch({
+          type: "ADD_TOAST",
+          toast: {
+            id: uuidv4(),
+            message: `⚠️ Connected (Simulated fallback). Real API: ${err?.response?.data?.message || err?.response?.status || err.message}`,
+            type: "warning"
+          }
+        });
+      }
     }
   };
 
@@ -1930,6 +1958,84 @@ function DeviceJoinTab({ state, dispatch, onPublish }) {
   );
 }
 
+// SMS Wakeup Tab
+function SMSWakeupTab({ state, dispatch, onPublish }) {
+  const [nadSW, setNadSW] = useState("ND0.02.03");
+  const [mcuSW, setMcuSW] = useState("MD0.02.03");
+  const [opState, setOpState] = useState("NORMAL");
+  const [appState, setAppState] = useState("CUSTOMER");
+  const [esimState, setEsimState] = useState("NORMAL_SIM");
+
+  const handleSMSWakeup = () => {
+    const payload = {
+      vehicleId: state.config.vin,
+      tboxSerialNum: state.config.tboxSerial,
+      imeiNo: state.config.imei,
+      protocolVersion: "2.0.0",
+      tboxOperatingState: opState,
+      tboxApplicationState: appState,
+      tboxeSimState: esimState,
+      NAD_SW_Version: nadSW,
+      MCU_SW_Version: mcuSW,
+    };
+    onPublish({
+      direction: "PUB",
+      messageType: "remoteSMSWakeup",
+      topic: `/dongle/${state.config.vin}/MQTTPROTOBUF/remoteSMSWakeup`,
+      status: "SUCCESS",
+      payloadBytes: JSON.stringify(payload).length,
+      payloadJson: payload,
+      hexPayload: mockHex("remoteSMSWakeup", payload),
+    });
+    // Simulate subscription response (9.14.4)
+    setTimeout(() => {
+      dispatch({
+        type: "ADD_LOG",
+        entry: {
+          id: uuidv4(), timestamp: new Date().toISOString(),
+          direction: "SUB", messageType: "remoteSMSWakeupRsp",
+          topic: `/dongle/${state.config.vin}/MQTTPROTOBUF/remoteSMSWakeupRsp`,
+          status: "SUCCESS", payloadBytes: 48,
+          payloadJson: { deviceJoinedAck: "Success" },
+          hexPayload: "0a24" + "53756363657373", expanded: false,
+        },
+      });
+      dispatch({ type: "INCREMENT_RECEIVE" });
+      dispatch({ type: "ADD_TOAST", toast: { id: uuidv4(), message: "✓ Device Woken Up via Remote SMS", type: "success" } });
+    }, 1200);
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: 12, padding: 10, background: T.bgPrimary, borderRadius: 6, border: `1px solid ${T.border}` }}>
+        <Label>Device Identity (Read-Only)</Label>
+        {[
+          ["VIN", state.config.vin],
+          ["IMEI", state.config.imei],
+          ["TBOX Serial", state.config.tboxSerial],
+          ["Client ID", state.config.clientId],
+        ].map(([k, v]) => (
+          <div key={k} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+            <span style={{ fontSize: 11, color: T.textMut, fontFamily: T.mono }}>{k}</span>
+            <span style={{ fontSize: 11, color: T.textPri, fontFamily: T.mono }}>{v}</span>
+          </div>
+        ))}
+      </div>
+      <Field label="NAD SW Version" value={nadSW} onChange={setNadSW} />
+      <Field label="MCU SW Version" value={mcuSW} onChange={setMcuSW} />
+      <Field label="Operating State" value={opState} onChange={setOpState} isSelect options={["NORMAL", "SLEEP", "FULL_SLEEP", "BOOT"].map(v => ({ value: v, label: v }))} />
+      <Field label="App State" value={appState} onChange={setAppState} isSelect options={["CUSTOMER", "PROVISIONED", "AUTHORIZED", "FACTORY"].map(v => ({ value: v, label: v }))} />
+      <Field label="eSIM State" value={esimState} onChange={setEsimState} isSelect options={["NORMAL_SIM", "NO_SIM", "ROAMING_SIM"].map(v => ({ value: v, label: v }))} />
+      <PressButton onClick={handleSMSWakeup} color={T.accent} style={{ width: "100%" }}>
+        ↑ Send Remote SMS Wakeup
+      </PressButton>
+      <div style={{ marginTop: 8, fontSize: 10, color: T.textMut, fontFamily: T.mono }}>
+        Subscribes: remoteSMSWakeupRsp, command
+      </div>
+    </div>
+  );
+}
+
 // FOTA Tab
 function FotaTab({ state, dispatch, onPublish }) {
   const { fota, config } = state;
@@ -2015,6 +2121,7 @@ function PublishPanel({ state, dispatch, onPublish }) {
     { key: "alerts", label: "Alerts" },
     { key: "trips", label: "Trips" },
     { key: "deviceJoin", label: "Device Join" },
+    { key: "smsWakeup", label: "SMS Wakeup" },
     { key: "fota", label: "FOTA Simulator" },
     { key: "diagnostics", label: "Diagnostics" },
   ];
@@ -2089,6 +2196,7 @@ function PublishPanel({ state, dispatch, onPublish }) {
             {active === "alerts" && <AlertsTab state={state} onPublish={onPublish} />}
             {active === "trips" && <TripsTab state={state} onPublish={onPublish} />}
             {active === "deviceJoin" && <DeviceJoinTab state={state} dispatch={dispatch} onPublish={onPublish} />}
+            {active === "smsWakeup" && <SMSWakeupTab state={state} dispatch={dispatch} onPublish={onPublish} />}
             {active === "fota" && <FotaTab state={state} dispatch={dispatch} onPublish={onPublish} />}
             {active === "diagnostics" && <DiagnosticsTab state={state} dispatch={dispatch} onPublish={onPublish} />}
           </motion.div>
@@ -2798,6 +2906,7 @@ export default function MQTTVirtualDeviceDashboard() {
       protocol: state.config.selectedProtocol
     };
 
+    let encoded = null;
     if (state.config.selectedProtocol === "5.0") {
       const typePath = getTopicProtoType(entry.topic);
       if (typePath) {
@@ -2812,7 +2921,7 @@ export default function MQTTVirtualDeviceDashboard() {
           tbox_esim_state: entry.payloadJson.tboxEsimState || entry.payloadJson.tbox_esim_state,
         };
 
-        const encoded = binaryEncode(protoPayload, typePath);
+        encoded = binaryEncode(protoPayload, typePath);
         if (encoded && !encoded.error) {
           finalEntry.payloadHex = encoded.hex;
           finalEntry.binarySize = encoded.buffer.length;
@@ -2821,6 +2930,41 @@ export default function MQTTVirtualDeviceDashboard() {
         }
       }
     }
+
+    // Forward telemetry to HTTP-to-MQTT bridge if it's running
+    const body = (encoded && encoded.buffer) ? encoded.buffer : JSON.stringify(entry.payloadJson || {});
+    const contentType = (encoded && encoded.buffer) ? "application/octet-stream" : "application/json";
+
+    fetch(`/api/bridge/${state.config.vin}/${entry.messageType}`, {
+      method: "POST",
+      headers: { "Content-Type": contentType },
+      body: body
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && data.mqttResponse) {
+        // Log incoming response from MQTT subscription
+        dispatch({
+          type: "ADD_LOG",
+          entry: {
+            id: uuidv4(),
+            timestamp: new Date().toISOString(),
+            direction: "SUB",
+            messageType: entry.messageType === "deviceJoin" ? "deviceJoinedRsp" : (entry.messageType === "remoteSMSWakeup" ? "remoteSMSWakeupRsp" : "response"),
+            topic: data.mqttResponse.topic,
+            status: "SUCCESS",
+            payloadBytes: data.mqttResponse.bytes,
+            payloadJson: { status: "Success", hex: data.mqttResponse.hex },
+            hexPayload: data.mqttResponse.hex,
+            expanded: false
+          }
+        });
+        dispatch({ type: "INCREMENT_RECEIVE" });
+      }
+    })
+    .catch(err => {
+      console.warn("Failed to route publish event to HTTP-to-MQTT bridge:", err.message);
+    });
 
     dispatch({
       type: "ADD_LOG",

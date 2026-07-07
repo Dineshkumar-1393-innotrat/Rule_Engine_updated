@@ -37,6 +37,18 @@ const files = {
   'device.csr':        bundle.csrPem,
   'device-cert.crt':   bundle.certPem,
   'cvip-ca-bundle.crt':bundle.bundlePem,
+
+  // Alternative formats expected by various simulator scripts:
+  'ca.crt':             bundle.bundlePem,
+  'client.crt':         bundle.certPem,
+  'client.key':         bundle.privateKeyPem,
+
+  'cvipcabundle.pem':   bundle.bundlePem,
+  'ping-cert.pem':      bundle.certPem,
+  'ping-key.pem':       bundle.privateKeyPem,
+
+  'cacert.pem':         bundle.bundlePem,
+  'client.pem':         bundle.certPem
 };
 
 for (const [filename, content] of Object.entries(files)) {

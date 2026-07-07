@@ -298,7 +298,7 @@ const SidebarContent = ({ onClose, currentPath, isCollapsed, onToggle, ...rest }
             </Text>
           )}
           {renderNavItem(navItems[0])}
-          {renderIoTIndustries()}
+          {/* {renderIoTIndustries()} */}
           {navItems.slice(1).map(renderNavItem)}
         </VStack>
       </Box>

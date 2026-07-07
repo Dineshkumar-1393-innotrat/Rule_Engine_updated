@@ -22,6 +22,14 @@ export default defineConfig({
           });
         }
       },
+      '/api/traxo-prod': {
+        target: 'https://cvipiot.fca-india.com:40543',
+        changeOrigin: true,
+        secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/traxo-prod/, ''),
+      },
       '/api/jeep': {
         target: 'https://cvipapi-preprod.fca-india.com',
         changeOrigin: true,
@@ -37,6 +45,14 @@ export default defineConfig({
           proxy.on('proxyRes', (proxyRes, req, res) => {
           });
         }
+      },
+      '/api/jeep-prod': {
+        target: 'https://cvipapi.fca-india.com',
+        changeOrigin: true,
+        secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/jeep-prod/, '/jeep'),
       },
       '/api/platform': {
         target: 'https://lb2.cvip-preprod.citroen.in:40543',
@@ -54,6 +70,14 @@ export default defineConfig({
         proxyTimeout: 60000,
         rewrite: (path) => path.replace(/^\/api\/fota-fca/, ''),
       },
+      '/api/fota-fca-prod': {
+        target: 'https://cvipiot.fca-india.com:40543',
+        changeOrigin: true,
+        secure: false,
+        timeout: 60000,
+        proxyTimeout: 60000,
+        rewrite: (path) => path.replace(/^\/api\/fota-fca-prod/, ''),
+      },
       '/api/fota-lb1-fca': {
         target: 'https://lb1.cvip-preprod.citroen.in:40543',
         changeOrigin: true,
@@ -69,6 +93,12 @@ export default defineConfig({
         timeout: 60000,
         proxyTimeout: 60000,
         rewrite: (path) => path.replace(/^\/api\/aws/, ''),
+      },
+      '/api/bridge': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/api\/bridge/, '/api'),
       },
       '/api/device': {
         target: 'http://localhost:5173', // Dummy target

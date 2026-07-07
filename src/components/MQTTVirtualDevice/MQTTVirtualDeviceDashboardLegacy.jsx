@@ -572,7 +572,6 @@ function DeviceIdentityPanel({ state, dispatch }) {
   const brokerOptions = [
     { value: "mqtts://cvipiot.fca-india.com:18883", label: "FCA India Prod" },
     { value: "mqtts://cvipiot-preprod.fca-india.com:18883", label: "FCA India Preprod" },
-    { value: "mqtts://lb2.cvip-preprod.citroen.in:48883", label: "Citroen Preprod" },
   ];
 
   return (

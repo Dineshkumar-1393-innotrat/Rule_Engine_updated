@@ -1,5 +1,25 @@
 import axios from 'axios';
 
+axios.interceptors.request.use((config) => {
+    const broker = localStorage.getItem('selected_broker') || 'mqtts://cvipiot-preprod.fca-india.com:18883';
+    const isProd = broker.includes('cvipiot.fca-india.com') && !broker.includes('preprod');
+
+    if (isProd && config.url) {
+        if (config.url.startsWith('/api/traxo')) {
+            config.url = config.url.replace('/api/traxo', '/api/traxo-prod');
+        }
+        if (config.url.startsWith('/api/jeep')) {
+            config.url = config.url.replace('/api/jeep', '/api/jeep-prod');
+        }
+        if (config.url.startsWith('/api/fota-fca')) {
+            config.url = config.url.replace('/api/fota-fca', '/api/fota-fca-prod');
+        }
+    }
+    return config;
+}, (error) => {
+    return Promise.reject(error);
+});
+
 const BASE_URL = '/api/traxo';
 const PLATFORM_BASE_URL = '/api/platform'; // For lb2 endpoints
 const JEEP_BASE_URL = '/api/jeep'; // For trip and JEEP-specific APIs

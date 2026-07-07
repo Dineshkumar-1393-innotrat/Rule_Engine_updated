@@ -32,9 +32,9 @@ const mqttClient = mqtt.connect(BROKER, {
   protocolVersion: 4,
   connectTimeout: 10000,
   rejectUnauthorized: false,
-  ca:   fs.readFileSync(path.join(CERTS_DIR, 'cvipcabundle.pem')),
-  cert: fs.readFileSync(path.join(CERTS_DIR, 'ping-cert.pem')),
-  key:  fs.readFileSync(path.join(CERTS_DIR, 'ping-key.pem')),
+  ca:   fs.existsSync(path.join(CERTS_DIR, 'cvipcabundle.pem')) ? fs.readFileSync(path.join(CERTS_DIR, 'cvipcabundle.pem')) : (fs.existsSync(path.join(CERTS_DIR, 'cacert.pem')) ? fs.readFileSync(path.join(CERTS_DIR, 'cacert.pem')) : fs.readFileSync(path.join(CERTS_DIR, 'ca.crt'))),
+  cert: fs.existsSync(path.join(CERTS_DIR, 'ping-cert.pem')) ? fs.readFileSync(path.join(CERTS_DIR, 'ping-cert.pem')) : (fs.existsSync(path.join(CERTS_DIR, 'client.pem')) ? fs.readFileSync(path.join(CERTS_DIR, 'client.pem')) : fs.readFileSync(path.join(CERTS_DIR, 'client.crt'))),
+  key:  fs.existsSync(path.join(CERTS_DIR, 'ping-key.pem')) ? fs.readFileSync(path.join(CERTS_DIR, 'ping-key.pem')) : (fs.existsSync(path.join(CERTS_DIR, 'device-key.key')) ? fs.readFileSync(path.join(CERTS_DIR, 'device-key.key')) : fs.readFileSync(path.join(CERTS_DIR, 'client.key'))),
 });
 
 let mqttReady = false;
@@ -183,6 +183,18 @@ const ROUTES = {
     pubTopic: (vin) => `/dongle/${vin}/MQTTPROTOBUF/fotaCommand`,
     rspTopic: null,
   },
+  'POST /api/:vin/fotaCommandResponse': {
+    pubTopic: (vin) => `/dongle/${vin}/MQTTPROTOBUF/fotaCommandResponse`,
+    rspTopic: null,
+  },
+  'POST /api/:vin/fetchDeviceLog': {
+    pubTopic: (vin) => `/dongle/${vin}/MQTTPROTOBUF/fetchDeviceLog`,
+    rspTopic: null,
+  },
+  'POST /api/:vin/remoteSMSWakeup': {
+    pubTopic: (vin) => `/dongle/${vin}/MQTTPROTOBUF/remoteSMSWakeup`,
+    rspTopic: (vin) => `/dongle/${vin}/MQTTPROTOBUF/remoteSMSWakeupRsp`,
+  },
 };
 
 // ─── Route matching ───────────────────────────────────────────────────────────
@@ -312,8 +324,9 @@ const server = http.createServer(async (req, res) => {
 
   } catch (err) {
     console.error('[Bridge] Error:', err.message);
-    const status = err.message.startsWith('Timeout') ? 504 : 500;
-    return sendJson(res, status, { error: err.message });
+    // Return 200 with success: false to prevent flooding the browser network tab with 500 errors 
+    // when using mock VINs that get rejected by AWS IoT Core
+    return sendJson(res, 200, { success: false, error: err.message });
   }
 });
 

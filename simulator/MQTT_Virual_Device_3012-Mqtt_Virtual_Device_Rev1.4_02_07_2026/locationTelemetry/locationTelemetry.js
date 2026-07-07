@@ -55,9 +55,9 @@ async function sendExactLocationTelemetry() {
         // ca: fs.readFileSync('./certs/cvipcabundle.pem'),
         // cert: fs.readFileSync('./certs/ping-cert.pem'),
         // key: fs.readFileSync('./certs/ping-key.pem'),
-         ca: fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/cacert.pem'),
-            cert: fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/client.pem'),
-            key: fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/device-key.key'),
+         ca: fs.existsSync('./certs/cacert.pem') ? fs.readFileSync('./certs/cacert.pem') : (fs.existsSync('./certs/ca.crt') ? fs.readFileSync('./certs/ca.crt') : fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/cacert.pem')),
+            cert: fs.existsSync('./certs/client.pem') ? fs.readFileSync('./certs/client.pem') : (fs.existsSync('./certs/client.crt') ? fs.readFileSync('./certs/client.crt') : fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/client.pem')),
+            key: fs.existsSync('./certs/device-key.key') ? fs.readFileSync('./certs/device-key.key') : (fs.existsSync('./certs/client.key') ? fs.readFileSync('./certs/client.key') : fs.readFileSync('./T123ZTZT867677788_Modified/T123ZTZT867677788_Modified/device-key.key')),
         protocolVersion: 4
     });
 
